@@ -1,0 +1,58 @@
+import {
+  BeVietnamPro_400Regular,
+  BeVietnamPro_500Medium,
+  BeVietnamPro_600SemiBold,
+  BeVietnamPro_700Bold,
+  useFonts,
+} from '@expo-google-fonts/be-vietnam-pro';
+import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { QueryClientProvider } from '@tanstack/react-query';
+import * as SplashScreen from 'expo-splash-screen';
+import { StatusBar } from 'expo-status-bar';
+import { type PropsWithChildren, useEffect } from 'react';
+import { useColorScheme } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+
+import { queryClient } from '@/shared/lib/query-client';
+
+void SplashScreen.preventAutoHideAsync();
+
+export function AppProvider({ children }: PropsWithChildren) {
+  const colorScheme = useColorScheme();
+  const [fontsLoaded, fontError] = useFonts({
+    BeVietnamPro_400Regular,
+    BeVietnamPro_500Medium,
+    BeVietnamPro_600SemiBold,
+    BeVietnamPro_700Bold,
+  });
+
+  useEffect(() => {
+    if (fontError) {
+      throw fontError;
+    }
+  }, [fontError]);
+
+  useEffect(() => {
+    if (fontsLoaded) {
+      void SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded]);
+
+  if (!fontsLoaded) {
+    return null;
+  }
+
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+          <QueryClientProvider client={queryClient}>
+            {children}
+            <StatusBar style="auto" />
+          </QueryClientProvider>
+        </ThemeProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
+  );
+}
