@@ -24,4 +24,15 @@ export const secureTokenStorage = {
   async clearTokens() {
     await Promise.all([this.deleteAccessToken(), this.deleteRefreshToken()]);
   },
+  async getTokenPair() {
+    const [accessToken, refreshToken] = await Promise.all([
+      this.getAccessToken(),
+      this.getRefreshToken(),
+    ]);
+
+    return { accessToken, refreshToken };
+  },
+  async setTokenPair(accessToken: string, refreshToken: string) {
+    await Promise.all([this.setAccessToken(accessToken), this.setRefreshToken(refreshToken)]);
+  },
 };

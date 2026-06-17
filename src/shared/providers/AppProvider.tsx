@@ -15,11 +15,13 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { queryClient } from '@/shared/lib/query-client';
+import { useAuthStore } from '@/shared/store/auth-store';
 
 void SplashScreen.preventAutoHideAsync();
 
 export function AppProvider({ children }: PropsWithChildren) {
   const colorScheme = useColorScheme();
+  const initializeSession = useAuthStore((state) => state.initializeSession);
   const [fontsLoaded, fontError] = useFonts({
     BeVietnamPro_400Regular,
     BeVietnamPro_500Medium,
@@ -38,6 +40,10 @@ export function AppProvider({ children }: PropsWithChildren) {
       void SplashScreen.hideAsync();
     }
   }, [fontsLoaded]);
+
+  useEffect(() => {
+    void initializeSession();
+  }, [initializeSession]);
 
   if (!fontsLoaded) {
     return null;
