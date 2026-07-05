@@ -52,3 +52,37 @@ export interface BackendProfile {
   phone: string | null;
   role: BackendUserRole;
 }
+
+export interface GoogleLoginRequest {
+  idToken: string;
+}
+
+export interface RegisterRequest {
+  fullName: string;
+  email: string;
+  phone?: string;
+  password: string;
+  role: 'customer';
+}
+
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+export interface VerifyPasswordResetCodeRequest {
+  email: string;
+  code: string;
+}
+
+export interface ResetPasswordRequest {
+  email: string;
+  code: string;
+  password: string;
+}
+
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+}
+
+

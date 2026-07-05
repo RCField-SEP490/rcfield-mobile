@@ -1,12 +1,14 @@
 import { create } from 'zustand';
 
-import { getMe, loginWithPassword, logoutSession } from '@/features/auth/api/auth.api';
+import { getMe, loginWithPassword, logoutSession, registerWithPassword, loginWithGoogle } from '@/features/auth/api/auth.api';
 import type {
   AuthUser,
   LoginRequest,
+  RegisterRequest,
   UserRole,
 } from '@/features/auth/types/auth.types';
 import { secureTokenStorage } from '@/shared/lib/secure-storage';
+import { setTokenRevokedCallback } from '@/shared/lib/api';
 
 interface AuthState {
   accessToken: string | null;
@@ -16,10 +18,13 @@ interface AuthState {
   isInitialized: boolean;
   isLoading: boolean;
   login: (payload: LoginRequest) => Promise<AuthUser>;
+  loginGoogle: (idToken: string) => Promise<AuthUser>;
+  registerUser: (payload: RegisterRequest) => Promise<AuthUser>;
   logout: () => Promise<void>;
   refreshToken: string | null;
   role: UserRole | null;
   setSession: (session: { accessToken: string; refreshToken: string; user: AuthUser }) => void;
+  setUser: (user: AuthUser | null) => void;
   user: AuthUser | null;
 }
 
@@ -94,6 +99,48 @@ export const useAuthStore = create<AuthState>((set) => ({
       throw error;
     }
   },
+  loginGoogle: async (idToken) => {
+    set({ isLoading: true });
+    try {
+      const session = await loginWithGoogle({ idToken });
+      await secureTokenStorage.setTokenPair(session.accessToken, session.refreshToken);
+      set({
+        accessToken: session.accessToken,
+        assignedCafeId: session.user.assignedCafeId ?? null,
+        isAuthenticated: true,
+        isInitialized: true,
+        isLoading: false,
+        refreshToken: session.refreshToken,
+        role: session.user.role,
+        user: session.user,
+      });
+      return session.user;
+    } catch (error) {
+      set({ isLoading: false });
+      throw error;
+    }
+  },
+  registerUser: async (payload) => {
+    set({ isLoading: true });
+    try {
+      const session = await registerWithPassword(payload);
+      await secureTokenStorage.setTokenPair(session.accessToken, session.refreshToken);
+      set({
+        accessToken: session.accessToken,
+        assignedCafeId: session.user.assignedCafeId ?? null,
+        isAuthenticated: true,
+        isInitialized: true,
+        isLoading: false,
+        refreshToken: session.refreshToken,
+        role: session.user.role,
+        user: session.user,
+      });
+      return session.user;
+    } catch (error) {
+      set({ isLoading: false });
+      throw error;
+    }
+  },
   logout: async () => {
     const refreshToken = useAuthStore.getState().refreshToken;
     try {
@@ -129,5 +176,16 @@ export const useAuthStore = create<AuthState>((set) => ({
       role: session.user.role,
       user: session.user,
     }),
+  setUser: (user) =>
+    set(() => ({
+      user,
+      role: user ? user.role : null,
+      assignedCafeId: user ? (user.assignedCafeId ?? null) : null,
+    })),
   user: null,
 }));
+
+// Đăng ký callback xử lý khi token bị thu hồi hoặc hết hạn (gọi từ Axios response interceptor)
+setTokenRevokedCallback(() => {
+  void useAuthStore.getState().logout();
+});
