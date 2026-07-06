@@ -11,6 +11,7 @@ export interface AuthUser {
   phone?: string;
   registrationStatus?: string;
   role: UserRole;
+  trustScore?: number;
 }
 
 export interface LoginRequest {
@@ -35,6 +36,7 @@ export interface BackendLoginUser {
   phone?: string | null;
   registration_status?: string;
   role: BackendUserRole;
+  trustScore?: number;
 }
 
 export interface BackendLoginResponse {
@@ -51,6 +53,7 @@ export interface BackendProfile {
   id: string;
   phone: string | null;
   role: BackendUserRole;
+  trustScore?: number;
 }
 
 export interface GoogleLoginRequest {

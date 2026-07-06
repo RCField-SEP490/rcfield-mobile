@@ -12,6 +12,10 @@ import {
   Bell,
   User,
   Save,
+  Crown,
+  Gem,
+  Award,
+  ShieldCheck,
 } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -29,6 +33,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { getMe, updateMe, changePassword, uploadImage } from '@/features/auth/api/auth.api';
+import { getMyBookings } from '@/features/bookings/api/booking.api';
 import { useAuthStore } from '@/shared/store/auth-store';
 import { Text } from '@/shared/ui/Text';
 
@@ -40,6 +45,69 @@ export function ProfileScreen() {
 
   const displayName = user?.fullName ?? user?.email ?? 'RCField User';
   const email = user?.email ?? 'user@rcfield.vn';
+
+  const [bookingCount, setBookingCount] = useState(0);
+
+  useEffect(() => {
+    getMyBookings({ limit: 1 })
+      .then((res) => {
+        setBookingCount(res.total);
+      })
+      .catch((err) => {
+        console.error('Error fetching bookings total for profile stats:', err);
+      });
+  }, []);
+
+  const { points, memberTier, pointsToNextTier, progress, tierColor, tierBg, nextTierLabel } = useMemo(() => {
+    const pts = bookingCount * 500;
+    let tier = 'Standard Member';
+    let nextTier = 'Bronze';
+    let ptsToNext = 1500 - pts;
+    let prog = pts / 1500;
+    let color = '#94a3b8'; // slate-400
+    let bg = 'bg-slate-500/10 border-slate-500/20';
+
+    if (pts >= 25000) {
+      tier = 'Platinum Member';
+      nextTier = '';
+      ptsToNext = 0;
+      prog = 1.0;
+      color = '#38bdf8'; // sky-400
+      bg = 'bg-sky-500/10 border-sky-500/20';
+    } else if (pts >= 10000) {
+      tier = 'Gold Member';
+      nextTier = 'Platinum';
+      ptsToNext = 25000 - pts;
+      prog = (pts - 10000) / 15000;
+      color = '#eab308'; // yellow-500
+      bg = 'bg-yellow-500/10 border-yellow-500/20';
+    } else if (pts >= 5000) {
+      tier = 'Silver Member';
+      nextTier = 'Gold';
+      ptsToNext = 10000 - pts;
+      prog = (pts - 5000) / 5000;
+      color = '#cbd5e1'; // slate-300
+      bg = 'bg-slate-300/10 border-slate-300/20';
+    } else if (pts >= 1500) {
+      tier = 'Bronze Member';
+      nextTier = 'Silver';
+      ptsToNext = 5000 - pts;
+      prog = (pts - 1500) / 3500;
+      color = '#b45309'; // amber-700
+      bg = 'bg-amber-700/10 border-amber-700/20';
+    }
+
+    return {
+      points: pts,
+      memberTier: tier,
+      pointsToNextTier: ptsToNext,
+      progress: Math.min(100, Math.max(0, prog * 100)),
+      tierColor: color,
+      tierBg: bg,
+      nextTierLabel: nextTier,
+    };
+  }, [bookingCount]);
+
   const [firstName, lastName] = useMemo(() => splitName(displayName), [displayName]);
 
   // States cho Form Thông tin cá nhân
@@ -372,6 +440,89 @@ export function ProfileScreen() {
             <Text className="mt-3 text-[11px] text-slate-400 text-center leading-4 font-medium">
               Khuyên dùng ảnh định dạng JPG, PNG hoặc WEBP.{'\n'}Kích thước tối đa 5MB.
             </Text>
+          </View>
+
+          {/* Section: Hạng thành viên & Điểm tin cậy (Premium Loyaty Card) */}
+          <View className="rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-5 shadow-2xl mb-6 relative overflow-hidden">
+            {/* Thanh màu phản quang theo hạng */}
+            <View className="absolute top-0 right-0 left-0 h-[3px]" style={{ backgroundColor: tierColor }} />
+            
+            <View className="flex-row items-center justify-between mb-3.5">
+              <Text className="text-[12px] font-bold text-white uppercase tracking-wider">
+                Hạng thành viên
+              </Text>
+              <View className={`px-2.5 py-0.5 rounded-full border ${tierBg}`}>
+                <Text className="text-[9px] font-black uppercase tracking-wide" style={{ color: tierColor }}>
+                  {memberTier}
+                </Text>
+              </View>
+            </View>
+
+            <View className="flex-row items-center gap-4 mb-4">
+              <View className="size-12 rounded-xl bg-slate-900 border border-slate-800 justify-center items-center shadow-lg">
+                {memberTier.includes('Gold') ? (
+                  <Crown color={tierColor} size={22} />
+                ) : memberTier.includes('Platinum') ? (
+                  <Gem color={tierColor} size={22} />
+                ) : memberTier.includes('Silver') ? (
+                  <ShieldCheck color={tierColor} size={22} />
+                ) : (
+                  <Award color={tierColor} size={22} />
+                )}
+              </View>
+              <View className="flex-1">
+                <View className="flex-row items-baseline gap-1">
+                  <Text className="text-xl text-white font-extrabold" style={{ color: tierColor }}>
+                    {points.toLocaleString('vi-VN')}
+                  </Text>
+                  <Text className="text-slate-400 text-xs font-bold">
+                    điểm
+                  </Text>
+                </View>
+                <Text className="text-[11px] text-slate-400 font-semibold mt-0.5">
+                  Tích lũy từ {bookingCount} lượt chơi đã đặt
+                </Text>
+              </View>
+            </View>
+
+            {/* Thanh tiến trình thăng hạng */}
+            {pointsToNextTier > 0 ? (
+              <View className="space-y-1.5">
+                <View className="flex-row justify-between text-[10.5px] font-bold">
+                  <Text className="text-slate-400">Tiến trình lên {nextTierLabel}</Text>
+                  <Text style={{ color: tierColor }}>Còn {pointsToNextTier.toLocaleString('vi-VN')} điểm</Text>
+                </View>
+                <View className="h-2 w-full bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+                  <View 
+                    className="h-full rounded-full" 
+                    style={{ width: `${progress}%`, backgroundColor: tierColor }} 
+                  />
+                </View>
+              </View>
+            ) : (
+              <View className="rounded-lg bg-sky-500/5 border border-sky-500/10 py-2 items-center">
+                <Text className="text-[10px] text-sky-400 font-black tracking-wide uppercase">
+                  🏆 Bạn đã đạt hạng thành viên cao nhất!
+                </Text>
+              </View>
+            )}
+
+            {/* Điểm uy tín (Trust Score) */}
+            <View className="w-full h-[1px] bg-slate-800/80 my-4" />
+            <View className="flex-row items-center justify-between">
+              <View className="flex-1 pr-4">
+                <Text className="text-[13px] font-bold text-white">Điểm uy tín (Trust Score)</Text>
+                <Text className="text-[10px] text-slate-400 font-semibold leading-4 mt-0.5">
+                  Quyết định quyền hạn đặt lịch chơi và hoàn tiền của bạn.
+                </Text>
+              </View>
+              <View className="flex-row items-baseline gap-0.5">
+                <Text className="text-lg font-black text-emerald-500">
+                  {user?.trustScore ?? 100}
+                </Text>
+                <Text className="text-slate-400 text-xs font-bold">/100</Text>
+              </View>
+            </View>
           </View>
 
           {/* Section: Thông tin cơ bản */}
