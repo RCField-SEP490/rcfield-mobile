@@ -16,7 +16,7 @@ const STEPS = [
 
 export function StepperBar({ currentStep }: StepperBarProps) {
   return (
-    <View className="w-full bg-[#0f172a]/40 border border-slate-800/80 rounded-2xl p-4.5 mb-5">
+    <View className="w-full bg-[#0f172a]/40 border border-slate-800/80 rounded-2xl p-5 mb-5">
       {/* Title */}
       <View className="mb-4">
         <Text className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">
@@ -80,7 +80,7 @@ export function StepperBar({ currentStep }: StepperBarProps) {
         </View>
 
         {/* Hàng 2: Nhãn chữ tương ứng thẳng cột */}
-        <View className="flex-row justify-between">
+        <View className="flex-row justify-between px-1">
           {STEPS.map((step) => {
             const isActive = step.id === currentStep;
             return (

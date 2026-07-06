@@ -25,8 +25,17 @@ export interface VehicleCatalog {
   id: string;
   name: string;
   description: string | null;
-  price_per_hour: number;
-  image: string | null;
+  tier: string;
+  hourlyRate: number | string;
+  securityDeposit: number | string;
+  coverImageUrl: string | null;
+  total_units?: number;
+  available_units?: number;
+  compatibleTrackTypes?: {
+    id: string;
+    name: string;
+    code: string;
+  }[];
 }
 
 export interface MenuItem {
@@ -145,12 +154,27 @@ export const bookingWizardApi = {
     return response.data?.data;
   },
 
-  createCheckout: async (bookingId: string): Promise<CheckoutResponse> => {
-    const response = await api.post(`/bookings/${bookingId}/checkout`);
+  createCheckout: async (bookingId: string, returnUrl?: string): Promise<CheckoutResponse> => {
+    const response = await api.post(`/bookings/${bookingId}/checkout`, { return_url: returnUrl });
     return response.data?.data;
   },
 
   mockCheckout: async (bookingId: string): Promise<void> => {
     await api.post(`/bookings/${bookingId}/mock-checkout`);
+  },
+
+  createCheckoutAdditionalPayment: async (bookingId: string, returnUrl?: string): Promise<CheckoutResponse> => {
+    const response = await api.post(`/bookings/${bookingId}/checkout-additional-payment`, { return_url: returnUrl });
+    return response.data?.data;
+  },
+
+  getBooking: async (bookingId: string): Promise<any> => {
+    const response = await api.get(`/bookings/${bookingId}`);
+    return response.data?.data;
+  },
+
+  cancelBooking: async (bookingId: string, reason: string): Promise<any> => {
+    const response = await api.patch(`/bookings/${bookingId}/cancel`, { reason });
+    return response.data?.data;
   },
 };

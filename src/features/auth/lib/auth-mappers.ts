@@ -20,6 +20,7 @@ export function mapBackendUser(user: BackendLoginUser): AuthUser {
     phone: user.phone ?? undefined,
     registrationStatus: user.registration_status,
     role: mapBackendRole(user.role),
+    trustScore: user.trustScore,
   };
 }
 
@@ -32,6 +33,7 @@ export function mapBackendProfile(profile: BackendProfile): AuthUser {
     id: profile.id,
     phone: profile.phone ?? undefined,
     role: mapBackendRole(profile.role),
+    trustScore: profile.trustScore,
   };
 }
 

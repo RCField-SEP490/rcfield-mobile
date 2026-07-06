@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { View, ScrollView, Pressable, ActivityIndicator, Alert, Linking } from 'react-native';
+import { View, ScrollView, Pressable, ActivityIndicator, Alert } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
@@ -113,7 +114,7 @@ export function BookingWizardScreen({ cafeId, preselectedVehicleId }: BookingWiz
   const vehiclePriceTotal = useMemo(() => {
     return selectedVehicleIds.reduce((sum, id) => {
       const match = catalogs.find((c) => c.id === id);
-      const rate = match ? Number(match.price_per_hour) : 0;
+      const rate = match ? Number(match.hourlyRate) : 0;
       return sum + rate * durationHours;
     }, 0);
   }, [selectedVehicleIds, catalogs, durationHours]);
@@ -145,7 +146,6 @@ export function BookingWizardScreen({ cafeId, preselectedVehicleId }: BookingWiz
     const baseSlotFee = slotFeeRate * participants * durationHours;
     const slotFeeDiscount = selectedPackageId !== null ? slotFeeRate * durationHours : 0;
     const finalSlotFee = Math.max(0, baseSlotFee - slotFeeDiscount);
-    const securityDeposit = playMode === 'RENTAL' ? selectedVehicleIds.length * 50000 : 0;
 
     const subtotal = finalSlotFee + vehiclePriceTotal + fnbPriceTotal;
     let promoDiscount = 0;
@@ -158,8 +158,8 @@ export function BookingWizardScreen({ cafeId, preselectedVehicleId }: BookingWiz
       promoDiscount = Math.min(subtotal, promoDiscount);
     }
 
-    return Math.max(0, subtotal + securityDeposit - promoDiscount);
-  }, [slotFeeRate, participants, durationHours, selectedPackageId, playMode, selectedVehicleIds.length, vehiclePriceTotal, fnbPriceTotal, appliedPromo]);
+    return Math.max(0, subtotal - promoDiscount);
+  }, [slotFeeRate, participants, durationHours, selectedPackageId, vehiclePriceTotal, fnbPriceTotal, appliedPromo]);
 
   // 3. Navigation Controls
   const slotStartIso = useMemo(() => {
@@ -259,8 +259,16 @@ export function BookingWizardScreen({ cafeId, preselectedVehicleId }: BookingWiz
       const payload = getBookingPayload();
       const booking = await bookingWizardApi.createBooking(payload);
 
+      // Build dynamic returnUrl from EXPO_PUBLIC_API_URL to handle local IP redirection for VNPAY callback
+      const apiEndpoint = process.env.EXPO_PUBLIC_API_URL || '';
+      let customReturnUrl: string | undefined;
+      if (apiEndpoint.includes('/api/v1')) {
+        const baseHost = apiEndpoint.split('/api/v1')[0];
+        customReturnUrl = `${baseHost}/api/payments/vnpay-return`;
+      }
+
       // Create VNPay checkout url
-      const checkout = await bookingWizardApi.createCheckout(booking.booking_id);
+      const checkout = await bookingWizardApi.createCheckout(booking.booking_id, customReturnUrl);
       
       if (checkout.confirmed) {
         Alert.alert('Thành công', 'Đặt lịch thành công! Slot đã được thanh toán thông qua Gói hội viên.', [
@@ -270,13 +278,25 @@ export function BookingWizardScreen({ cafeId, preselectedVehicleId }: BookingWiz
       }
 
       if (checkout.payment_url) {
-        // Open VNPay checkout URL in external browser
-        await Linking.openURL(checkout.payment_url);
+        // Open VNPay checkout URL in In-App Browser for seamless checkout flow
+        await WebBrowser.openBrowserAsync(checkout.payment_url);
         
-        // Wait and redirect user to bookings page
-        Alert.alert('Thanh toán', 'Đang chuyển hướng sang cổng thanh toán VNPay. Hãy kiểm tra trạng thái trong mục Lịch đặt.', [
-          { text: 'Đóng', onPress: () => router.push('/(tabs)/bookings') },
-        ]);
+        // After browser is closed, check the latest status of this booking from backend
+        setSubmitting(true);
+        try {
+          const latestBooking = await bookingWizardApi.getBooking(booking.booking_id);
+          if (latestBooking.status === 'PAYMENT_CONFIRMED' || latestBooking.status === 'CONFIRMED') {
+            Alert.alert('Thành công', 'Thanh toán thành công! Lịch đặt của bạn đã được xác nhận.', [
+              { text: 'Xem lịch đặt', onPress: () => router.push('/(tabs)/bookings') },
+            ]);
+          } else {
+            Alert.alert('Chưa hoàn tất', 'Giao dịch thanh toán chưa được xác nhận hoặc đã bị hủy. Bạn có thể kiểm tra lại trong mục Lịch đặt.', [
+              { text: 'Xem lịch đặt', onPress: () => router.push('/(tabs)/bookings') },
+            ]);
+          }
+        } catch {
+          router.push('/(tabs)/bookings');
+        }
       } else {
         throw new Error('Không nhận được URL thanh toán từ cổng VNPay!');
       }
@@ -384,6 +404,8 @@ export function BookingWizardScreen({ cafeId, preselectedVehicleId }: BookingWiz
                 cafeId={cafeId}
                 playMode={playMode}
                 slotStart={slotStartIso}
+                slotEnd={slotEndIso}
+                durationHours={durationHours}
                 slotFeeRate={slotFeeRate}
                 participants={participants}
                 selectedVehicleIds={selectedVehicleIds}
@@ -396,6 +418,11 @@ export function BookingWizardScreen({ cafeId, preselectedVehicleId }: BookingWiz
                 setAppliedPromo={setAppliedPromo}
                 onMockPayment={handleMockPayment}
                 isMockSubmitting={mockSubmitting}
+                cafeName={cafe?.name || 'Chi nhánh'}
+                cafeAddress={`${cafe?.district || ''}, ${cafe?.city || ''}`}
+                cafeImage={cafe?.image || null}
+                trackConfigName={selectedTrackConfig?.track_type?.name || 'Sân đua'}
+                vehicleCatalogs={catalogs}
               />
             )}
           </ScrollView>

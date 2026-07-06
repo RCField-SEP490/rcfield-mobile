@@ -246,9 +246,9 @@ export function ParticipantsStep({
                         : 'bg-[#0f172a]/50 border-slate-800'
                     }`}
                   >
-                    {vehicle.image ? (
+                    {vehicle.coverImageUrl ? (
                       <Image
-                        source={{ uri: vehicle.image }}
+                        source={{ uri: vehicle.coverImageUrl }}
                         className="h-16 w-16 rounded-lg bg-slate-900 object-cover"
                       />
                     ) : (
@@ -257,17 +257,40 @@ export function ParticipantsStep({
                       </View>
                     )}
                     <View className="flex-1 justify-center">
-                      <Text className="text-[13px] text-white" weight="700">
-                        {vehicle.name}
-                      </Text>
+                      <View className="flex-row items-center justify-between">
+                        <Text className="text-[13px] text-white" weight="700">
+                          {vehicle.name}
+                        </Text>
+                        <View className="bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+                          <Text className="text-[8px] text-slate-400 font-bold uppercase">
+                            {vehicle.tier}
+                          </Text>
+                        </View>
+                      </View>
                       {vehicle.description && (
                         <Text className="text-[10px] text-slate-400 mt-0.5 font-semibold" numberOfLines={1}>
                           {vehicle.description}
                         </Text>
                       )}
-                      <Text className="text-[12px] text-[#f97316] mt-1.5 font-bold">
-                        {Number(vehicle.price_per_hour).toLocaleString('vi-VN')}đ/giờ
-                      </Text>
+                      {vehicle.compatibleTrackTypes && vehicle.compatibleTrackTypes.length > 0 && (
+                        <View className="flex-row flex-wrap gap-1 mt-1">
+                          {vehicle.compatibleTrackTypes.map((type) => (
+                            <View key={type.id} className="bg-[#0b0f19] px-1.5 py-0.5 rounded border border-slate-800">
+                              <Text className="text-[7.5px] text-slate-400 font-bold">
+                                Sân: {type.name}
+                              </Text>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+                      <View className="flex-row items-center justify-between mt-1.5">
+                        <Text className="text-[12px] text-[#f97316] font-bold">
+                          {Number(vehicle.hourlyRate).toLocaleString('vi-VN')}đ/giờ
+                        </Text>
+                        <Text className="text-[9px] text-[#10b981] font-bold">
+                          Còn {vehicle.available_units ?? 0} xe trống
+                        </Text>
+                      </View>
                     </View>
                   </Pressable>
                 );

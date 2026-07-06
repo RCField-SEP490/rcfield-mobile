@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { View, TextInput, Pressable, ActivityIndicator, Alert } from 'react-native';
-import { Ticket, CreditCard, Package, Info, CheckCircle2 } from 'lucide-react-native';
+import { View, TextInput, Pressable, ActivityIndicator, Alert, Image } from 'react-native';
+import { Ticket, CreditCard, Package, Info, CheckCircle2, MapPin, Layers } from 'lucide-react-native';
 import { Text } from '@/shared/ui/Text';
 import { getMyPackages, type MyPackageResponse } from '@/features/packages/api/package.api';
-import { bookingWizardApi, type PromoValidationResult } from '../api/booking-wizard.api';
+import { bookingWizardApi, type PromoValidationResult, type VehicleCatalog } from '../api/booking-wizard.api';
 
 interface PaymentStepProps {
   cafeId: string;
   playMode: 'RENTAL' | 'BYOC';
   slotStart: string;
+  slotEnd: string;
+  durationHours: number;
   slotFeeRate: number;
   participants: number;
   selectedVehicleIds: string[];
@@ -21,12 +23,21 @@ interface PaymentStepProps {
   setAppliedPromo: (promo: PromoValidationResult | null) => void;
   onMockPayment: () => void;
   isMockSubmitting: boolean;
+
+  // Add detail props to mirror web summary
+  cafeName: string;
+  cafeAddress: string;
+  cafeImage: string | null;
+  trackConfigName: string;
+  vehicleCatalogs: VehicleCatalog[];
 }
 
 export function PaymentStep({
   cafeId,
   playMode,
   slotStart,
+  slotEnd,
+  durationHours,
   slotFeeRate,
   participants,
   selectedVehicleIds,
@@ -39,6 +50,11 @@ export function PaymentStep({
   setAppliedPromo,
   onMockPayment,
   isMockSubmitting,
+  cafeName,
+  cafeAddress,
+  cafeImage,
+  trackConfigName,
+  vehicleCatalogs,
 }: PaymentStepProps) {
   const [packages, setPackages] = useState<MyPackageResponse[]>([]);
   const [loadingPackages, setLoadingPackages] = useState(false);
@@ -89,16 +105,13 @@ export function PaymentStep({
   };
 
   // 3. Billing Calculations
-  // Base Slot Fee = slotFeeRate * participants
-  const baseSlotFee = slotFeeRate * participants;
+  // Base Slot Fee = slotFeeRate * participants * durationHours
+  const baseSlotFee = slotFeeRate * participants * durationHours;
   
-  // If package is applied, user gets 1 slot free (their own slot)
+  // If package is applied, user gets 1 slot free (their own slot) for the booking duration
   const isPackageApplied = selectedPackageId !== null;
-  const slotFeeDiscount = isPackageApplied ? slotFeeRate : 0;
+  const slotFeeDiscount = isPackageApplied ? slotFeeRate * durationHours : 0;
   const finalSlotFee = Math.max(0, baseSlotFee - slotFeeDiscount);
-
-  // Security Deposit: e.g. 50.000đ per rental vehicle
-  const securityDeposit = playMode === 'RENTAL' ? selectedVehicleIds.length * 50000 : 0;
 
   // Promo Discount
   let promoDiscount = 0;
@@ -113,16 +126,122 @@ export function PaymentStep({
     promoDiscount = Math.min(subtotalBeforePromo, promoDiscount);
   }
 
-  const totalAmount = Math.max(0, subtotalBeforePromo + securityDeposit - promoDiscount);
+  const totalAmount = Math.max(0, subtotalBeforePromo - promoDiscount);
+
+  // Formatting utils
+  const formattedDate = React.useMemo(() => {
+    if (!slotStart) return '';
+    const [datePart] = slotStart.split('T');
+    const [y, m, d] = datePart.split('-');
+    return `${Number(d)}/${Number(m)}/${y}`;
+  }, [slotStart]);
+
+  const formattedTimeRange = React.useMemo(() => {
+    if (!slotStart || !slotEnd) return '';
+    const startT = slotStart.split('T')[1].substring(0, 5);
+    const endT = slotEnd.split('T')[1].substring(0, 5);
+    return `${startT} - ${endT}`;
+  }, [slotStart, slotEnd]);
+
+  const selectedVehicleNames = React.useMemo(() => {
+    return selectedVehicleIds
+      .map(id => vehicleCatalogs.find(c => c.id === id)?.name)
+      .filter(Boolean)
+      .join(', ') || 'Không có';
+  }, [selectedVehicleIds, vehicleCatalogs]);
 
   return (
     <View className="space-y-6">
-      {/* 1. Gói slot hội viên */}
-      <View>
+      {/* 1. Tóm tắt đơn đặt (Giống y hệt giao diện trên Web) */}
+      <View className="bg-[#0f172a]/50 border border-slate-800 rounded-2xl p-5">
+        <Text className="text-[13px] text-slate-400 uppercase tracking-wider font-bold mb-3.5">
+          Tóm tắt đơn đặt
+        </Text>
+        <Text className="text-[10px] text-slate-500 font-semibold mb-4">
+          Giá sẽ được chốt tại thời điểm thanh toán.
+        </Text>
+
+        {/* Cafe Info block */}
+        <View className="flex-row gap-3.5 items-center mb-4">
+          {cafeImage ? (
+            <Image
+              source={{ uri: cafeImage }}
+              className="h-12 w-12 rounded-xl bg-slate-900 object-cover"
+            />
+          ) : (
+            <View className="h-12 w-12 rounded-xl bg-[#ea580c]/10 border border-[#ea580c]/20 items-center justify-center">
+              <MapPin color="#f97316" size={20} />
+            </View>
+          )}
+          <View className="flex-1 pr-1">
+            <Text className="text-[14px] text-white" weight="700">
+              {cafeName}
+            </Text>
+            <Text className="text-[10.5px] text-slate-400 mt-1" numberOfLines={1}>
+              {cafeAddress}
+            </Text>
+          </View>
+        </View>
+
+        {/* Track Config Badge */}
+        <View className="flex-row mb-4">
+          <View className="bg-[#ea580c]/10 border border-[#ea580c]/20 px-3 py-1.5 rounded-lg flex-row items-center gap-1.5">
+            <Layers color="#f97316" size={13} />
+            <Text className="text-[12px] text-[#f97316]" weight="700">
+              {trackConfigName}
+            </Text>
+          </View>
+        </View>
+
+        {/* Details Table */}
+        <View className="space-y-2.5">
+          <View className="flex-row justify-between items-center">
+            <Text className="text-[12px] text-slate-400 font-semibold">Loại đặt lịch</Text>
+            <Text className="text-[12px] text-white font-bold">
+              {isPackageApplied ? 'Hội viên' : 'Đơn lẻ'}
+            </Text>
+          </View>
+          <View className="flex-row justify-between items-center">
+            <Text className="text-[12px] text-slate-400 font-semibold">Hình thức</Text>
+            <Text className="text-[12px] text-white font-bold">
+              {playMode === 'RENTAL' ? 'Thuê xe' : 'Xe cá nhân'}
+            </Text>
+          </View>
+          <View className="flex-row justify-between items-center">
+            <Text className="text-[12px] text-slate-400 font-semibold">Ngày</Text>
+            <Text className="text-[12px] text-white font-bold">{formattedDate}</Text>
+          </View>
+          <View className="flex-row justify-between items-center">
+            <Text className="text-[12px] text-slate-400 font-semibold">Giờ</Text>
+            <Text className="text-[12px] text-white font-bold">{formattedTimeRange}</Text>
+          </View>
+          
+          {playMode === 'RENTAL' && (
+            <View className="flex-row justify-between items-center">
+              <Text className="text-[12px] text-slate-400 font-semibold">Xe thuê</Text>
+              <Text className="text-[12px] text-white font-bold" numberOfLines={1}>
+                {selectedVehicleNames}
+              </Text>
+            </View>
+          )}
+
+          {fnbPriceTotal > 0 && (
+            <View className="flex-row justify-between items-center">
+              <Text className="text-[12px] text-slate-400 font-semibold">Đặt trước F&B</Text>
+              <Text className="text-[12px] text-white font-bold">
+                {fnbPriceTotal.toLocaleString('vi-VN')}đ
+              </Text>
+            </View>
+          )}
+        </View>
+      </View>
+
+      {/* 2. Gói slot hội viên */}
+      <View className="mt-5">
         <View className="flex-row items-center gap-1.5 mb-3">
           <Package color="#f97316" size={15} />
           <Text className="text-[13px] text-slate-400 uppercase tracking-wider font-bold">
-            1. Áp dụng gói slot hội viên
+            Áp dụng gói slot hội viên
           </Text>
         </View>
 
@@ -164,7 +283,7 @@ export function PaymentStep({
               <View className="flex-row items-start gap-2 bg-[#ea580c]/10 border border-[#ea580c]/20 rounded-xl p-3 mt-1">
                 <Info color="#f97316" size={14} className="mt-0.5" />
                 <Text className="text-[10px] text-slate-300 leading-4 font-semibold flex-1">
-                  Đã áp dụng gói: Miễn phí tiền sân cho bản thân (1 slot). Người đi cùng (nếu có) vẫn tính phí bình thường.
+                  Đã áp dụng gói: Miễn phí tiền sân cho bản thân trong suốt {durationHours} giờ chơi. Người đi cùng (nếu có) vẫn tính phí bình thường.
                 </Text>
               </View>
             )}
@@ -178,12 +297,12 @@ export function PaymentStep({
         )}
       </View>
 
-      {/* 2. Mã ưu đãi */}
+      {/* 3. Mã ưu đãi */}
       <View className="mt-5">
         <View className="flex-row items-center gap-1.5 mb-3">
           <Ticket color="#f97316" size={15} />
           <Text className="text-[13px] text-slate-400 uppercase tracking-wider font-bold">
-            2. Nhập mã ưu đãi (Voucher)
+            Nhập mã ưu đãi (Voucher)
           </Text>
         </View>
 
@@ -234,7 +353,7 @@ export function PaymentStep({
         )}
       </View>
 
-      {/* 3. Phân tích hoá đơn */}
+      {/* 4. Phân tích hoá đơn chi tiết */}
       <View className="mt-5 bg-[#0f172a]/50 border border-slate-800 rounded-2xl p-4">
         <Text className="text-[13px] text-white mb-3.5" weight="700">
           Chi tiết hoá đơn
@@ -243,11 +362,13 @@ export function PaymentStep({
         <View className="space-y-2.5">
           {/* Tiền sân */}
           <View className="flex-row justify-between items-center">
-            <View>
-              <Text className="text-[12px] text-slate-300 font-semibold">Tiền sân ({participants} người)</Text>
+            <View className="flex-1 pr-2">
+              <Text className="text-[12px] text-slate-300 font-semibold">
+                Phí lịch chơi ({participants} người x {durationHours}h)
+              </Text>
               {isPackageApplied && (
                 <Text className="text-[9.5px] text-[#f97316] font-semibold">
-                  (Đã giảm 1 slot từ gói hội viên)
+                  (Đã áp dụng gói hội viên)
                 </Text>
               )}
             </View>
@@ -260,25 +381,10 @@ export function PaymentStep({
           {playMode === 'RENTAL' && (
             <View className="flex-row justify-between items-center">
               <Text className="text-[12px] text-slate-300 font-semibold">
-                Phí thuê xe ({selectedVehicleIds.length} xe)
+                Phí thuê {selectedVehicleNames}
               </Text>
               <Text className="text-[12px] text-slate-200 font-bold">
                 {vehiclePriceTotal.toLocaleString('vi-VN')}đ
-              </Text>
-            </View>
-          )}
-
-          {/* Tiền cọc xe */}
-          {securityDeposit > 0 && (
-            <View className="flex-row justify-between items-center">
-              <View>
-                <Text className="text-[12px] text-slate-300 font-semibold">Tiền cọc giữ xe (Sẽ hoàn lại)</Text>
-                <Text className="text-[9.5px] text-slate-400 font-semibold">
-                  (50k/xe, hoàn sau check-out)
-                </Text>
-              </View>
-              <Text className="text-[12px] text-slate-200 font-bold">
-                +{securityDeposit.toLocaleString('vi-VN')}đ
               </Text>
             </View>
           )}
@@ -287,7 +393,7 @@ export function PaymentStep({
           {fnbPriceTotal > 0 && (
             <View className="space-y-1">
               <View className="flex-row justify-between items-center">
-                <Text className="text-[12px] text-slate-300 font-semibold">Dịch vụ ăn uống đặt trước</Text>
+                <Text className="text-[12px] text-slate-300 font-semibold">F&B preorder</Text>
                 <Text className="text-[12px] text-slate-200 font-bold">
                   {fnbPriceTotal.toLocaleString('vi-VN')}đ
                 </Text>
@@ -319,8 +425,8 @@ export function PaymentStep({
           <View className="h-[1px] bg-slate-800 my-2" />
 
           {/* Tổng cộng */}
-          <View className="flex-row justify-between items-center">
-            <Text className="text-[13px] text-white" weight="700">Tổng tiền thanh toán</Text>
+          <View className="flex-row justify-between items-center font-bold">
+            <Text className="text-[13px] text-white" weight="700">Tổng thanh toán</Text>
             <Text className="text-[16px] text-[#f97316]" weight="700">
               {totalAmount.toLocaleString('vi-VN')}đ
             </Text>
@@ -328,12 +434,12 @@ export function PaymentStep({
         </View>
       </View>
 
-      {/* 4. Chọn phương thức & Nút giả lập */}
+      {/* 5. Chọn phương thức & Nút giả lập */}
       <View className="mt-5">
         <View className="flex-row items-center gap-1.5 mb-3">
           <CreditCard color="#f97316" size={15} />
           <Text className="text-[13px] text-slate-400 uppercase tracking-wider font-bold">
-            3. Phương thức thanh toán
+            Phương thức thanh toán
           </Text>
         </View>
 
