@@ -37,7 +37,7 @@ export function BookingWizardScreen({ cafeId, preselectedVehicleId }: BookingWiz
     const d = String(today.getDate()).padStart(2, '0');
     return `${y}-${m}-${d}`;
   });
-  const [selectedSlot, setSelectedSlot] = useState<string>('');
+  const [selectedSlots, setSelectedSlots] = useState<string[]>([]);
   const [playMode, setPlayMode] = useState<'RENTAL' | 'BYOC'>('RENTAL');
   const [participants, setParticipants] = useState<number>(1);
   const [companions, setCompanions] = useState<Companion[]>([]);
@@ -98,7 +98,15 @@ export function BookingWizardScreen({ cafeId, preselectedVehicleId }: BookingWiz
   }, [playMode]);
 
   // 2. Calculations
-  const slotDurationHours = (cafe?.slotDurationMinutes || 60) / 60;
+  const sortedSlots = useMemo(() => {
+    return [...selectedSlots].sort((a, b) => {
+      const [ha, ma] = a.split(':').map(Number);
+      const [hb, mb] = b.split(':').map(Number);
+      return (ha * 60 + ma) - (hb * 60 + mb);
+    });
+  }, [selectedSlots]);
+
+  const durationHours = sortedSlots.length || 1;
   const slotFeeRate = cafe?.slotFeeRate || 0;
 
   // Rental vehicle prices calculation
@@ -106,9 +114,9 @@ export function BookingWizardScreen({ cafeId, preselectedVehicleId }: BookingWiz
     return selectedVehicleIds.reduce((sum, id) => {
       const match = catalogs.find((c) => c.id === id);
       const rate = match ? Number(match.price_per_hour) : 0;
-      return sum + rate * slotDurationHours;
+      return sum + rate * durationHours;
     }, 0);
-  }, [selectedVehicleIds, catalogs, slotDurationHours]);
+  }, [selectedVehicleIds, catalogs, durationHours]);
 
   // Fnb preorder price total
   const fnbPriceTotal = useMemo(() => {
@@ -134,8 +142,8 @@ export function BookingWizardScreen({ cafeId, preselectedVehicleId }: BookingWiz
 
   // Final Total calculation for Step 4 Preview (also used for next step button label)
   const finalTotalAmount = useMemo(() => {
-    const baseSlotFee = slotFeeRate * participants;
-    const slotFeeDiscount = selectedPackageId !== null ? slotFeeRate : 0;
+    const baseSlotFee = slotFeeRate * participants * durationHours;
+    const slotFeeDiscount = selectedPackageId !== null ? slotFeeRate * durationHours : 0;
     const finalSlotFee = Math.max(0, baseSlotFee - slotFeeDiscount);
     const securityDeposit = playMode === 'RENTAL' ? selectedVehicleIds.length * 50000 : 0;
 
@@ -151,17 +159,26 @@ export function BookingWizardScreen({ cafeId, preselectedVehicleId }: BookingWiz
     }
 
     return Math.max(0, subtotal + securityDeposit - promoDiscount);
-  }, [slotFeeRate, participants, selectedPackageId, playMode, selectedVehicleIds.length, vehiclePriceTotal, fnbPriceTotal, appliedPromo]);
+  }, [slotFeeRate, participants, durationHours, selectedPackageId, playMode, selectedVehicleIds.length, vehiclePriceTotal, fnbPriceTotal, appliedPromo]);
 
   // 3. Navigation Controls
-  const slotStartIso = `${selectedDate}T${selectedSlot}:00+07:00`;
-  const [sh, sm] = selectedSlot.split(':').map(Number);
-  const endH = String(sh + 1).padStart(2, '0');
-  const slotEndIso = `${selectedDate}T${endH}:${String(sm || 0).padStart(2, '0')}:00+07:00`;
+  const slotStartIso = useMemo(() => {
+    if (sortedSlots.length === 0) return '';
+    return `${selectedDate}T${sortedSlots[0]}:00+07:00`;
+  }, [selectedDate, sortedSlots]);
+
+  const slotEndIso = useMemo(() => {
+    if (sortedSlots.length === 0) return '';
+    const lastSlot = sortedSlots[sortedSlots.length - 1];
+    const [lastH, lastM] = lastSlot.split(':').map(Number);
+    const endH = String(lastH + 1).padStart(2, '0');
+    const endM = String(lastM || 0).padStart(2, '0');
+    return `${selectedDate}T${endH}:${endM}:00+07:00`;
+  }, [selectedDate, sortedSlots]);
 
   const isNextDisabled = useMemo(() => {
     if (currentStep === 1) {
-      return !selectedTrackConfig || !selectedSlot;
+      return !selectedTrackConfig || selectedSlots.length === 0;
     }
     if (currentStep === 2) {
       // Validation rules
@@ -179,10 +196,28 @@ export function BookingWizardScreen({ cafeId, preselectedVehicleId }: BookingWiz
       return false; // For BYOC capacity error, screen will show warnings but we check before going next
     }
     return false;
-  }, [currentStep, selectedTrackConfig, selectedSlot, playMode, selectedVehicleIds.length, participants, companions]);
+  }, [currentStep, selectedTrackConfig, selectedSlots.length, playMode, selectedVehicleIds.length, participants, companions]);
 
   const handleNext = () => {
     if (currentStep === 4) return;
+    
+    // Step 1 Validation: Ensure sequential selected slots
+    if (currentStep === 1) {
+      let isSequential = true;
+      for (let i = 0; i < sortedSlots.length - 1; i++) {
+        const [h1] = sortedSlots[i].split(':').map(Number);
+        const [h2] = sortedSlots[i + 1].split(':').map(Number);
+        if (h2 - h1 !== 1) {
+          isSequential = false;
+          break;
+        }
+      }
+      if (!isSequential) {
+        Alert.alert('Khung giờ không hợp lệ', 'Các khung giờ được chọn phải liên tiếp nhau!');
+        return;
+      }
+    }
+
     setCurrentStep(prev => prev + 1);
   };
 
@@ -313,8 +348,8 @@ export function BookingWizardScreen({ cafeId, preselectedVehicleId }: BookingWiz
                 setSelectedTrackConfig={setSelectedTrackConfig}
                 selectedDate={selectedDate}
                 setSelectedDate={setSelectedDate}
-                selectedSlot={selectedSlot}
-                setSelectedSlot={setSelectedSlot}
+                selectedSlots={selectedSlots}
+                setSelectedSlots={setSelectedSlots}
                 playMode={playMode}
                 setPlayMode={setPlayMode}
               />

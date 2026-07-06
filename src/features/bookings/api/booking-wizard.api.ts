@@ -11,7 +11,14 @@ export interface TrackConfig {
   description: string | null;
   status: string;
   track_type_id: string;
-  track_type?: { id: string; name: string } | null;
+  track_type?: {
+    id: string;
+    name: string;
+    description?: string | null;
+  } | null;
+  images?: string[];
+  max_concurrent?: number;
+  byoc_capacity?: number;
 }
 
 export interface VehicleCatalog {
