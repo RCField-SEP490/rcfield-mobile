@@ -47,7 +47,6 @@ export function ProfileScreen() {
   const email = user?.email ?? 'user@rcfield.vn';
 
   const [bookingCount, setBookingCount] = useState(0);
-  const [loadingStats, setLoadingStats] = useState(true);
 
   useEffect(() => {
     getMyBookings({ limit: 1 })
@@ -56,9 +55,6 @@ export function ProfileScreen() {
       })
       .catch((err) => {
         console.error('Error fetching bookings total for profile stats:', err);
-      })
-      .finally(() => {
-        setLoadingStats(false);
       });
   }, []);
 

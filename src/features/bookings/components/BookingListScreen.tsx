@@ -2,15 +2,10 @@ import { useRouter } from 'expo-router';
 import {
   Calendar,
   Clock,
-  Car,
-  ChevronRight,
   HelpCircle,
-  CreditCard,
   Gamepad2,
   AlertTriangle,
   RotateCcw,
-  BadgeAlert,
-  Search,
 } from 'lucide-react-native';
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import {
@@ -22,13 +17,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { getMyBookings, type BookingListItem, type BookingStatus } from '@/features/bookings/api/booking.api';
+import { getMyBookings, type BookingListItem } from '@/features/bookings/api/booking.api';
 import { Text } from '@/shared/ui/Text';
 import { cn } from '@/shared/lib/utils';
 
 type FilterTab = 'upcoming' | 'active' | 'completed' | 'cancelled';
 
-const TAB_CONFIG: Array<{ key: FilterTab; label: string }> = [
+const TAB_CONFIG: { key: FilterTab; label: string }[] = [
   { key: 'upcoming', label: 'Sắp tới' },
   { key: 'active', label: 'Đang chơi' },
   { key: 'completed', label: 'Đã chơi' },

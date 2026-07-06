@@ -5,19 +5,13 @@ import {
   Clock,
   Car,
   MapPin,
-  ChevronRight,
   ArrowLeft,
   AlertTriangle,
   RotateCcw,
   CheckCircle2,
   AlertCircle,
-  Phone,
-  Compass,
-  ArrowRightLeft,
-  Coins,
   Camera,
   User,
-  ExternalLink,
   CreditCard,
 } from 'lucide-react-native';
 import { useEffect, useMemo, useState, useCallback } from 'react';
@@ -36,7 +30,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { bookingWizardApi } from '@/features/bookings/api/booking-wizard.api';
 import { Text } from '@/shared/ui/Text';
 import { cn } from '@/shared/lib/utils';
-import { useAuthStore } from '@/shared/store/auth-store';
 
 interface BookingDetailScreenProps {
   bookingId: string;
@@ -44,7 +37,6 @@ interface BookingDetailScreenProps {
 
 export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
   const router = useRouter();
-  const user = useAuthStore((state) => state.user);
 
   const [booking, setBooking] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -115,7 +107,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
 
       if (res.payment_url) {
         // Mở trình duyệt in-app
-        const result = await WebBrowser.openBrowserAsync(res.payment_url);
+        await WebBrowser.openBrowserAsync(res.payment_url);
         // Khi người dùng đóng trình duyệt, reload lại data
         loadBookingDetail();
       } else {
@@ -148,7 +140,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
       const res = await bookingWizardApi.createCheckoutAdditionalPayment(bookingId, returnUrl);
 
       if (res.payment_url) {
-        const result = await WebBrowser.openBrowserAsync(res.payment_url);
+        await WebBrowser.openBrowserAsync(res.payment_url);
         loadBookingDetail();
       } else {
         Alert.alert('Lỗi', 'Không tìm thấy URL thanh toán VNPay.');
@@ -229,7 +221,6 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
   const slotEnd = new Date(booking.slotEnd);
   const dateLabel = slotStart.toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
   const timeLabel = `${slotStart.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - ${slotEnd.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`;
-  const shortId = booking.id.substring(0, 8).toUpperCase();
 
   // ── Tính toán các khoản hóa đơn theo logic của Web ──
   const snapshot = booking.snapshot as any;
