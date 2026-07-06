@@ -71,10 +71,49 @@ export function ProfileScreen() {
     newPassword: '',
     confirmNewPassword: '',
   });
+  const [passwordErrors, setPasswordErrors] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmNewPassword: '',
+  });
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
   const [changingPw, setChangingPw] = useState(false);
+
+  // Hàm validate form đổi mật khẩu inline
+  const validatePasswordForm = () => {
+    const errors = {
+      currentPassword: '',
+      newPassword: '',
+      confirmNewPassword: '',
+    };
+    let isValid = true;
+
+    if (!passwordForm.currentPassword) {
+      errors.currentPassword = 'Vui lòng nhập mật khẩu hiện tại.';
+      isValid = false;
+    }
+
+    if (!passwordForm.newPassword) {
+      errors.newPassword = 'Vui lòng nhập mật khẩu mới.';
+      isValid = false;
+    } else if (passwordForm.newPassword.length < 6) {
+      errors.newPassword = 'Mật khẩu mới phải từ 6 ký tự trở lên.';
+      isValid = false;
+    }
+
+    if (!passwordForm.confirmNewPassword) {
+      errors.confirmNewPassword = 'Vui lòng xác nhận mật khẩu mới.';
+      isValid = false;
+    } else if (passwordForm.newPassword !== passwordForm.confirmNewPassword) {
+      errors.confirmNewPassword = 'Mật khẩu mới nhập lại không trùng khớp.';
+      isValid = false;
+    }
+
+    setPasswordErrors(errors);
+    return isValid;
+  };
 
   // States cho Cài đặt thông báo (Mô phỏng lưu trữ local)
   const [emailMarketing, setEmailMarketing] = useState(true);
@@ -181,16 +220,7 @@ export function ProfileScreen() {
 
   // Hàm đổi mật khẩu
   const handleChangePassword = async () => {
-    if (!passwordForm.currentPassword) {
-      Alert.alert('Lỗi', 'Vui lòng nhập mật khẩu hiện tại.');
-      return;
-    }
-    if (passwordForm.newPassword.length < 6) {
-      Alert.alert('Lỗi', 'Mật khẩu mới phải từ 6 ký tự trở lên.');
-      return;
-    }
-    if (passwordForm.newPassword !== passwordForm.confirmNewPassword) {
-      Alert.alert('Lỗi', 'Mật khẩu mới nhập lại không trùng khớp.');
+    if (!validatePasswordForm()) {
       return;
     }
 
@@ -201,6 +231,18 @@ export function ProfileScreen() {
         newPassword: passwordForm.newPassword,
       });
       
+      // Reset form sau khi thành công
+      setPasswordForm({
+        currentPassword: '',
+        newPassword: '',
+        confirmNewPassword: '',
+      });
+      setPasswordErrors({
+        currentPassword: '',
+        newPassword: '',
+        confirmNewPassword: '',
+      });
+
       Alert.alert(
         'Thành công',
         'Đổi mật khẩu thành công. Vui lòng đăng nhập lại bằng mật khẩu mới.',
@@ -216,7 +258,11 @@ export function ProfileScreen() {
       );
     } catch (error: any) {
       const errMsg = error?.response?.data?.message || 'Đổi mật khẩu thất bại. Vui lòng kiểm tra lại mật khẩu hiện tại.';
-      Alert.alert('Thất bại', errMsg);
+      // Nếu là lỗi từ server liên quan đến mật khẩu cũ, hiển thị ở input mật khẩu hiện tại
+      setPasswordErrors((prev) => ({
+        ...prev,
+        currentPassword: errMsg,
+      }));
     } finally {
       setChangingPw(false);
     }
@@ -489,12 +535,17 @@ export function ProfileScreen() {
                 <Text className="mb-1.5 text-[11px] uppercase text-slate-400 tracking-wider font-bold">
                   Mật khẩu hiện tại
                 </Text>
-                <View className="h-11 flex-row items-center rounded-xl border border-slate-800 bg-slate-900/80 px-3.5 focus:border-[#f97316]">
+                <View className={`h-11 flex-row items-center rounded-xl border bg-slate-900/80 px-3.5 focus:border-[#f97316] ${passwordErrors.currentPassword ? 'border-red-500' : 'border-slate-800'}`}>
                   <TextInput
                     autoCapitalize="none"
-                    className="flex-1 text-[14px] text-white font-medium"
+                    className="flex-1 text-[14px] text-white font-medium py-0"
                     editable={!changingPw}
-                    onChangeText={(val) => setPasswordForm((prev) => ({ ...prev, currentPassword: val }))}
+                    onChangeText={(val) => {
+                      setPasswordForm((prev) => ({ ...prev, currentPassword: val }));
+                      if (passwordErrors.currentPassword) {
+                        setPasswordErrors((prev) => ({ ...prev, currentPassword: '' }));
+                      }
+                    }}
                     placeholder="••••••••"
                     placeholderTextColor="#475569"
                     secureTextEntry={!showCurrentPassword}
@@ -502,12 +553,17 @@ export function ProfileScreen() {
                   />
                   <Pressable onPress={() => setShowCurrentPassword(!showCurrentPassword)}>
                     {showCurrentPassword ? (
-                      <EyeOff color="#94a3b8" size={16} />
+                      <EyeOff color={passwordErrors.currentPassword ? '#ef4444' : '#94a3b8'} size={16} />
                     ) : (
-                      <Eye color="#94a3b8" size={16} />
+                      <Eye color={passwordErrors.currentPassword ? '#ef4444' : '#94a3b8'} size={16} />
                     )}
                   </Pressable>
                 </View>
+                {passwordErrors.currentPassword ? (
+                  <Text className="mt-1.5 text-[11.5px] text-red-500 font-semibold">
+                    {passwordErrors.currentPassword}
+                  </Text>
+                ) : null}
               </View>
 
               {/* Mật khẩu mới */}
@@ -515,12 +571,17 @@ export function ProfileScreen() {
                 <Text className="mb-1.5 text-[11px] uppercase text-slate-400 tracking-wider font-bold">
                   Mật khẩu mới
                 </Text>
-                <View className="h-11 flex-row items-center rounded-xl border border-slate-800 bg-slate-900/80 px-3.5 focus:border-[#f97316]">
+                <View className={`h-11 flex-row items-center rounded-xl border bg-slate-900/80 px-3.5 focus:border-[#f97316] ${passwordErrors.newPassword ? 'border-red-500' : 'border-slate-800'}`}>
                   <TextInput
                     autoCapitalize="none"
-                    className="flex-1 text-[14px] text-white font-medium"
+                    className="flex-1 text-[14px] text-white font-medium py-0"
                     editable={!changingPw}
-                    onChangeText={(val) => setPasswordForm((prev) => ({ ...prev, newPassword: val }))}
+                    onChangeText={(val) => {
+                      setPasswordForm((prev) => ({ ...prev, newPassword: val }));
+                      if (passwordErrors.newPassword) {
+                        setPasswordErrors((prev) => ({ ...prev, newPassword: '' }));
+                      }
+                    }}
                     placeholder="••••••••"
                     placeholderTextColor="#475569"
                     secureTextEntry={!showNewPassword}
@@ -528,12 +589,17 @@ export function ProfileScreen() {
                   />
                   <Pressable onPress={() => setShowNewPassword(!showNewPassword)}>
                     {showNewPassword ? (
-                      <EyeOff color="#94a3b8" size={16} />
+                      <EyeOff color={passwordErrors.newPassword ? '#ef4444' : '#94a3b8'} size={16} />
                     ) : (
-                      <Eye color="#94a3b8" size={16} />
+                      <Eye color={passwordErrors.newPassword ? '#ef4444' : '#94a3b8'} size={16} />
                     )}
                   </Pressable>
                 </View>
+                {passwordErrors.newPassword ? (
+                  <Text className="mt-1.5 text-[11.5px] text-red-500 font-semibold">
+                    {passwordErrors.newPassword}
+                  </Text>
+                ) : null}
               </View>
 
               {/* Nhập lại mật khẩu mới */}
@@ -541,12 +607,17 @@ export function ProfileScreen() {
                 <Text className="mb-1.5 text-[11px] uppercase text-slate-400 tracking-wider font-bold">
                   Nhập lại mật khẩu mới
                 </Text>
-                <View className="h-11 flex-row items-center rounded-xl border border-slate-800 bg-slate-900/80 px-3.5 focus:border-[#f97316]">
+                <View className={`h-11 flex-row items-center rounded-xl border bg-slate-900/80 px-3.5 focus:border-[#f97316] ${passwordErrors.confirmNewPassword ? 'border-red-500' : 'border-slate-800'}`}>
                   <TextInput
                     autoCapitalize="none"
-                    className="flex-1 text-[14px] text-white font-medium"
+                    className="flex-1 text-[14px] text-white font-medium py-0"
                     editable={!changingPw}
-                    onChangeText={(val) => setPasswordForm((prev) => ({ ...prev, confirmNewPassword: val }))}
+                    onChangeText={(val) => {
+                      setPasswordForm((prev) => ({ ...prev, confirmNewPassword: val }));
+                      if (passwordErrors.confirmNewPassword) {
+                        setPasswordErrors((prev) => ({ ...prev, confirmNewPassword: '' }));
+                      }
+                    }}
                     placeholder="••••••••"
                     placeholderTextColor="#475569"
                     secureTextEntry={!showConfirmNewPassword}
@@ -554,12 +625,17 @@ export function ProfileScreen() {
                   />
                   <Pressable onPress={() => setShowConfirmNewPassword(!showConfirmNewPassword)}>
                     {showConfirmNewPassword ? (
-                      <EyeOff color="#94a3b8" size={16} />
+                      <EyeOff color={passwordErrors.confirmNewPassword ? '#ef4444' : '#94a3b8'} size={16} />
                     ) : (
-                      <Eye color="#94a3b8" size={16} />
+                      <Eye color={passwordErrors.confirmNewPassword ? '#ef4444' : '#94a3b8'} size={16} />
                     )}
                   </Pressable>
                 </View>
+                {passwordErrors.confirmNewPassword ? (
+                  <Text className="mt-1.5 text-[11.5px] text-red-500 font-semibold">
+                    {passwordErrors.confirmNewPassword}
+                  </Text>
+                ) : null}
               </View>
 
               {/* Button Submit Change Password */}
