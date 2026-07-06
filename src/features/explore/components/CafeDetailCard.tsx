@@ -1,5 +1,6 @@
 import { Alert, Image, Linking, Pressable, View } from 'react-native';
 import { MapPin, Star, Route, X, Calendar } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
 import type { Cafe, UserLocation } from '../types/explore.types';
 import { Text } from '@/shared/ui/Text';
 
@@ -25,6 +26,8 @@ function getHaversineDistance(lat1: number, lon1: number, lat2: number, lon2: nu
 }
 
 export function CafeDetailCard({ cafe, userLocation, onClose }: CafeDetailCardProps) {
+  const router = useRouter();
+
   const distance =
     userLocation && cafe.latitude && cafe.longitude
       ? getHaversineDistance(
@@ -52,11 +55,10 @@ export function CafeDetailCard({ cafe, userLocation, onClose }: CafeDetailCardPr
   };
 
   const handleBookNow = () => {
-    Alert.alert(
-      'Đặt lịch sân đua',
-      `Bạn có muốn đặt lịch tại chi nhánh ${cafe.name}? Tính năng thanh toán và đặt lịch trực tiếp trên ứng dụng di động đang được phát triển. Vui lòng truy cập website RCField để hoàn tất đặt lịch.`,
-      [{ text: 'Đóng' }]
-    );
+    router.push({
+      pathname: '/booking/create',
+      params: { cafeId: cafe.id },
+    } as any);
   };
 
   return (
