@@ -12,6 +12,7 @@ import {
   TextInput,
   View,
   Alert,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -97,6 +98,13 @@ export function RegisterScreen() {
         >
           {/* Header */}
           <View className="mb-6 mt-2">
+            <View className="mb-4">
+              <Image
+                source={require('../../../../assets/images/rcfield-logo.png')}
+                className="h-14 w-14 rounded-2xl"
+                resizeMode="cover"
+              />
+            </View>
             <Text className="text-white text-3xl" variant="title" weight="700">
               Đăng ký thành viên
             </Text>
@@ -107,10 +115,10 @@ export function RegisterScreen() {
 
           {/* Form */}
           <View className="rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-5 shadow-2xl mb-8">
-            <View className="gap-4.5">
+            <View className="gap-5">
               {/* Họ tên */}
               <View>
-                <Text className="mb-1.5 text-[12px] uppercase text-slate-300 tracking-wider" weight="700">
+                <Text className="mb-2 text-[12px] uppercase text-slate-300 tracking-wider" weight="700">
                   Họ và tên
                 </Text>
                 <Controller
@@ -120,7 +128,7 @@ export function RegisterScreen() {
                     <View className={`h-12 flex-row items-center rounded-xl border bg-slate-900/80 px-3.5 focus:border-[#f97316] ${errors.fullName ? 'border-red-500' : 'border-slate-800'}`}>
                       <User color={errors.fullName ? '#ef4444' : '#94a3b8'} size={18} strokeWidth={2} />
                       <TextInput
-                        className="ml-2.5 flex-1 text-[14px] text-white font-medium"
+                        className="ml-2.5 flex-1 text-[14px] text-white font-medium py-0"
                         editable={!isLoading}
                         onBlur={onBlur}
                         onChangeText={onChange}
@@ -140,7 +148,7 @@ export function RegisterScreen() {
 
               {/* Email */}
               <View>
-                <Text className="mb-1.5 text-[12px] uppercase text-slate-300 tracking-wider" weight="700">
+                <Text className="mb-2 text-[12px] uppercase text-slate-300 tracking-wider" weight="700">
                   Email
                 </Text>
                 <Controller
@@ -152,7 +160,7 @@ export function RegisterScreen() {
                       <TextInput
                         autoCapitalize="none"
                         autoComplete="email"
-                        className="ml-2.5 flex-1 text-[14px] text-white font-medium"
+                        className="ml-2.5 flex-1 text-[14px] text-white font-medium py-0"
                         editable={!isLoading}
                         keyboardType="email-address"
                         onBlur={onBlur}
@@ -173,7 +181,7 @@ export function RegisterScreen() {
 
               {/* Số điện thoại */}
               <View>
-                <Text className="mb-1.5 text-[12px] uppercase text-slate-300 tracking-wider" weight="700">
+                <Text className="mb-2 text-[12px] uppercase text-slate-300 tracking-wider" weight="700">
                   Số điện thoại
                 </Text>
                 <Controller
@@ -183,7 +191,7 @@ export function RegisterScreen() {
                     <View className={`h-12 flex-row items-center rounded-xl border bg-slate-900/80 px-3.5 focus:border-[#f97316] ${errors.phoneNumber ? 'border-red-500' : 'border-slate-800'}`}>
                       <Phone color={errors.phoneNumber ? '#ef4444' : '#94a3b8'} size={18} strokeWidth={2} />
                       <TextInput
-                        className="ml-2.5 flex-1 text-[14px] text-white font-medium"
+                        className="ml-2.5 flex-1 text-[14px] text-white font-medium py-0"
                         editable={!isLoading}
                         keyboardType="phone-pad"
                         onBlur={onBlur}
@@ -204,7 +212,7 @@ export function RegisterScreen() {
 
               {/* Mật khẩu */}
               <View>
-                <Text className="mb-1.5 text-[12px] uppercase text-slate-300 tracking-wider" weight="700">
+                <Text className="mb-2 text-[12px] uppercase text-slate-300 tracking-wider" weight="700">
                   Mật khẩu
                 </Text>
                 <Controller
@@ -215,7 +223,7 @@ export function RegisterScreen() {
                       <LockKeyhole color={errors.password ? '#ef4444' : '#94a3b8'} size={18} strokeWidth={2} />
                       <TextInput
                         autoCapitalize="none"
-                        className="ml-2.5 flex-1 text-[14px] text-white font-medium"
+                        className="ml-2.5 flex-1 text-[14px] text-white font-medium py-0"
                         editable={!isLoading}
                         onBlur={onBlur}
                         onChangeText={onChange}
@@ -243,7 +251,7 @@ export function RegisterScreen() {
 
               {/* Xác nhận mật khẩu */}
               <View>
-                <Text className="mb-1.5 text-[12px] uppercase text-slate-300 tracking-wider" weight="700">
+                <Text className="mb-2 text-[12px] uppercase text-slate-300 tracking-wider" weight="700">
                   Xác nhận mật khẩu
                 </Text>
                 <Controller
@@ -254,7 +262,7 @@ export function RegisterScreen() {
                       <LockKeyhole color={errors.confirmPassword ? '#ef4444' : '#94a3b8'} size={18} strokeWidth={2} />
                       <TextInput
                         autoCapitalize="none"
-                        className="ml-2.5 flex-1 text-[14px] text-white font-medium"
+                        className="ml-2.5 flex-1 text-[14px] text-white font-medium py-0"
                         editable={!isLoading}
                         onBlur={onBlur}
                         onChangeText={onChange}

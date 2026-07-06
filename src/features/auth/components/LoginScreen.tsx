@@ -12,6 +12,7 @@ import {
   TextInput,
   View,
   Alert,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
@@ -224,8 +225,12 @@ export function LoginScreen() {
         >
           {/* Header Section */}
           <View className="mb-8">
-            <View className="mb-4 h-12 w-12 items-center justify-center rounded-2xl bg-[#ea580c]/20 border border-[#ea580c]/30">
-              <ShieldCheck color="#ea580c" size={26} strokeWidth={2.2} />
+            <View className="mb-4">
+              <Image
+                source={require('../../../../assets/images/rcfield-logo.png')}
+                className="h-16 w-16 rounded-2xl"
+                resizeMode="cover"
+              />
             </View>
             <Text className="text-white text-3xl" variant="title" weight="700">
               Chào mừng quay lại
