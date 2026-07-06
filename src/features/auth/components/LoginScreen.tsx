@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'expo-router';
-import { Eye, EyeOff, LockKeyhole, Mail, ShieldCheck } from 'lucide-react-native';
+import { Eye, EyeOff, LockKeyhole, Mail } from 'lucide-react-native';
 import { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import {

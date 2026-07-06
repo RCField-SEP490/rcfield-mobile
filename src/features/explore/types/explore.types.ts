@@ -1,0 +1,69 @@
+export type VehicleStatus = 'available' | 'rented' | 'maintenance';
+
+export interface Vehicle {
+  id: string;
+  name: string;
+  scale: string;
+  type: string;
+  image: string;
+  pricePerHour: number;
+  securityDeposit?: number;
+  status: VehicleStatus;
+  specs?: {
+    battery?: string;
+    motor?: string;
+    brand?: string;
+  };
+}
+
+export type CafeOperatingHour = {
+  open?: string;
+  close?: string;
+  is_closed?: boolean;
+};
+
+export interface Cafe {
+  id: string;
+  providerId?: string;
+  name: string;
+  slug: string;
+  rating: number;
+  reviewsCount: number;
+  phone?: string | null;
+  status?: 'PENDING' | 'ACTIVE' | 'SUSPENDED';
+  address: string;
+  district: string;
+  city: string;
+  image: string;
+  images?: string[];
+  priceRange: string;
+  slotDurationMinutes?: number;
+  slotFeeRate?: number;
+  maxConcurrentBookings?: number;
+  minBookingNoticeMinutes?: number;
+  byocCapacity?: number;
+  trackTypes: string[];
+  trackTypeIds?: string[];
+  features: string[];
+  description: string;
+  coordinates?: { x: number; y: number };
+  latitude?: number | null;
+  longitude?: number | null;
+  availableVehicles: Vehicle[];
+  operatingHours?: Record<string, CafeOperatingHour> | string;
+}
+
+export type CafeSearchParams = {
+  query?: string;
+  city?: string;
+  trackType?: string;
+  priceRange?: string;
+  feature?: string;
+  date?: string;
+  vehicleType?: string;
+};
+
+export interface UserLocation {
+  latitude: number;
+  longitude: number;
+}

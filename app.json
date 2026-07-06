@@ -9,7 +9,10 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.rcfield.mobile"
+      "bundleIdentifier": "com.rcfield.mobile",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "RCField cần quyền truy cập vị trí của bạn để định vị và tìm kiếm các chi nhánh sân đua gần nhất."
+      }
     },
     "android": {
       "package": "com.rcfield.mobile",
@@ -19,7 +22,12 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "FOREGROUND_SERVICE"
+      ]
     },
     "web": {
       "bundler": "metro",

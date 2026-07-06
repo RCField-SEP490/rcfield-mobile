@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { CalendarDays, Home, UserRound, type LucideIcon } from 'lucide-react-native';
+import { CalendarDays, Home, UserRound, Compass, type LucideIcon } from 'lucide-react-native';
 import { type ColorValue } from 'react-native';
 
 interface TabBarIconProps {
@@ -29,6 +29,13 @@ export default function TabLayout() {
         options={{
           title: 'Home',
           tabBarIcon: (props) => <TabBarIcon Icon={Home} {...props} />,
+        }}
+      />
+      <Tabs.Screen
+        name="explore"
+        options={{
+          title: 'Khám phá',
+          tabBarIcon: (props) => <TabBarIcon Icon={Compass} {...props} />,
         }}
       />
       <Tabs.Screen
