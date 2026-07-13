@@ -1,14 +1,50 @@
-import { useAuthStore } from '@/shared/store/auth-store';
-import { Alert } from 'react-native';
 import { router } from 'expo-router';
+import { Alert } from 'react-native';
+
+import { useAuthStore } from '@/shared/store/auth-store';
 
 type WsCallback = (event: string, data: any) => void;
+
+const AUTH_CLOSE_CODES = new Set([4001, 4003, 4401, 4403]);
+
+function isAuthClose(code: number, reason: string) {
+  const normalizedReason = reason.toLowerCase();
+  return (
+    AUTH_CLOSE_CODES.has(code) ||
+    normalizedReason.includes('invalid token') ||
+    normalizedReason.includes('unauthorized') ||
+    normalizedReason.includes('forbidden')
+  );
+}
+
+function toWebSocketUrl(apiUrl: string, accessToken: string) {
+  try {
+    const urlObj = new URL(apiUrl);
+    const protocol = urlObj.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${protocol}//${urlObj.host}/ws?token=${encodeURIComponent(accessToken)}`;
+  } catch {
+    const match = apiUrl.match(/^(https?):\/\/([^/]+)/);
+    if (match) {
+      const protocol = match[1] === 'https' ? 'wss' : 'ws';
+      return `${protocol}://${match[2]}/ws?token=${encodeURIComponent(accessToken)}`;
+    }
+
+    return `ws://192.168.1.4:3000/ws?token=${encodeURIComponent(accessToken)}`;
+  }
+}
+
+function redactToken(url: string, accessToken: string) {
+  return url.replace(encodeURIComponent(accessToken), '[token]');
+}
 
 class WebSocketClient {
   private ws: WebSocket | null = null;
   private listeners = new Set<WsCallback>();
-  private reconnectTimer: any = null;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private isConnecting = false;
+  private connectedToken: string | null = null;
+  private rejectedToken: string | null = null;
+  private intentionalDisconnect = false;
 
   public connect() {
     const accessToken = useAuthStore.getState().accessToken;
@@ -17,36 +53,38 @@ class WebSocketClient {
       return;
     }
 
-    if (this.ws || this.isConnecting) return;
-
-    this.isConnecting = true;
-    const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.4:3000/api/v1';
-    
-    // Convert API HTTP URL to WS URL
-    let wsUrl = '';
-    try {
-      const urlObj = new URL(apiUrl);
-      const protocol = urlObj.protocol === 'https:' ? 'wss:' : 'ws:';
-      // wsService in backend is mounted at path: '/ws'
-      wsUrl = `${protocol}//${urlObj.host}/ws?token=${accessToken}`;
-    } catch {
-      // Fallback regex if URL parse fails
-      const match = apiUrl.match(/^(https?):\/\/([^\/]+)/);
-      if (match) {
-        const protocol = match[1] === 'https' ? 'wss' : 'ws';
-        wsUrl = `${protocol}://${match[2]}/ws?token=${accessToken}`;
-      } else {
-        wsUrl = `ws://192.168.1.4:3000/ws?token=${accessToken}`;
-      }
+    if (this.rejectedToken === accessToken) {
+      console.warn('[WS] Token was rejected by the server. Waiting for a new token before reconnecting.');
+      return;
     }
 
-    console.log('[WS] Connecting to:', wsUrl);
+    if (this.ws || this.isConnecting) {
+      if (this.connectedToken === accessToken || this.isConnecting) {
+        return;
+      }
+
+      this.disconnect();
+    }
+
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+
+    this.intentionalDisconnect = false;
+    this.isConnecting = true;
+    const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.4:3000/api/v1';
+    const wsUrl = toWebSocketUrl(apiUrl, accessToken);
+
+    console.log('[WS] Connecting to:', redactToken(wsUrl, accessToken));
 
     try {
-      this.ws = new WebSocket(wsUrl);
+      const socket = new WebSocket(wsUrl);
+      this.ws = socket;
 
-      this.ws.onopen = () => {
+      socket.onopen = () => {
         console.log('[WS] Connection established');
+        this.connectedToken = accessToken;
         this.isConnecting = false;
         if (this.reconnectTimer) {
           clearTimeout(this.reconnectTimer);
@@ -54,93 +92,110 @@ class WebSocketClient {
         }
       };
 
-      this.ws.onmessage = (e) => {
+      socket.onmessage = (e) => {
         try {
           const payload = JSON.parse(e.data);
           const { event, data } = payload;
           console.log('[WS] Received event:', event, data);
 
-          // Handle common customer notifications and show in-app Alerts
           this.handleInAppNotification(event, data);
-
-          // Notify all subscribers
           this.listeners.forEach((callback) => callback(event, data));
         } catch (err) {
           console.error('[WS] Failed to parse message data:', err);
         }
       };
 
-      this.ws.onerror = (error) => {
+      socket.onerror = (error) => {
         console.error('[WS] Socket error:', error);
       };
 
-      this.ws.onclose = (e) => {
+      socket.onclose = (e) => {
+        if (this.ws !== socket) {
+          return;
+        }
+
         console.log('[WS] Socket closed:', e.code, e.reason);
+        const wasIntentional = this.intentionalDisconnect;
         this.ws = null;
+        this.connectedToken = null;
         this.isConnecting = false;
-        this.scheduleReconnect();
+        this.intentionalDisconnect = false;
+
+        if (wasIntentional) {
+          return;
+        }
+
+        if (isAuthClose(e.code, e.reason)) {
+          this.rejectedToken = accessToken;
+          console.warn('[WS] Authentication rejected. Reconnect stopped until the access token changes.');
+          return;
+        }
+
+        this.scheduleReconnect(accessToken);
       };
     } catch (err) {
       console.error('[WS] Connection error:', err);
       this.isConnecting = false;
-      this.scheduleReconnect();
+      this.scheduleReconnect(accessToken);
     }
   }
 
   private handleInAppNotification(event: string, data: any) {
-    // Notify custom local push alert popup when app is open
     switch (event) {
       case 'SESSION_CHECKIN_INSPECTION':
         Alert.alert(
-          'Biên bản bàn giao xe',
-          'Nhân viên trực ca vừa bàn giao xe và bắt đầu phiên chơi của bạn. Lượt chơi hiện đã có hiệu lực!'
+          'Bien ban ban giao xe',
+          'Nhan vien truc ca vua ban giao xe va bat dau phien choi cua ban. Luot choi hien da co hieu luc!'
         );
         break;
       case 'SESSION_CHECKOUT_INSPECTION':
         Alert.alert(
-          'Biên bản trả xe',
-          'Nhân viên trực ca vừa thực hiện kiểm tra và nhận lại xe. Vui lòng kiểm tra và xác nhận biên bản.',
+          'Bien ban tra xe',
+          'Nhan vien truc ca vua thuc hien kiem tra va nhan lai xe. Vui long kiem tra va xac nhan bien ban.',
           [
             {
-              text: 'Kiểm tra ngay',
+              text: 'Kiem tra ngay',
               onPress: () => {
                 if (data?.sessionId) {
                   router.push({
                     pathname: '/customer/inspections/[sessionId]',
-                    params: { sessionId: data.sessionId, inspectionId: data.inspectionId }
+                    params: { sessionId: data.sessionId, inspectionId: data.inspectionId },
                   } as any);
                 }
-              }
+              },
             },
-            { text: 'Để sau', style: 'cancel' }
+            { text: 'De sau', style: 'cancel' },
           ]
         );
         break;
       case 'CUSTOMER_PAYMENT_CONFIRMED':
         Alert.alert(
-          'Thanh toán thành công',
-          'Đã nhận được khoản thanh toán hóa đơn / phí phát sinh cho đơn đặt sân của bạn.'
+          'Thanh toan thanh cong',
+          'Da nhan duoc khoan thanh toan hoa don / phi phat sinh cho don dat san cua ban.'
         );
         break;
       case 'SESSION_EXTENSION_PROPOSED':
         Alert.alert(
-          'Yêu cầu gia hạn ca chơi',
-          `Nhân viên vừa đề xuất gia hạn ca chơi thêm ${data.extraMinutes} phút với phí phát sinh là ${Number(data.additionalFee).toLocaleString('vi-VN')}đ.`
+          'Yeu cau gia han ca choi',
+          `Nhan vien vua de xuat gia han ca choi them ${data.extraMinutes} phut voi phi phat sinh la ${Number(data.additionalFee).toLocaleString('vi-VN')}d.`
         );
         break;
       case 'SESSION_FNB_ORDER_ADDED':
         Alert.alert(
-          'Gọi món thành công',
-          `Món ăn/nước uống mới trị giá ${Number(data.totalAmount).toLocaleString('vi-VN')}đ đã được thêm thành công vào phòng chạy.`
+          'Goi mon thanh cong',
+          `Mon an/nuoc uong moi tri gia ${Number(data.totalAmount).toLocaleString('vi-VN')}d da duoc them thanh cong vao phong chay.`
         );
         break;
     }
   }
 
-  private scheduleReconnect() {
+  private scheduleReconnect(tokenAtClose: string) {
     if (this.reconnectTimer) return;
-    const token = useAuthStore.getState().accessToken;
-    if (!token) return; // Don't reconnect if logged out
+
+    const currentToken = useAuthStore.getState().accessToken;
+    if (!currentToken || currentToken !== tokenAtClose || this.rejectedToken === currentToken) {
+      return;
+    }
 
     console.log('[WS] Scheduling reconnection in 5 seconds...');
     this.reconnectTimer = setTimeout(() => {
@@ -161,11 +216,18 @@ class WebSocketClient {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
+
+    this.isConnecting = false;
+    this.connectedToken = null;
+
     if (this.ws) {
+      this.intentionalDisconnect = true;
       this.ws.close();
       this.ws = null;
+    } else {
+      this.intentionalDisconnect = false;
     }
-    this.isConnecting = false;
+
     console.log('[WS] Disconnected');
   }
 }
