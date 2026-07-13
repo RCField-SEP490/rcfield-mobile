@@ -61,8 +61,15 @@ export function CafeDetailCard({ cafe, userLocation, onClose }: CafeDetailCardPr
     } as any);
   };
 
+  const handleGoToDetail = () => {
+    router.push(`/cafe-detail/${cafe.id}` as any);
+  };
+
   return (
-    <View className="absolute bottom-6 left-4 right-4 rounded-2xl border border-slate-800 bg-[#0f172a]/95 p-4 shadow-2xl backdrop-blur-md">
+    <View
+      style={{ zIndex: 99, elevation: 5 }}
+      className="absolute bottom-6 left-4 right-4 rounded-2xl border border-slate-800 bg-[#0f172a]/95 p-4 shadow-2xl backdrop-blur-md"
+    >
       {/* Nút đóng card */}
       <Pressable
         onPress={onClose}
@@ -71,7 +78,7 @@ export function CafeDetailCard({ cafe, userLocation, onClose }: CafeDetailCardPr
         <X color="#94a3b8" size={16} />
       </Pressable>
 
-      <View className="flex-row gap-3.5">
+      <Pressable onPress={handleGoToDetail} className="flex-row gap-3.5">
         {/* Ảnh cơ sở */}
         <Image
           source={{ uri: cafe.image }}
@@ -114,7 +121,7 @@ export function CafeDetailCard({ cafe, userLocation, onClose }: CafeDetailCardPr
             {cafe.priceRange}
           </Text>
         </View>
-      </View>
+      </Pressable>
 
       {/* Nút hành động */}
       <View className="mt-4 flex-row gap-2.5">

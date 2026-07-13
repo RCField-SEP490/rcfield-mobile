@@ -379,6 +379,9 @@ export function BookingWizardScreen({
                 setSelectedSlots={setSelectedSlots}
                 playMode={playMode}
                 setPlayMode={setPlayMode}
+                selectedVehicleIds={selectedVehicleIds}
+                setSelectedVehicleIds={setSelectedVehicleIds}
+                catalogs={catalogs}
               />
             )}
 

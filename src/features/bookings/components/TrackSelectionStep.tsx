@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { View, Pressable, ScrollView, ActivityIndicator, Image, Modal } from 'react-native';
+import { View, Pressable, ScrollView, ActivityIndicator, Image, Modal, Alert } from 'react-native';
 import { Calendar, Clock, Layers, ShieldCheck, AlertCircle, ChevronLeft, ChevronRight, X, Car, User } from 'lucide-react-native';
 import { Text } from '@/shared/ui/Text';
-import { bookingWizardApi, type TrackConfig } from '../api/booking-wizard.api';
+import { bookingWizardApi, type TrackConfig, type VehicleCatalog } from '../api/booking-wizard.api';
 
 const TRACK_PLACEHOLDER_IMAGE =
   'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?q=80&w=600&auto=format&fit=crop';
@@ -17,6 +17,9 @@ interface TrackSelectionStepProps {
   setSelectedSlots: (slots: string[]) => void;
   playMode: 'RENTAL' | 'BYOC';
   setPlayMode: (mode: 'RENTAL' | 'BYOC') => void;
+  selectedVehicleIds: string[];
+  setSelectedVehicleIds: (ids: string[]) => void;
+  catalogs: VehicleCatalog[];
 }
 
 interface SlotDetails {
@@ -28,24 +31,24 @@ interface SlotDetails {
 // Check if a time slot on a given date is in the past compared to current system time
 const isSlotPast = (slot: string, dateStr: string) => {
   const today = new Date();
-  
+
   // Format today as YYYY-MM-DD
   const y = today.getFullYear();
   const m = String(today.getMonth() + 1).padStart(2, '0');
   const d = String(today.getDate()).padStart(2, '0');
   const todayStr = `${y}-${m}-${d}`;
-  
+
   if (dateStr < todayStr) return true;
   if (dateStr > todayStr) return false;
-  
+
   // Same day, compare hours
   const [slotH, slotM] = slot.split(':').map(Number);
   const currentH = today.getHours();
   const currentM = today.getMinutes();
-  
+
   if (slotH < currentH) return true;
   if (slotH === currentH && slotM <= currentM) return true;
-  
+
   return false;
 };
 
@@ -56,12 +59,12 @@ const getNext7Days = () => {
   for (let i = 0; i < 7; i++) {
     const d = new Date();
     d.setDate(d.getDate() + i);
-    
+
     const year = d.getFullYear();
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const dateStr = String(d.getDate()).padStart(2, '0');
     const fullDate = `${year}-${month}-${dateStr}`;
-    
+
     list.push({
       fullDate,
       dayLabel: daysOfWeek[d.getDay()],
@@ -88,11 +91,41 @@ export function TrackSelectionStep({
   setSelectedSlots,
   playMode,
   setPlayMode,
+  selectedVehicleIds,
+  setSelectedVehicleIds,
+  catalogs,
 }: TrackSelectionStepProps) {
   const [tracks, setTracks] = useState<TrackConfig[]>([]);
   const [loadingTracks, setLoadingTracks] = useState(true);
   const [slotDetails, setSlotDetails] = useState<Record<string, SlotDetails>>({});
   const [loadingSlots, setLoadingSlots] = useState(false);
+
+  // Popup warning when switching playMode from RENTAL to BYOC with selected vehicles
+  const handleSelectByoc = () => {
+    if (playMode === 'RENTAL' && selectedVehicleIds.length > 0) {
+      const selectedNames = selectedVehicleIds
+        .map((id) => catalogs.find((c) => c.id === id)?.name)
+        .filter(Boolean)
+        .join(', ');
+      Alert.alert(
+        'Chuyển sang mang xe riêng?',
+        `Bạn đang có xe ${selectedNames} đã chọn để thuê. Chuyển sang chế độ mang xe riêng sẽ xóa toàn bộ lựa chọn xe thuê này.`,
+        [
+          { text: 'Hủy', style: 'cancel' },
+          {
+            text: 'Đồng ý',
+            style: 'destructive',
+            onPress: () => {
+              setSelectedVehicleIds([]);
+              setPlayMode('BYOC');
+            },
+          },
+        ]
+      );
+    } else {
+      setPlayMode('BYOC');
+    }
+  };
 
   // Custom Calendar Modal State
   const [showCalendar, setShowCalendar] = useState(false);
@@ -139,7 +172,7 @@ export function TrackSelectionStep({
 
             const [h, m] = slot.split(':').map(Number);
             const slotStart = `${selectedDate}T${slot}:00+07:00`;
-            
+
             // End time is +1 hour
             const endH = String(h + 1).padStart(2, '0');
             const slotEnd = `${selectedDate}T${endH}:${String(m).padStart(2, '0')}:00+07:00`;
@@ -151,7 +184,7 @@ export function TrackSelectionStep({
                 play_mode: playMode,
                 track_config_id: selectedTrackConfig.id,
               });
-              
+
               const vCount = res.vehicles?.length || 0;
               const byocRem = res.byoc_remaining || 0;
               const isAvail = playMode === 'RENTAL' ? vCount > 0 : byocRem > 0;
@@ -218,7 +251,7 @@ export function TrackSelectionStep({
     const monthStr = String(calendarMonth + 1).padStart(2, '0');
     const dayStr = String(day).padStart(2, '0');
     const fullDate = `${yearStr}-${monthStr}-${dayStr}`;
-    
+
     setSelectedDate(fullDate);
     setSelectedSlots([]);
     setShowCalendar(false);
@@ -257,11 +290,10 @@ export function TrackSelectionStep({
                 <Pressable
                   key={track.id}
                   onPress={() => setSelectedTrackConfig(track)}
-                  className={`p-3 rounded-xl border flex-row gap-3 transition-all duration-200 ${
-                    isSelected
-                      ? 'bg-[#ea580c]/10 border-[#f97316]'
-                      : 'bg-[#0f172a]/50 border-slate-800'
-                  }`}
+                  className={`p-3 rounded-xl border flex-row gap-3 transition-all duration-200 ${isSelected
+                    ? 'bg-[#ea580c]/10 border-[#f97316]'
+                    : 'bg-[#0f172a]/50 border-slate-800'
+                    }`}
                 >
                   {/* Sân image */}
                   <Image
@@ -281,7 +313,7 @@ export function TrackSelectionStep({
                         </View>
                       )}
                     </View>
-                    
+
                     <Text className="text-[10px] text-slate-400 leading-4 font-semibold" numberOfLines={1}>
                       {trackDesc}
                     </Text>
@@ -327,11 +359,10 @@ export function TrackSelectionStep({
         <View className="flex-row gap-3">
           <Pressable
             onPress={() => setPlayMode('RENTAL')}
-            className={`flex-1 p-3.5 rounded-xl border items-center justify-center ${
-              playMode === 'RENTAL'
-                ? 'bg-[#ea580c]/10 border-[#f97316]'
-                : 'bg-[#0f172a]/50 border-slate-800'
-            }`}
+            className={`flex-1 p-3.5 rounded-xl border items-center justify-center ${playMode === 'RENTAL'
+              ? 'bg-[#ea580c]/10 border-[#f97316]'
+              : 'bg-[#0f172a]/50 border-slate-800'
+              }`}
           >
             <Text className={`text-[13px] ${playMode === 'RENTAL' ? 'text-[#f97316]' : 'text-slate-300'}`} weight="700">
               Thuê xe (RENTAL)
@@ -342,12 +373,11 @@ export function TrackSelectionStep({
           </Pressable>
 
           <Pressable
-            onPress={() => setPlayMode('BYOC')}
-            className={`flex-1 p-3.5 rounded-xl border items-center justify-center ${
-              playMode === 'BYOC'
-                ? 'bg-[#ea580c]/10 border-[#f97316]'
-                : 'bg-[#0f172a]/50 border-slate-800'
-            }`}
+            onPress={handleSelectByoc}
+            className={`flex-1 p-3.5 rounded-xl border items-center justify-center ${playMode === 'BYOC'
+              ? 'bg-[#ea580c]/10 border-[#f97316]'
+              : 'bg-[#0f172a]/50 border-slate-800'
+              }`}
           >
             <Text className={`text-[13px] ${playMode === 'BYOC' ? 'text-[#f97316]' : 'text-slate-300'}`} weight="700">
               Xe cá nhân (BYOC)
@@ -390,11 +420,10 @@ export function TrackSelectionStep({
                     setSelectedDate(item.fullDate);
                     setSelectedSlots([]); // Reset slots when date changes
                   }}
-                  className={`w-14 py-2.5 rounded-xl border items-center justify-center flex-col ${
-                    isSelected
-                      ? 'bg-[#ea580c] border-[#ea580c]'
-                      : 'bg-[#0f172a]/50 border-slate-800'
-                  }`}
+                  className={`w-14 py-2.5 rounded-xl border items-center justify-center flex-col ${isSelected
+                    ? 'bg-[#ea580c] border-[#ea580c]'
+                    : 'bg-[#0f172a]/50 border-slate-800'
+                    }`}
                 >
                   <Text className={`text-[10px] ${isSelected ? 'text-white' : 'text-slate-400'} font-bold`}>
                     {item.dayLabel}
@@ -452,7 +481,7 @@ export function TrackSelectionStep({
               const detail = slotDetails[slot];
               const isPast = isSlotPast(slot, selectedDate);
               const isAvailable = !isPast && (detail?.available ?? false);
-              
+
               // Dynamic Styling based on slot status
               let btnStyle = "bg-[#0f172a]/50 border-slate-800";
               let textStyle = "text-slate-300";
@@ -570,7 +599,7 @@ export function TrackSelectionStep({
               {/* Days digits */}
               {Array.from({ length: daysInMonth }).map((_, i) => {
                 const dayNum = i + 1;
-                
+
                 // Construct string date to check selection
                 const checkingDate = `${calendarYear}-${String(calendarMonth + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
                 const isSelected = selectedDate === checkingDate;
@@ -586,18 +615,16 @@ export function TrackSelectionStep({
                     key={`day-${dayNum}`}
                     disabled={isPast}
                     onPress={() => handleSelectDateFromCalendar(dayNum)}
-                    className={`w-[14.28%] aspect-square justify-center items-center rounded-lg border ${
-                      isSelected
-                        ? 'bg-[#ea580c] border-[#ea580c]'
-                        : isPast
+                    className={`w-[14.28%] aspect-square justify-center items-center rounded-lg border ${isSelected
+                      ? 'bg-[#ea580c] border-[#ea580c]'
+                      : isPast
                         ? 'opacity-25 border-transparent'
                         : 'border-transparent active:bg-slate-900'
-                    }`}
+                      }`}
                   >
                     <Text
-                      className={`text-[12px] font-bold ${
-                        isSelected ? 'text-white' : isPast ? 'text-slate-600 line-through' : 'text-slate-200'
-                      }`}
+                      className={`text-[12px] font-bold ${isSelected ? 'text-white' : isPast ? 'text-slate-600 line-through' : 'text-slate-200'
+                        }`}
                     >
                       {dayNum}
                     </Text>

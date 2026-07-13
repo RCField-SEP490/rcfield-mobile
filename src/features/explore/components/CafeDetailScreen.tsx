@@ -83,6 +83,29 @@ export function CafeDetailScreen({ cafeId }: CafeDetailScreenProps) {
     { code: 'RCDRIFT', description: 'Giảm 20k tiền thuê xe Drift' },
   ], []);
 
+  // Tính toán tổng tiền ước lượng tạm tính (1 slot + xe + F&B pre-selected)
+  const totalEstimation = useMemo(() => {
+    const slotFee = cafe?.slotFeeRate || 0;
+    
+    // Giá xe thuê
+    let vehicleFee = 0;
+    if (selectedVehicleId) {
+      const match = catalogs.find((v) => v.id === selectedVehicleId);
+      if (match) {
+        vehicleFee = typeof match.hourlyRate === 'number' ? match.hourlyRate : Number(match.hourlyRate || 0);
+      }
+    }
+
+    // Giá F&B
+    const fnbFee = Object.entries(fnbQuantities).reduce((sum, [id, qty]) => {
+      const match = menuItems.find((m) => m.id === id);
+      const price = match ? (typeof match.price === 'number' ? match.price : Number(match.price || 0)) : 0;
+      return sum + price * qty;
+    }, 0);
+
+    return slotFee + vehicleFee + fnbFee;
+  }, [cafe?.slotFeeRate, selectedVehicleId, fnbQuantities, catalogs, menuItems]);
+
   // Fetch all details on mount
   useEffect(() => {
     const fetchAllData = async () => {
@@ -498,9 +521,9 @@ export function CafeDetailScreen({ cafeId }: CafeDetailScreenProps) {
                           <Text className="text-[12px] text-white" weight="700" numberOfLines={1}>{v.name}</Text>
                           <Text className="text-[10px] text-slate-400 mt-0.5">{v.tier} · Tỷ lệ: 1:10</Text>
                         </View>
-                        <View className="mt-3 flex-row items-baseline justify-between border-t border-slate-800 pt-2">
+                        <View className="mt-3 flex-row items-baseline justify-start border-t border-slate-800 pt-2 gap-1">
                           <Text className="text-[12px] text-[#f97316] font-bold">{rate.toLocaleString('vi-VN')}đ</Text>
-                          <Text className="text-[8px] text-slate-500 font-semibold">/giờ</Text>
+                          <Text className="text-[8px] text-slate-500 font-semibold">/ giờ</Text>
                         </View>
                       </View>
                     </Pressable>
@@ -714,10 +737,9 @@ export function CafeDetailScreen({ cafeId }: CafeDetailScreenProps) {
         className="absolute bottom-0 left-0 right-0 border-t border-slate-900 bg-[#0f172a]/95 px-5 flex-row justify-between items-center shadow-2xl"
       >
         <View>
-          <Text className="text-[10px] text-slate-500 font-bold uppercase">Giá tham khảo</Text>
+          <Text className="text-[9px] text-slate-500 font-bold uppercase">Tạm tính (1 slot)</Text>
           <Text className="text-[15px] text-[#f97316] mt-0.5" weight="700">
-            {cafe.slotFeeRate ? `${cafe.slotFeeRate.toLocaleString('vi-VN')}đ` : '0đ'}
-            <Text className="text-[10px] text-slate-400 font-medium">/slot</Text>
+            {totalEstimation.toLocaleString('vi-VN')}đ
           </Text>
         </View>
         
