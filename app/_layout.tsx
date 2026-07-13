@@ -1,7 +1,7 @@
 import 'react-native-gesture-handler';
 import '../global.css';
 
-import { Slot } from 'expo-router';
+import { Stack } from 'expo-router';
 import 'react-native-reanimated';
 import { LogBox } from 'react-native';
 import { AppProvider } from '@/shared/providers/AppProvider';
@@ -23,7 +23,13 @@ export const unstable_settings = {
 export default function RootLayout() {
   return (
     <AppProvider>
-      <Slot />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          animation: 'slide_from_right',
+          gestureEnabled: true,
+        }}
+      />
     </AppProvider>
   );
 }

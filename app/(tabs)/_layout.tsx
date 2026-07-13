@@ -1,5 +1,5 @@
-import { InstagramTabPager } from '@/shared/ui/InstagramTabPager';
+import { SwipeTabPager } from '@/shared/ui/SwipeTabPager';
 
 export default function TabLayout() {
-  return <InstagramTabPager />;
+  return <SwipeTabPager />;
 }
