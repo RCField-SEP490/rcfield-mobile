@@ -17,6 +17,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { queryClient } from '@/shared/lib/query-client';
 import { useAuthStore } from '@/shared/store/auth-store';
 import { wsClient } from '@/shared/lib/websocket';
+import { GestureWrapper } from '@/shared/ui/GestureWrapper';
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -70,7 +71,9 @@ export function AppProvider({ children }: PropsWithChildren) {
       <SafeAreaProvider>
         <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
           <QueryClientProvider client={queryClient}>
-            {children}
+            <GestureWrapper>
+              {children}
+            </GestureWrapper>
             <StatusBar style="auto" />
           </QueryClientProvider>
         </ThemeProvider>
