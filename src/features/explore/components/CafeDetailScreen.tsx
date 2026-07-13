@@ -182,31 +182,10 @@ export function CafeDetailScreen({ cafeId }: CafeDetailScreenProps) {
 
   // Open Map Direction
   const handleOpenMapDirection = () => {
-    if (!cafe) return;
-    const query = cafe.latitude && cafe.longitude
-      ? `${cafe.latitude},${cafe.longitude}`
-      : encodeURIComponent(`${cafe.address}, ${cafe.district}, ${cafe.city}`);
-    
-    const url = Platform.select({
-      ios: `maps:0,0?q=${query}`,
-      android: `geo:0,0?q=${query}`,
-      default: `https://www.google.com/maps/search/?api=1&query=${query}`
-    });
-
-    Linking.canOpenURL(url)
-      .then((supported) => {
-        if (supported) {
-          return Linking.openURL(url);
-        } else {
-          const webUrl = `https://www.google.com/maps/search/?api=1&query=${query}`;
-          return Linking.openURL(webUrl);
-        }
-      })
-      .catch((err) => {
-        console.error('[CafeDetailScreen] Open map error:', err);
-        const webUrl = `https://www.google.com/maps/search/?api=1&query=${query}`;
-        Linking.openURL(webUrl);
-      });
+    router.push({
+      pathname: '/explore-map',
+      params: { cafeId },
+    } as any);
   };
 
   // Copy Promo Code to Clipboard & Alert
@@ -748,7 +727,7 @@ export function CafeDetailScreen({ cafeId }: CafeDetailScreenProps) {
             className="flex-row items-center justify-center border border-slate-800 bg-[#0f172a] active:bg-slate-900 py-3 px-4 rounded-xl gap-1.5"
           >
             <MapPin color="#f97316" size={16} />
-            <Text className="text-[13px] text-slate-200 font-bold">Chỉ đường</Text>
+            <Text className="text-[13px] text-slate-200 font-bold">Bản đồ</Text>
           </Pressable>
 
           <Pressable
