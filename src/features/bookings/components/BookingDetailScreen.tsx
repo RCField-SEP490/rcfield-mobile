@@ -519,8 +519,8 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                   {session?.status === 'COMPLETED'
                     ? 'Đã hoàn thành phiên chơi và checkout xe đua.'
                     : isSessionActive
-                    ? 'Ca chơi đang hoạt động trên track.'
-                    : 'Chưa bắt đầu ca chơi.'}
+                      ? 'Ca chơi đang hoạt động trên track.'
+                      : 'Chưa bắt đầu ca chơi.'}
                 </Text>
               </View>
             </View>
@@ -688,8 +688,8 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                 {booking.status === 'PENDING'
                   ? 'Sẽ thanh toán qua VNPAY'
                   : prepaidTx
-                  ? `Đã trả qua ${gatewayLabel(prepaidTx.gateway)}`
-                  : 'Đã trả qua VNPAY'}
+                    ? `Đã trả qua ${gatewayLabel(prepaidTx.gateway)}`
+                    : 'Đã trả qua VNPAY'}
               </Text>
             </View>
 
@@ -724,7 +724,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                   <Text className="text-emerald-400 text-xs font-bold">-{discountAmount.toLocaleString('vi-VN')}đ</Text>
                 </View>
               )}
-              
+
               {/* Dòng gạch chân mờ và Tổng đã trả */}
               <View className="w-full h-[1px] bg-slate-800/60 my-1" />
               <View className="flex-row justify-between">
@@ -833,20 +833,18 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
         )}
       </ScrollView>
 
-      {/* Modal Hủy Đặt Lịch */}
       <Modal
         animationType="slide"
         transparent={true}
         visible={cancelModalVisible}
         onRequestClose={() => setCancelModalVisible(false)}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 40 : 0}
-          className="flex-1"
-        >
-          <View className="flex-1 bg-black/60 justify-end">
-            <View className="bg-[#0f172a] rounded-t-3xl border-t border-slate-800 p-6 space-y-4">
+        <View className="flex-1 bg-black/60 justify-end">
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+          >
+            <View className="bg-[#0f172a] rounded-t-3xl border-t border-slate-800 p-6 pb-10 space-y-4">
               <View className="flex-row justify-between items-center border-b border-slate-800 pb-3">
                 <Text className="text-white text-base" weight="700">Xác nhận hủy đặt lịch</Text>
                 <Pressable onPress={() => setCancelModalVisible(false)}>
@@ -855,7 +853,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
               </View>
 
               {refundEstimation && (
-                <View className="rounded-xl bg-amber-500/5 border border-amber-500/10 p-3 space-y-2">
+                <View className="rounded-xl bg-amber-500/5 border border-amber-500/10 p-3 space-y-2 mt-6">
                   <Text className="text-amber-500 text-xs font-bold uppercase tracking-wider">
                     ⚠️ Chính sách hoàn phí chi tiết:
                   </Text>
@@ -873,10 +871,10 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                 </View>
               )}
 
-              <View className="space-y-1.5">
+              <View className="space-y-1.5 mt-4">
                 <Text className="text-slate-400 text-xs font-bold uppercase tracking-wider">Nhập lý do hủy đặt lịch</Text>
                 <TextInput
-                  className="w-full min-h-[70px] rounded-xl border border-slate-800 bg-slate-950 p-3 text-white text-xs font-medium leading-4"
+                  className="w-full min-h-[70px] rounded-xl border border-slate-800 bg-slate-950 p-3 text-white text-xs font-medium leading-4 mt-3"
                   multiline={true}
                   placeholder="Nhập lý do hủy lịch chơi của bạn..."
                   placeholderTextColor="#475569"
@@ -900,8 +898,8 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                 )}
               </Pressable>
             </View>
-          </View>
-        </KeyboardAvoidingView>
+          </KeyboardAvoidingView>
+        </View>
       </Modal>
     </SafeAreaView>
   );

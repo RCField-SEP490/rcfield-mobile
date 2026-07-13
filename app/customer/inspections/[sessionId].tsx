@@ -370,7 +370,7 @@ export default function InspectionReviewScreen() {
         </View>
 
         {/* Action Buttons */}
-        <View className="mt-6 space-y-3">
+        <View className="mt-6 gap-3">
           <TouchableOpacity
             disabled={submitting}
             onPress={handleConfirm}
@@ -391,7 +391,7 @@ export default function InspectionReviewScreen() {
           <TouchableOpacity
             disabled={submitting}
             onPress={() => setRejectModalVisible(true)}
-            className="w-full bg-red-500/5 border border-red-500/20 h-12 rounded-xl justify-center items-center active:opacity-80 flex-row gap-2"
+            className="w-full bg-red-500/5 border border-red-500/20 h-12 rounded-xl justify-center items-center active:opacity-80 flex-row gap-2 mt-2"
           >
             <XCircle color="#ef4444" size={16} />
             <Text className="text-red-400 font-bold text-xs uppercase tracking-wider">
@@ -421,58 +421,60 @@ export default function InspectionReviewScreen() {
 
       {/* Modal từ chối (Disagreement Reason) */}
       <Modal visible={rejectModalVisible} transparent={true} animationType="slide">
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          className="flex-1 bg-black/80 justify-end"
-        >
-          <View className="bg-slate-900 border-t border-slate-800 rounded-t-3xl p-6 space-y-4">
-            <View className="flex-row justify-between items-center border-b border-slate-800 pb-3">
-              <Text className="text-white font-bold text-base">Lý Do Từ Chối Biên Bản</Text>
-              <TouchableOpacity onPress={() => setRejectModalVisible(false)}>
-                <XCircle color="#94a3b8" size={22} />
-              </TouchableOpacity>
+        <View className="flex-1 bg-black/80 justify-end">
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+          >
+            <View className="bg-slate-900 border-t border-slate-800 rounded-t-3xl p-6 pb-10 space-y-4">
+              <View className="flex-row justify-between items-center border-b border-slate-800 pb-3">
+                <Text className="text-white font-bold text-base">Lý Do Từ Chối Biên Bản</Text>
+                <TouchableOpacity onPress={() => setRejectModalVisible(false)}>
+                  <XCircle color="#94a3b8" size={22} />
+                </TouchableOpacity>
+              </View>
+
+              <Text className="text-slate-400 text-xs leading-4">
+                Vui lòng chỉ rõ điểm không đồng ý hoặc sai lệch về hình ảnh/checklist xe để nhân viên trực ca thực hiện điều chỉnh và bàn giao lại.
+              </Text>
+
+              <TextInput
+                multiline
+                numberOfLines={4}
+                value={disagreementNote}
+                onChangeText={setDisagreementNote}
+                placeholder="Nhập lý do chi tiết (ví dụ: ảnh xe không khớp, xước cánh gió nhưng chưa note, v.v.)..."
+                placeholderTextColor="#475569"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3.5 text-white text-xs font-semibold leading-5 text-start"
+                style={{ minHeight: 100, textAlignVertical: 'top' }}
+              />
+
+              <View className="flex-row gap-3 pt-2">
+                <TouchableOpacity
+                  onPress={() => setRejectModalVisible(false)}
+                  className="flex-1 bg-slate-950 border border-slate-800 h-11 rounded-xl justify-center items-center"
+                >
+                  <Text className="text-slate-400 font-bold text-xs">Hủy bỏ</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  disabled={submitting}
+                  onPress={handleReject}
+                  className="flex-1 bg-red-600 h-11 rounded-xl justify-center items-center shadow-lg active:opacity-90 flex-row gap-1.5"
+                >
+                  {submitting ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <>
+                      <XCircle color="#fff" size={14} />
+                      <Text className="text-white font-bold text-xs">Gửi từ chối</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
-
-            <Text className="text-slate-400 text-xs leading-4">
-              Vui lòng chỉ rõ điểm không đồng ý hoặc sai lệch về hình ảnh/checklist xe để nhân viên trực ca thực hiện điều chỉnh và bàn giao lại.
-            </Text>
-
-            <TextInput
-              multiline
-              numberOfLines={4}
-              value={disagreementNote}
-              onChangeText={setDisagreementNote}
-              placeholder="Nhập lý do chi tiết (ví dụ: ảnh xe không khớp, xước cánh gió nhưng chưa note, v.v.)..."
-              placeholderTextColor="#475569"
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3.5 text-white text-xs font-semibold leading-5 text-start"
-              style={{ minHeight: 100, textAlignVertical: 'top' }}
-            />
-
-            <View className="flex-row gap-3 pt-2">
-              <TouchableOpacity
-                onPress={() => setRejectModalVisible(false)}
-                className="flex-1 bg-slate-950 border border-slate-800 h-11 rounded-xl justify-center items-center"
-              >
-                <Text className="text-slate-400 font-bold text-xs">Hủy bỏ</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                disabled={submitting}
-                onPress={handleReject}
-                className="flex-1 bg-red-600 h-11 rounded-xl justify-center items-center shadow-lg active:opacity-90 flex-row gap-1.5"
-              >
-                {submitting ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <>
-                    <XCircle color="#fff" size={14} />
-                    <Text className="text-white font-bold text-xs">Gửi từ chối</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
+          </KeyboardAvoidingView>
+        </View>
       </Modal>
     </SafeAreaView>
   );
