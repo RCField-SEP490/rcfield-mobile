@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { View, ScrollView, Pressable, ActivityIndicator, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import { View, ScrollView, Pressable, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, DeviceEventEmitter } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
@@ -228,13 +228,20 @@ export function BookingWizardScreen({
     setCurrentStep(prev => prev + 1);
   };
 
-  const handleBack = () => {
+  const handleBack = useCallback(() => {
     if (currentStep === 1) {
       router.back();
     } else {
       setCurrentStep(prev => prev - 1);
     }
-  };
+  }, [currentStep, router]);
+
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('WIZARD_SWIPE_BACK', () => {
+      handleBack();
+    });
+    return () => sub.remove();
+  }, [handleBack]);
 
   // 4. Booking submission
   const getBookingPayload = () => {

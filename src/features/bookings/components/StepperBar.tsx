@@ -1,5 +1,5 @@
 import React from 'react';
-import { View } from 'react-native';
+import { View, StyleSheet, type DimensionValue } from 'react-native';
 import { Check, Compass, Users, Coffee, CreditCard } from 'lucide-react-native';
 import { Text } from '@/shared/ui/Text';
 
@@ -15,10 +15,13 @@ const STEPS = [
 ];
 
 export function StepperBar({ currentStep }: StepperBarProps) {
+  // Tính toán chiều rộng của đường màu cam active nối từ tâm vòng tròn 1 đến tâm vòng tròn 4
+  const activeLineWidth = `${((currentStep - 1) / (STEPS.length - 1)) * 100}%` as DimensionValue;
+
   return (
     <View className="w-full bg-[#0f172a]/40 border border-slate-800/80 rounded-2xl p-5 mb-5">
       {/* Title */}
-      <View className="mb-4">
+      <View className="mb-5">
         <Text className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">
           RCField Checkout
         </Text>
@@ -28,17 +31,22 @@ export function StepperBar({ currentStep }: StepperBarProps) {
       </View>
 
       {/* Stepper progress */}
-      <View className="w-full">
-        {/* Hàng 1: Nodes tròn và Lines nối ngang đồng tâm */}
-        <View className="flex-row items-center justify-between px-3 mb-2">
-          {STEPS.map((step, index) => {
+      <View className="w-full relative">
+        {/* Đường nối ngang chạy nền phía sau các vòng tròn */}
+        <View style={styles.lineBackground}>
+          <View style={[styles.lineActive, { width: activeLineWidth }]} />
+        </View>
+
+        {/* 4 Steps Block chia đều cột dọc, căn giữa đồng tâm */}
+        <View className="flex-row justify-between w-full">
+          {STEPS.map((step) => {
             const isCompleted = step.id < currentStep;
             const isActive = step.id === currentStep;
             const IconComponent = step.Icon;
 
             return (
-              <React.Fragment key={step.id}>
-                {/* Node hình tròn */}
+              <View key={step.id} className="items-center" style={{ width: '23%' }}>
+                {/* Node hình tròn (chèn lên trên đường line nền nhờ zIndex) */}
                 <View
                   style={{
                     width: 36,
@@ -51,6 +59,7 @@ export function StepperBar({ currentStep }: StepperBarProps) {
                     borderColor: isCompleted ? '#ea580c' : isActive ? '#f97316' : '#334155',
                     zIndex: 10,
                   }}
+                  className="mb-2"
                 >
                   {isCompleted ? (
                     <Check color="#ffffff" size={14} strokeWidth={3} />
@@ -63,28 +72,7 @@ export function StepperBar({ currentStep }: StepperBarProps) {
                   )}
                 </View>
 
-                {/* Đường nối ngang flex-1 tự động lấp đầy */}
-                {index < STEPS.length - 1 && (
-                  <View
-                    style={{
-                      flex: 1,
-                      height: 2,
-                      marginHorizontal: 4,
-                      backgroundColor: step.id < currentStep ? '#ea580c' : '#1e293b',
-                    }}
-                  />
-                )}
-              </React.Fragment>
-            );
-          })}
-        </View>
-
-        {/* Hàng 2: Nhãn chữ tương ứng thẳng cột */}
-        <View className="flex-row justify-between px-1">
-          {STEPS.map((step) => {
-            const isActive = step.id === currentStep;
-            return (
-              <View key={step.id} style={{ width: 70 }} className="items-center">
+                {/* Nhãn chữ nằm chính giữa cột dọc của vòng tròn */}
                 <Text
                   className={`text-[10px] text-center font-bold leading-4 ${
                     isActive ? 'text-[#f97316]' : 'text-slate-400'
@@ -104,3 +92,19 @@ export function StepperBar({ currentStep }: StepperBarProps) {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  lineBackground: {
+    position: 'absolute',
+    top: 18, // Bằng 1/2 chiều cao vòng tròn (36px / 2) để nằm chính giữa
+    left: '11.5%', // Bắt đầu tại tâm của cột thứ nhất (23% / 2)
+    right: '11.5%', // Kết thúc tại tâm của cột thứ tư (23% / 2)
+    height: 2,
+    backgroundColor: '#1e293b',
+    zIndex: 1,
+  },
+  lineActive: {
+    height: '100%',
+    backgroundColor: '#ea580c',
+  },
+});

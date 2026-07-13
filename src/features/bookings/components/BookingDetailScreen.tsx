@@ -389,6 +389,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
       </View>
 
       <ScrollView contentContainerClassName="px-5 py-5 pb-12" showsVerticalScrollIndicator={false}>
+
         {/* Mã QR Code Check-in — dùng endpoint BE /bookings/:id/qr (Ẩn nếu đã checkout hoặc bị hủy) */}
         {booking.status !== 'CANCELLED' && booking.status !== 'NO_SHOW' && (!session || session.status !== 'COMPLETED') && (
           <View className="items-center mb-6 rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-6 shadow-2xl">
