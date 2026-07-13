@@ -8,8 +8,6 @@ import {
   Alert,
   Dimensions,
   Share,
-  Platform,
-  Linking,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -24,7 +22,6 @@ import {
   Car,
   Wallet,
   Wrench,
-  CheckCircle,
   Coffee,
   Plus,
   Minus,
@@ -33,7 +30,6 @@ import {
 
 import { Text } from '@/shared/ui/Text';
 import { useAuthStore } from '@/shared/store/auth-store';
-import { useLocation } from '@/shared/hooks/useLocation';
 import {
   getCafeById,
   listCafeImages,
@@ -56,7 +52,6 @@ export function CafeDetailScreen({ cafeId }: CafeDetailScreenProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const { location: userLocation } = useLocation();
 
   // Data states
   const [cafe, setCafe] = useState<Cafe | null>(null);
@@ -165,7 +160,7 @@ export function CafeDetailScreen({ cafeId }: CafeDetailScreenProps) {
     };
 
     fetchAllData();
-  }, [cafeId, isAuthenticated]);
+  }, [cafeId, isAuthenticated, router]);
 
   const isFavorite = favoriteIds.includes(cafeId);
 

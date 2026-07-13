@@ -1,7 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
-  ScrollView,
   FlatList,
   Image,
   Pressable,
@@ -26,7 +25,7 @@ export function FavoritesScreen() {
   const [loading, setLoading] = useState(true);
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
 
-  const fetchFavorites = async () => {
+  const fetchFavorites = useCallback(async () => {
     setLoading(true);
     try {
       // 1. Lấy tất cả cafe
@@ -54,11 +53,11 @@ export function FavoritesScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [isAuthenticated]);
 
   useEffect(() => {
     fetchFavorites();
-  }, [isAuthenticated]);
+  }, [fetchFavorites]);
 
   // Xử lý Bỏ thích nhanh (Unfavorite)
   const handleRemoveFavorite = async (cafeId: string) => {
