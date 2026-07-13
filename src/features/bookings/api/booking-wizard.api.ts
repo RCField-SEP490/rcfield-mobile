@@ -182,4 +182,13 @@ export const bookingWizardApi = {
     const response = await api.get(`/sessions/${sessionId}`);
     return response.data?.data;
   },
+
+  confirmInspection: async (
+    sessionId: string,
+    inspectionId: string,
+    payload: { agreed: boolean; disagreementNote?: string }
+  ): Promise<any> => {
+    const response = await api.post(`/sessions/${sessionId}/inspections/${inspectionId}/confirm`, payload);
+    return response.data?.data;
+  },
 };

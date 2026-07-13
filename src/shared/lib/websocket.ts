@@ -1,5 +1,6 @@
 import { useAuthStore } from '@/shared/store/auth-store';
 import { Alert } from 'react-native';
+import { router } from 'expo-router';
 
 type WsCallback = (event: string, data: any) => void;
 
@@ -98,7 +99,21 @@ class WebSocketClient {
       case 'SESSION_CHECKOUT_INSPECTION':
         Alert.alert(
           'Biên bản trả xe',
-          'Nhân viên trực ca vừa thực hiện kiểm tra và nhận lại xe. Phiên chơi của bạn đã kết thúc.'
+          'Nhân viên trực ca vừa thực hiện kiểm tra và nhận lại xe. Vui lòng kiểm tra và xác nhận biên bản.',
+          [
+            {
+              text: 'Kiểm tra ngay',
+              onPress: () => {
+                if (data?.sessionId) {
+                  router.push({
+                    pathname: '/customer/inspections/[sessionId]',
+                    params: { sessionId: data.sessionId, inspectionId: data.inspectionId }
+                  } as any);
+                }
+              }
+            },
+            { text: 'Để sau', style: 'cancel' }
+          ]
         );
         break;
       case 'CUSTOMER_PAYMENT_CONFIRMED':
