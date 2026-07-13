@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { View, ScrollView, Pressable, ActivityIndicator, Alert } from 'react-native';
+import { View, ScrollView, Pressable, ActivityIndicator, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
@@ -194,7 +194,7 @@ export function BookingWizardScreen({
         (c) => c.phone.trim() !== '' && !phoneRegex.test(c.phone)
       );
       const companionNameEmpty = companions.some((c) => c.name.trim() === '');
-      
+
       if (companionNameEmpty || companionPhoneInvalid) return true;
 
       if (playMode === 'RENTAL') {
@@ -207,7 +207,7 @@ export function BookingWizardScreen({
 
   const handleNext = () => {
     if (currentStep === 4) return;
-    
+
     // Step 1 Validation: Ensure sequential selected slots
     if (currentStep === 1) {
       let isSequential = true;
@@ -276,7 +276,7 @@ export function BookingWizardScreen({
 
       // Create VNPay checkout url
       const checkout = await bookingWizardApi.createCheckout(booking.booking_id, customReturnUrl);
-      
+
       if (checkout.confirmed) {
         Alert.alert('Thành công', 'Đặt lịch thành công! Slot đã được thanh toán thông qua Gói hội viên.', [
           { text: 'Đóng', onPress: () => router.push('/(tabs)/bookings') },
@@ -287,7 +287,7 @@ export function BookingWizardScreen({
       if (checkout.payment_url) {
         // Open VNPay checkout URL in In-App Browser for seamless checkout flow
         await WebBrowser.openBrowserAsync(checkout.payment_url);
-        
+
         // After browser is closed, check the latest status of this booking from backend
         setSubmitting(true);
         try {
@@ -321,10 +321,10 @@ export function BookingWizardScreen({
     try {
       const payload = getBookingPayload();
       const booking = await bookingWizardApi.createBooking(payload);
-      
+
       // Perform mock checkout
       await bookingWizardApi.mockCheckout(booking.booking_id);
-      
+
       Alert.alert('Thành công', 'Mock thanh toán thành công! Lịch đặt đã được xác nhận.', [
         { text: 'Xem lịch đặt', onPress: () => router.push('/(tabs)/bookings') },
       ]);
@@ -359,129 +359,136 @@ export function BookingWizardScreen({
           <ActivityIndicator size="large" color="#f97316" />
         </View>
       ) : (
-        <View className="flex-1">
-          <ScrollView
-            contentContainerClassName="px-5 py-5 pb-40"
-            showsVerticalScrollIndicator={false}
-          >
-            {/* Stepper progress */}
-            <StepperBar currentStep={currentStep} />
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+          className="flex-1"
+        >
+          <View className="flex-1">
+            <ScrollView
+              className="flex-1"
+              contentContainerClassName="px-5 py-5 pb-6"
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {/* Stepper progress */}
+              <StepperBar currentStep={currentStep} />
 
-            {/* Steps Container */}
-            {currentStep === 1 && (
-              <TrackSelectionStep
-                cafeId={cafeId}
-                selectedTrackConfig={selectedTrackConfig}
-                setSelectedTrackConfig={setSelectedTrackConfig}
-                selectedDate={selectedDate}
-                setSelectedDate={setSelectedDate}
-                selectedSlots={selectedSlots}
-                setSelectedSlots={setSelectedSlots}
-                playMode={playMode}
-                setPlayMode={setPlayMode}
-                selectedVehicleIds={selectedVehicleIds}
-                setSelectedVehicleIds={setSelectedVehicleIds}
-                catalogs={catalogs}
-              />
-            )}
+              {/* Steps Container */}
+              {currentStep === 1 && (
+                <TrackSelectionStep
+                  cafeId={cafeId}
+                  selectedTrackConfig={selectedTrackConfig}
+                  setSelectedTrackConfig={setSelectedTrackConfig}
+                  selectedDate={selectedDate}
+                  setSelectedDate={setSelectedDate}
+                  selectedSlots={selectedSlots}
+                  setSelectedSlots={setSelectedSlots}
+                  playMode={playMode}
+                  setPlayMode={setPlayMode}
+                  selectedVehicleIds={selectedVehicleIds}
+                  setSelectedVehicleIds={setSelectedVehicleIds}
+                  catalogs={catalogs}
+                />
+              )}
 
-            {currentStep === 2 && (
-              <ParticipantsStep
-                cafeId={cafeId}
-                playMode={playMode}
-                participants={participants}
-                setParticipants={setParticipants}
-                companions={companions}
-                setCompanions={setCompanions}
-                selectedVehicleIds={selectedVehicleIds}
-                setSelectedVehicleIds={setSelectedVehicleIds}
-                slotStart={slotStartIso}
-                slotEnd={slotEndIso}
-                trackConfigId={selectedTrackConfig?.id}
-              />
-            )}
+              {currentStep === 2 && (
+                <ParticipantsStep
+                  cafeId={cafeId}
+                  playMode={playMode}
+                  participants={participants}
+                  setParticipants={setParticipants}
+                  companions={companions}
+                  setCompanions={setCompanions}
+                  selectedVehicleIds={selectedVehicleIds}
+                  setSelectedVehicleIds={setSelectedVehicleIds}
+                  slotStart={slotStartIso}
+                  slotEnd={slotEndIso}
+                  trackConfigId={selectedTrackConfig?.id}
+                />
+              )}
 
-            {currentStep === 3 && (
-              <FnbStep
-                cafeId={cafeId}
-                fnbQuantities={fnbQuantities}
-                setFnbQuantities={setFnbQuantities}
-              />
-            )}
+              {currentStep === 3 && (
+                <FnbStep
+                  cafeId={cafeId}
+                  fnbQuantities={fnbQuantities}
+                  setFnbQuantities={setFnbQuantities}
+                />
+              )}
 
-            {currentStep === 4 && (
-              <PaymentStep
-                cafeId={cafeId}
-                playMode={playMode}
-                slotStart={slotStartIso}
-                slotEnd={slotEndIso}
-                durationHours={durationHours}
-                slotFeeRate={slotFeeRate}
-                participants={participants}
-                selectedVehicleIds={selectedVehicleIds}
-                vehiclePriceTotal={vehiclePriceTotal}
-                fnbPriceTotal={fnbPriceTotal}
-                fnbDetailsList={fnbDetailsList}
-                selectedPackageId={selectedPackageId}
-                setSelectedPackageId={setSelectedPackageId}
-                appliedPromo={appliedPromo}
-                setAppliedPromo={setAppliedPromo}
-                onMockPayment={handleMockPayment}
-                isMockSubmitting={mockSubmitting}
-                cafeName={cafe?.name || 'Chi nhánh'}
-                cafeAddress={`${cafe?.district || ''}, ${cafe?.city || ''}`}
-                cafeImage={cafe?.image || null}
-                trackConfigName={selectedTrackConfig?.track_type?.name || 'Sân đua'}
-                vehicleCatalogs={catalogs}
-              />
-            )}
-          </ScrollView>
+              {currentStep === 4 && (
+                <PaymentStep
+                  cafeId={cafeId}
+                  playMode={playMode}
+                  slotStart={slotStartIso}
+                  slotEnd={slotEndIso}
+                  durationHours={durationHours}
+                  slotFeeRate={slotFeeRate}
+                  participants={participants}
+                  selectedVehicleIds={selectedVehicleIds}
+                  vehiclePriceTotal={vehiclePriceTotal}
+                  fnbPriceTotal={fnbPriceTotal}
+                  fnbDetailsList={fnbDetailsList}
+                  selectedPackageId={selectedPackageId}
+                  setSelectedPackageId={setSelectedPackageId}
+                  appliedPromo={appliedPromo}
+                  setAppliedPromo={setAppliedPromo}
+                  onMockPayment={handleMockPayment}
+                  isMockSubmitting={mockSubmitting}
+                  cafeName={cafe?.name || 'Chi nhánh'}
+                  cafeAddress={`${cafe?.district || ''}, ${cafe?.city || ''}`}
+                  cafeImage={cafe?.image || null}
+                  trackConfigName={selectedTrackConfig?.track_type?.name || 'Sân đua'}
+                  vehicleCatalogs={catalogs}
+                />
+              )}
+            </ScrollView>
 
-          {/* Action Bottom Bar */}
-          <View
-            style={{ paddingBottom: Math.max(insets.bottom, 16), paddingTop: 14 }}
-            className="absolute bottom-0 left-0 right-0 border-t border-slate-900 bg-[#0f172a]/95 px-5 flex-row justify-between items-center shadow-lg"
-          >
-            <View>
-              <Text className="text-[10px] text-slate-400 font-semibold">Tạm tính</Text>
-              <Text className="text-[16px] text-[#f97316]" weight="700">
-                {finalTotalAmount.toLocaleString('vi-VN')}đ
-              </Text>
-            </View>
-
-            {currentStep === 4 ? (
-              <Pressable
-                disabled={submitting}
-                onPress={handleConfirmPayment}
-                className="flex-row items-center justify-center bg-[#ea580c] py-2.5 px-6 rounded-xl active:bg-[#f97316] gap-1"
-              >
-                {submitting ? (
-                  <ActivityIndicator size="small" color="#ffffff" />
-                ) : (
-                  <>
-                    <Text className="text-[12px] text-white font-bold">
-                      Thanh toán VNPay
-                    </Text>
-                    <ChevronRight color="#ffffff" size={14} strokeWidth={2.5} />
-                  </>
-                )}
-              </Pressable>
-            ) : (
-              <Pressable
-                disabled={isNextDisabled}
-                onPress={handleNext}
-                className={`flex-row items-center justify-center py-2.5 px-6 rounded-xl gap-1 ${
-                  isNextDisabled ? 'bg-slate-800 opacity-50' : 'bg-[#ea580c] active:bg-[#f97316]'
-                }`}
-              >
-                <Text className="text-[12px] text-white font-bold">
-                  Tiếp theo
+            {/* Action Bottom Bar */}
+            <View
+              style={{ paddingBottom: Math.max(insets.bottom, 16), paddingTop: 14 }}
+              className="border-t border-slate-900 bg-[#0f172a]/95 px-5 flex-row justify-between items-center shadow-lg"
+            >
+              <View>
+                <Text className="text-[10px] text-slate-400 font-semibold">Tạm tính</Text>
+                <Text className="text-[16px] text-[#f97316]" weight="700">
+                  {finalTotalAmount.toLocaleString('vi-VN')}đ
                 </Text>
-                <ChevronRight color="#ffffff" size={14} strokeWidth={2.5} />
-              </Pressable>
-            )}
+              </View>
+
+              {currentStep === 4 ? (
+                <Pressable
+                  disabled={submitting}
+                  onPress={handleConfirmPayment}
+                  className="flex-row items-center justify-center bg-[#ea580c] py-2.5 px-6 rounded-xl active:bg-[#f97316] gap-1"
+                >
+                  {submitting ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <>
+                      <Text className="text-[12px] text-white font-bold">
+                        Thanh toán VNPay
+                      </Text>
+                      <ChevronRight color="#ffffff" size={14} strokeWidth={2.5} />
+                    </>
+                  )}
+                </Pressable>
+              ) : (
+                <Pressable
+                  disabled={isNextDisabled}
+                  onPress={handleNext}
+                  className={`flex-row items-center justify-center py-2.5 px-6 rounded-xl gap-1 ${isNextDisabled ? 'bg-slate-800 opacity-50' : 'bg-[#ea580c] active:bg-[#f97316]'
+                    }`}
+                >
+                  <Text className="text-[12px] text-white font-bold">
+                    Tiếp theo
+                  </Text>
+                  <ChevronRight color="#ffffff" size={14} strokeWidth={2.5} />
+                </Pressable>
+              )}
+            </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       )}
     </SafeAreaView>
   );

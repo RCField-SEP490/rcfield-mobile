@@ -177,4 +177,9 @@ export const bookingWizardApi = {
     const response = await api.patch(`/bookings/${bookingId}/cancel`, { reason });
     return response.data?.data;
   },
+
+  getSessionDetail: async (sessionId: string): Promise<any> => {
+    const response = await api.get(`/sessions/${sessionId}`);
+    return response.data?.data;
+  },
 };
