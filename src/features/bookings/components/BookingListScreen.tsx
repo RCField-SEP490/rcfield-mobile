@@ -13,44 +13,69 @@ import {
   FlatList,
   Pressable,
   RefreshControl,
+  ScrollView,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { getMyBookings, type BookingListItem } from '@/features/bookings/api/booking.api';
+import { getMyBookings, type BookingListItem, type BookingStatus } from '@/features/bookings/api/booking.api';
 import { Text } from '@/shared/ui/Text';
 import { cn } from '@/shared/lib/utils';
 
-type FilterTab = 'upcoming' | 'active' | 'completed' | 'cancelled';
+// ── 6 category filter theo yêu cầu ──────────────────────────────────────────
+type FilterKey = 'ALL' | BookingStatus;
 
-const TAB_CONFIG: { key: FilterTab; label: string }[] = [
-  { key: 'upcoming', label: 'Sắp tới' },
-  { key: 'active', label: 'Đang chơi' },
-  { key: 'completed', label: 'Đã chơi' },
-  { key: 'cancelled', label: 'Đã hủy' },
+interface TabConfig {
+  key: FilterKey;
+  label: string;
+  // Màu hex thực — tránh dùng Tailwind class động để NativeWind không bị conflict
+  activeBg: string;
+  activeBorderColor: string;
+  activeTextColor: string;
+  activeBadgeBg: string;
+}
+
+const TAB_CONFIG: TabConfig[] = [
+  { key: 'ALL',       label: 'Tất cả',        activeBg: '#334155',          activeBorderColor: '#64748b', activeTextColor: '#ffffff',  activeBadgeBg: 'rgba(255,255,255,0.15)' },
+  { key: 'PENDING',   label: 'Chờ thanh toán', activeBg: 'rgba(245,158,11,0.2)', activeBorderColor: '#f59e0b', activeTextColor: '#fbbf24',  activeBadgeBg: 'rgba(255,255,255,0.15)' },
+  { key: 'CONFIRMED', label: 'Đã xác nhận',    activeBg: 'rgba(16,185,129,0.2)', activeBorderColor: '#10b981', activeTextColor: '#34d399',  activeBadgeBg: 'rgba(255,255,255,0.15)' },
+  { key: 'NO_SHOW',   label: 'Không đến',      activeBg: 'rgba(51,65,85,0.5)',   activeBorderColor: '#64748b', activeTextColor: '#cbd5e1',  activeBadgeBg: 'rgba(255,255,255,0.15)' },
+  { key: 'COMPLETED', label: 'Hoàn thành',     activeBg: 'rgba(99,102,241,0.2)', activeBorderColor: '#6366f1', activeTextColor: '#818cf8',  activeBadgeBg: 'rgba(255,255,255,0.15)' },
+  { key: 'CANCELLED', label: 'Đã hủy',         activeBg: 'rgba(239,68,68,0.2)',  activeBorderColor: '#ef4444', activeTextColor: '#f87171',  activeBadgeBg: 'rgba(255,255,255,0.15)' },
 ];
 
+// ── Badge trạng thái hiển thị trên card ─────────────────────────────────────
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; icon: any }> = {
-  PENDING: { label: 'Chờ thanh toán', bg: 'bg-amber-500/10 border-amber-500/20', text: 'text-amber-500', icon: Clock },
-  CONFIRMED: { label: 'Đã xác nhận', bg: 'bg-emerald-500/10 border-emerald-500/20', text: 'text-emerald-500', icon: Calendar },
-  NO_SHOW: { label: 'Vắng mặt', bg: 'bg-slate-500/10 border-slate-500/20', text: 'text-slate-400', icon: HelpCircle },
-  COMPLETED: { label: 'Hoàn thành', bg: 'bg-indigo-500/10 border-indigo-500/20', text: 'text-indigo-400', icon: Gamepad2 },
-  CANCELLED: { label: 'Đã hủy', bg: 'bg-red-500/10 border-red-500/20', text: 'text-red-400', icon: RotateCcw },
-  
-  // Trạng thái lồng ghép Session thực tế
-  CHECKED_IN: { label: 'Đang check-in', bg: 'bg-amber-500/10 border-amber-500/20', text: 'text-amber-400', icon: Clock },
-  ACTIVE: { label: 'Đang chơi', bg: 'bg-orange-500/10 border-orange-500/20', text: 'text-orange-500', icon: Gamepad2 },
-  EXTENDING: { label: 'Đang gia hạn', bg: 'bg-orange-500/10 border-orange-500/20', text: 'text-orange-500', icon: SparklesIcon },
-  CHECKING_OUT: { label: 'Đang checkout', bg: 'bg-blue-500/10 border-blue-500/20', text: 'text-blue-400', icon: Clock },
+  PENDING:      { label: 'Chờ thanh toán', bg: 'bg-amber-500/10 border-amber-500/20',    text: 'text-amber-500',   icon: Clock },
+  CONFIRMED:    { label: 'Đã xác nhận',    bg: 'bg-emerald-500/10 border-emerald-500/20', text: 'text-emerald-500', icon: Calendar },
+  NO_SHOW:      { label: 'Không đến',      bg: 'bg-slate-500/10 border-slate-500/20',    text: 'text-slate-400',   icon: HelpCircle },
+  COMPLETED:    { label: 'Hoàn thành',     bg: 'bg-indigo-500/10 border-indigo-500/20',  text: 'text-indigo-400',  icon: Gamepad2 },
+  CANCELLED:    { label: 'Đã hủy',         bg: 'bg-red-500/10 border-red-500/20',        text: 'text-red-400',     icon: RotateCcw },
+  // Trạng thái Session thực tế
+  CHECKED_IN:   { label: 'Đang check-in',  bg: 'bg-amber-500/10 border-amber-500/20',    text: 'text-amber-400',   icon: Clock },
+  ACTIVE:       { label: 'Đang chơi',      bg: 'bg-orange-500/10 border-orange-500/20',  text: 'text-orange-500',  icon: Gamepad2 },
+  EXTENDING:    { label: 'Đang gia hạn',   bg: 'bg-orange-500/10 border-orange-500/20',  text: 'text-orange-500',  icon: Gamepad2 },
+  CHECKING_OUT: { label: 'Đang checkout',  bg: 'bg-blue-500/10 border-blue-500/20',      text: 'text-blue-400',    icon: Clock },
 };
 
-function SparklesIcon(props: any) {
-  return <Gamepad2 {...props} />;
+// Chuyển Tailwind text class → hex color để truyền vào icon component
+function resolveIconColor(textClass: string): string {
+  const map: Record<string, string> = {
+    'text-orange-500': '#f97316',
+    'text-emerald-500': '#10b981',
+    'text-amber-500': '#f59e0b',
+    'text-amber-400': '#f59e0b',
+    'text-blue-400': '#60a5fa',
+    'text-indigo-400': '#818cf8',
+    'text-slate-400': '#94a3b8',
+    'text-red-400': '#f87171',
+  };
+  return map[textClass] ?? '#94a3b8';
 }
 
 export function BookingListScreen() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<FilterTab>('upcoming');
+  const [activeTab, setActiveTab] = useState<FilterKey>('ALL');
   const [bookings, setBookings] = useState<BookingListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -61,13 +86,41 @@ export function BookingListScreen() {
     } else {
       setLoading(true);
     }
-
     try {
-      // Load tối đa 50 đơn gần đây của khách hàng để phân loại
-      const result = await getMyBookings({ limit: 50 });
-      setBookings(result.data);
+      // BE giới hạn limit tối đa 50 — fetch song song theo từng status để có đủ data tất cả category
+      const statuses: (BookingStatus | undefined)[] = [
+        undefined,       // ALL — lấy toàn bộ theo limit 50
+        'PENDING',
+        'CONFIRMED',
+        'NO_SHOW',
+        'COMPLETED',
+        'CANCELLED',
+      ];
+      const results = await Promise.allSettled(
+        statuses.map((s) => getMyBookings({ status: s, limit: 50, page: 1 }))
+      );
+
+      // Gộp và dedup theo id, giữ thứ tự mới nhất
+      const seen = new Set<string>();
+      const merged: BookingListItem[] = [];
+      results.forEach((r) => {
+        if (r.status === 'fulfilled') {
+          r.value.data.forEach((b) => {
+            if (!seen.has(b.id)) {
+              seen.add(b.id);
+              merged.push(b);
+            }
+          });
+        }
+      });
+
+      // Sắp xếp giảm dần theo slotStart
+      merged.sort(
+        (a, b) => new Date(b.slotStart).getTime() - new Date(a.slotStart).getTime()
+      );
+      setBookings(merged);
     } catch (error) {
-      console.error('Failed to load bookings list:', error);
+      console.error('[BookingList] Failed to load bookings:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -78,55 +131,58 @@ export function BookingListScreen() {
     fetchBookings();
   }, [fetchBookings]);
 
-  // Phân loại bookings theo các Tab trạng thái tương ứng
-  const filteredBookings = useMemo(() => {
-    const now = new Date();
-    return bookings.filter((b) => {
-      const slotStart = new Date(b.slotStart);
-      const isPast = slotStart < now;
-      const sessStatus = b.session?.status;
-      const hasActiveSession = sessStatus && ['ACTIVE', 'EXTENDING', 'CHECKED_IN', 'CHECKING_OUT'].includes(sessStatus);
-
-      switch (activeTab) {
-        case 'upcoming':
-          // Đơn PENDING hoặc CONFIRMED chưa chơi
-          return (b.status === 'PENDING' || b.status === 'CONFIRMED') && !isPast && !hasActiveSession;
-        case 'active':
-          // Đơn có session đang hoạt động thực tế tại sân
-          return hasActiveSession && b.status !== 'CANCELLED';
-        case 'completed':
-          // Đơn đã kết thúc hoặc vắng mặt
-          return b.status === 'COMPLETED' || b.status === 'NO_SHOW' || (isPast && b.status !== 'CANCELLED' && !hasActiveSession);
-        case 'cancelled':
-          // Đơn đã hủy
-          return b.status === 'CANCELLED';
-        default:
-          return false;
+  // Đếm số đơn theo từng status để hiển thị badge trên tab
+  const countByStatus = useMemo(() => {
+    const counts: Record<FilterKey, number> = {
+      ALL: bookings.length,
+      PENDING: 0,
+      CONFIRMED: 0,
+      NO_SHOW: 0,
+      COMPLETED: 0,
+      CANCELLED: 0,
+    };
+    bookings.forEach((b) => {
+      if (b.status in counts) {
+        (counts as Record<string, number>)[b.status]++;
       }
     });
+    return counts;
+  }, [bookings]);
+
+  // Filter bookings theo tab — trực tiếp theo BookingStatus từ BE
+  const filteredBookings = useMemo(() => {
+    if (activeTab === 'ALL') return bookings;
+    return bookings.filter((b) => b.status === activeTab);
   }, [bookings, activeTab]);
 
   const handleCardPress = (id: string) => {
-    // Expo Router navigation to dynamic path app/booking/[id].tsx
     router.push(`/booking/${id}` as any);
   };
 
   const renderBookingItem = ({ item }: { item: BookingListItem }) => {
-    // Ưu tiên ghi đè hiển thị trạng thái bằng trạng thái của Session thực tế
+    // Ưu tiên hiển thị trạng thái Session thực tế nếu đang active
     const sessStatus = item.session?.status;
-    const isSessionActive = sessStatus && ['ACTIVE', 'EXTENDING', 'CHECKED_IN', 'CHECKING_OUT'].includes(sessStatus);
-    const displayStatus = isSessionActive ? sessStatus : item.status;
+    const isSessionActive =
+      sessStatus && ['ACTIVE', 'EXTENDING', 'CHECKED_IN', 'CHECKING_OUT'].includes(sessStatus);
+    const displayStatus = isSessionActive ? sessStatus! : item.status;
     const status = STATUS_CONFIG[displayStatus] ?? STATUS_CONFIG.PENDING;
     const StatusIcon = status.icon;
 
     const slotStart = new Date(item.slotStart);
     const slotEnd = new Date(item.slotEnd);
-    const dateLabel = slotStart.toLocaleDateString('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit' });
-    const timeLabel = `${slotStart.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - ${slotEnd.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`;
+    const dateLabel = slotStart.toLocaleDateString('vi-VN', {
+      weekday: 'short',
+      day: '2-digit',
+      month: '2-digit',
+    });
+    const timeLabel = `${slotStart.toLocaleTimeString('vi-VN', {
+      hour: '2-digit',
+      minute: '2-digit',
+    })} - ${slotEnd.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`;
     const shortId = item.id.substring(0, 8).toUpperCase();
-    
-    // Fallback lấy tiền từ snapshot.total_charged của entity
-    const totalAmount = item.totalAmount ?? (item as any).total_amount ?? (item as any).snapshot?.total_charged ?? 0;
+
+    const totalAmount =
+      item.totalAmount ?? (item as any).total_amount ?? (item as any).snapshot?.total_charged ?? 0;
     const formattedAmount = Number(totalAmount).toLocaleString('vi-VN') + 'đ';
 
     return (
@@ -134,31 +190,29 @@ export function BookingListScreen() {
         className="mb-4 overflow-hidden rounded-2xl border border-slate-800 bg-[#0f172a]/60 active:bg-[#0f172a]/90 shadow-xl"
         onPress={() => handleCardPress(item.id)}
       >
-        {/* Glow nhỏ trên đầu card chỉ trạng thái hoạt động */}
+        {/* Thanh màu cam nếu session đang active */}
         {isSessionActive && (
           <View className="absolute top-0 right-0 left-0 h-[2px] bg-orange-500" />
         )}
-        
+
         <View className="p-5 space-y-3">
-          {/* Top Row: Mã Booking & Trạng thái */}
+          {/* Row 1: Mã booking + badge trạng thái + số tiền */}
           <View className="flex-row items-center justify-between">
             <View className="flex-row items-center gap-1.5">
               <Text className="text-slate-400 text-xs font-bold font-mono">#{shortId}</Text>
-              <View className={cn("px-2 py-0.5 rounded-full border flex-row items-center gap-1", status.bg)}>
-                <StatusIcon color={status.text === 'text-orange-500' ? '#f97316' : status.text === 'text-emerald-500' ? '#10b981' : status.text === 'text-amber-500' || status.text === 'text-amber-400' ? '#f59e0b' : status.text === 'text-blue-400' ? '#60a5fa' : '#ef4444'} size={10} />
-                <Text className={cn("text-[9px] font-black uppercase tracking-wide", status.text)}>
+              <View className={cn('px-2 py-0.5 rounded-full border flex-row items-center gap-1', status.bg)}>
+                <StatusIcon color={resolveIconColor(status.text)} size={10} />
+                <Text className={cn('text-[9px] font-black uppercase tracking-wide', status.text)}>
                   {status.label}
                 </Text>
               </View>
             </View>
-            <View className="flex-row items-center">
-              <Text className="text-white text-sm" weight="700">
-                {formattedAmount}
-              </Text>
-            </View>
+            <Text className="text-white text-sm" weight="700">
+              {formattedAmount}
+            </Text>
           </View>
 
-          {/* Middle: Chi nhánh và Giờ giấc */}
+          {/* Row 2: Tên chi nhánh + ngày giờ + mode */}
           <View className="space-y-2">
             <Text className="text-white text-[15px]" weight="600">
               {item.cafe?.name ?? 'RCField Platform Branch'}
@@ -172,20 +226,41 @@ export function BookingListScreen() {
                 <Clock color="#94a3b8" size={13} />
                 <Text className="text-slate-400 text-xs font-semibold">{timeLabel}</Text>
               </View>
-              <View className={cn("px-2 py-0.5 rounded-md border", item.playMode === 'RENTAL' ? 'bg-orange-500/5 border-orange-500/10' : 'bg-blue-500/5 border-blue-500/10')}>
-                <Text className={cn("text-[9px] font-bold uppercase", item.playMode === 'RENTAL' ? 'text-orange-500' : 'text-blue-400')}>
+              <View
+                className={cn(
+                  'px-2 py-0.5 rounded-md border',
+                  item.playMode === 'RENTAL'
+                    ? 'bg-orange-500/5 border-orange-500/10'
+                    : 'bg-blue-500/5 border-blue-500/10'
+                )}
+              >
+                <Text
+                  className={cn(
+                    'text-[9px] font-bold uppercase',
+                    item.playMode === 'RENTAL' ? 'text-orange-500' : 'text-blue-400'
+                  )}
+                >
                   {item.playMode === 'RENTAL' ? 'Thuê xe' : 'Xe riêng'}
                 </Text>
               </View>
             </View>
           </View>
 
-          {/* Bottom: Warning cho đơn Pending */}
+          {/* Row 3: Cảnh báo hạn thanh toán cho đơn PENDING */}
           {item.status === 'PENDING' && item.paymentExpiresAt && (
             <View className="flex-row items-center gap-1.5 rounded-lg bg-amber-500/5 border border-amber-500/10 p-2">
               <AlertTriangle color="#f59e0b" size={12} />
               <Text className="text-amber-500 text-[10px] font-semibold flex-1">
-                Hạn thanh toán: {new Date(item.paymentExpiresAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} ngày {new Date(item.paymentExpiresAt).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}
+                Hạn thanh toán:{' '}
+                {new Date(item.paymentExpiresAt).toLocaleTimeString('vi-VN', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}{' '}
+                ngày{' '}
+                {new Date(item.paymentExpiresAt).toLocaleDateString('vi-VN', {
+                  day: '2-digit',
+                  month: '2-digit',
+                })}
               </Text>
             </View>
           )}
@@ -210,41 +285,101 @@ export function BookingListScreen() {
         </Text>
       </View>
 
-      {/* Tab Filter */}
-      <View className="px-5 mb-5 flex-row gap-2">
-        {TAB_CONFIG.map((tab) => {
+
+      {/* Tab Filter — ScrollView ngang chứa đủ 6 category */}
+      {/* flexShrink:0 quan trọng: ngăn FlatList phía dưới đẩy co tab bar khi có nhiều item */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={{ flexGrow: 0, flexShrink: 0 }}
+        contentContainerStyle={{
+          paddingHorizontal: 20,
+          paddingBottom: 16,
+          paddingTop: 4,
+          flexDirection: 'row',
+          flexWrap: 'nowrap',
+          alignItems: 'center',
+        }}
+      >
+        {TAB_CONFIG.map((tab, index) => {
           const isActive = activeTab === tab.key;
+          const count = countByStatus[tab.key] ?? 0;
           return (
             <Pressable
               key={tab.key}
-              className={cn(
-                "flex-grow py-2.5 rounded-xl border items-center justify-center transition-all",
-                isActive
-                  ? "bg-[#ea580c] border-[#ea580c] shadow-md shadow-orange-500/10"
-                  : "bg-[#0f172a]/60 border-slate-800"
-              )}
               onPress={() => setActiveTab(tab.key)}
+              style={[
+                {
+                  flexShrink: 0,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingHorizontal: 16,
+                  paddingVertical: 10,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  marginRight: index < TAB_CONFIG.length - 1 ? 8 : 0,
+                  gap: 6,
+                },
+                isActive
+                  ? { backgroundColor: tab.activeBg, borderColor: tab.activeBorderColor }
+                  : { backgroundColor: 'rgba(15,23,42,0.6)', borderColor: '#1e293b' },
+              ]}
             >
               <Text
-                className={cn("text-[12px] font-bold", isActive ? "text-white" : "text-slate-400")}
+                style={{
+                  fontSize: 12,
+                  fontWeight: '700',
+                  color: isActive ? tab.activeTextColor : '#94a3b8',
+                }}
+                numberOfLines={1}
               >
                 {tab.label}
               </Text>
+              {/* Badge đếm số đơn, chỉ hiện khi count > 0 */}
+              {count > 0 && (
+                <View
+                  style={{
+                    minWidth: 18,
+                    height: 18,
+                    borderRadius: 9,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    paddingHorizontal: 4,
+                    backgroundColor: isActive ? tab.activeBadgeBg : '#1e293b',
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 10,
+                      fontWeight: '900',
+                      color: isActive ? tab.activeTextColor : '#94a3b8',
+                    }}
+                  >
+                    {count}
+                  </Text>
+                </View>
+              )}
             </Pressable>
           );
         })}
-      </View>
+      </ScrollView>
+
 
       {/* Bookings List */}
       {loading ? (
         <View className="flex-1 justify-center items-center">
           <ActivityIndicator color="#ea580c" size="large" />
-          <Text className="mt-3 text-slate-400 text-xs font-semibold">Đang tải lịch sử đặt sân...</Text>
+          <Text className="mt-3 text-slate-400 text-xs font-semibold">
+            Đang tải lịch sử đặt sân...
+          </Text>
         </View>
-      ) : filteredBookings.length === 0 ? (
+      ) : (
         <FlatList
-          data={[]}
-          renderItem={null}
+          data={filteredBookings}
+          renderItem={renderBookingItem}
+          keyExtractor={(item) => item.id}
+          contentContainerClassName="px-5 pb-10"
+          showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -262,31 +397,19 @@ export function BookingListScreen() {
                 Không tìm thấy lịch đặt nào
               </Text>
               <Text className="mt-1.5 text-slate-400 text-xs text-center leading-4 font-semibold max-w-xs">
-                Bạn không có đơn đặt nào trong danh mục này hoặc bộ lọc đang chọn.
+                {activeTab === 'ALL'
+                  ? 'Bạn chưa có đơn đặt sân nào. Hãy đặt lịch chơi ngay!'
+                  : `Bạn không có đơn đặt nào ở trạng thái "${TAB_CONFIG.find((t) => t.key === activeTab)?.label}".`}
               </Text>
-              <Pressable
-                className="mt-6 px-5 py-2.5 rounded-xl bg-[#ea580c] active:bg-[#f97316] shadow-md"
-                onPress={() => router.push('/booking/create')}
-              >
-                <Text className="text-white text-xs font-bold">Đặt lịch ngay</Text>
-              </Pressable>
+              {activeTab === 'ALL' && (
+                <Pressable
+                  className="mt-6 px-5 py-2.5 rounded-xl bg-[#ea580c] active:bg-[#f97316] shadow-md"
+                  onPress={() => router.push('/booking/create')}
+                >
+                  <Text className="text-white text-xs font-bold">Đặt lịch ngay</Text>
+                </Pressable>
+              )}
             </View>
-          }
-        />
-      ) : (
-        <FlatList
-          data={filteredBookings}
-          renderItem={renderBookingItem}
-          keyExtractor={(item) => item.id}
-          contentContainerClassName="px-5 pb-10"
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => fetchBookings(true)}
-              tintColor="#ea580c"
-              colors={['#ea580c']}
-            />
           }
         />
       )}

@@ -16,6 +16,7 @@ import {
   Gem,
   Award,
   ShieldCheck,
+  Heart,
 } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -806,8 +807,18 @@ export function ProfileScreen() {
             </View>
           </View>
 
-          {/* Section: Hành động khác (Đăng xuất, Xóa tài khoản) */}
+          {/* Section: Hành động khác (Đăng xuất, Xóa tài khoản, Wishlist) */}
           <View className="gap-3.5">
+            <Pressable
+              className="h-12 flex-row items-center justify-center rounded-xl border border-slate-800 bg-[#0f172a]/60 active:bg-slate-900/60 gap-2.5"
+              onPress={() => router.push('/favorites')}
+            >
+              <Heart color="#ef4444" fill="#ef4444" size={18} />
+              <Text className="text-[14px] text-slate-200 font-bold">
+                Cơ sở yêu thích (Wishlist)
+              </Text>
+            </Pressable>
+
             <Pressable
               className="h-12 flex-row items-center justify-center rounded-xl border border-red-900/20 bg-red-950/10 active:bg-red-950/20 gap-2.5"
               onPress={handleDeleteAccount}

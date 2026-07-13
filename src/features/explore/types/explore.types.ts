@@ -51,6 +51,8 @@ export interface Cafe {
   longitude?: number | null;
   availableVehicles: Vehicle[];
   operatingHours?: Record<string, CafeOperatingHour> | string;
+  amenities?: { id: string; title: string }[];
+  rules?: string[];
 }
 
 export type CafeSearchParams = {
@@ -67,3 +69,28 @@ export interface UserLocation {
   latitude: number;
   longitude: number;
 }
+
+export interface PublicPackage {
+  id: string;
+  name: string;
+  description: string | null;
+  price: number | string;
+  slot_count: number;
+  valid_days: number;
+  applicable_play_modes: ('RENTAL' | 'BYOC')[];
+  benefits: string[];
+  is_popular: boolean;
+}
+
+export interface Review {
+  id: string;
+  rating: number;
+  comment: string;
+  createdAt: string;
+  user?: {
+    fullName: string;
+    avatarUrl?: string | null;
+  } | null;
+  ownerResponse?: string | null;
+}
+

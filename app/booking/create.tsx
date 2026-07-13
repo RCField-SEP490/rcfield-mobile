@@ -5,7 +5,17 @@ import { View } from 'react-native';
 import { Text } from '@/shared/ui/Text';
 
 export default function BookingCreateRoute() {
-  const { cafeId, vehicleId } = useLocalSearchParams<{ cafeId: string; vehicleId?: string }>();
+  const { cafeId, vehicleId, fnb } = useLocalSearchParams<{ cafeId: string; vehicleId?: string; fnb?: string }>();
+
+  const preselectedFnb = React.useMemo(() => {
+    if (!fnb) return undefined;
+    try {
+      return JSON.parse(fnb) as Record<string, number>;
+    } catch (e) {
+      console.warn('Failed to parse preselected F&B params:', e);
+      return undefined;
+    }
+  }, [fnb]);
 
   if (!cafeId) {
     return (
@@ -17,5 +27,12 @@ export default function BookingCreateRoute() {
     );
   }
 
-  return <BookingWizardScreen cafeId={cafeId} preselectedVehicleId={vehicleId} />;
+  return (
+    <BookingWizardScreen
+      cafeId={cafeId}
+      preselectedVehicleId={vehicleId}
+      preselectedFnb={preselectedFnb}
+    />
+  );
 }
+

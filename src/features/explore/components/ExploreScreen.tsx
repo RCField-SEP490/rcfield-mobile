@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   Pressable,
@@ -10,11 +11,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Map, MapPin, Search, Star, Compass, RotateCcw } from 'lucide-react-native';
+import { Map, MapPin, Search, Star, Compass, RotateCcw, Heart } from 'lucide-react-native';
 
 import { getCafes } from '../api/explore.api';
+import { favoriteApi, favoriteLocal } from '../api/favorite.api';
 import type { Cafe } from '../types/explore.types';
 import { useLocation } from '@/shared/hooks/useLocation';
+import { useAuthStore } from '@/shared/store/auth-store';
 import { Text } from '@/shared/ui/Text';
 
 // Hàm tính khoảng cách Haversine (km)
@@ -38,6 +41,7 @@ const TRACK_TYPES = ['Tất cả', 'Drift', 'Off-Road', 'Speed'];
 export function ExploreScreen() {
   const router = useRouter();
   const { location: userLocation } = useLocation();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   const [cafes, setCafes] = useState<Cafe[]>([]);
   const [filteredCafes, setFilteredCafes] = useState<Cafe[]>([]);
@@ -45,20 +49,83 @@ export function ExploreScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCity, setSelectedCity] = useState('Tất cả');
   const [selectedTrackType, setSelectedTrackType] = useState('Tất cả');
+  const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
+  const [filterFavorites, setFilterFavorites] = useState(false);
 
   const fetchCafes = async () => {
     setLoading(true);
     const data = await getCafes();
     setCafes(data);
-    setFilteredCafes(data);
     setLoading(false);
   };
+
+  // 1. Tải và đồng bộ hóa Favorites khi load trang hoặc trạng thái login thay đổi
+  useEffect(() => {
+    const loadAndSyncFavorites = async () => {
+      let localFavs = await favoriteLocal.getLocalFavorites();
+
+      if (isAuthenticated) {
+        try {
+          const synced = await favoriteLocal.isSynced();
+          if (!synced) {
+            // Chưa đồng bộ: Gọi API sync gộp
+            const merged = await favoriteApi.syncFavorites(localFavs);
+            setFavoriteIds(merged);
+            await favoriteLocal.setLocalFavorites(merged);
+            await favoriteLocal.setSyncedStatus(true);
+          } else {
+            // Đã đồng bộ: Lấy trực tiếp từ server
+            const dbFavs = await favoriteApi.getFavorites();
+            setFavoriteIds(dbFavs);
+            await favoriteLocal.setLocalFavorites(dbFavs);
+          }
+        } catch (e) {
+          console.error('[ExploreScreen] Failed to sync/fetch favorites from BE:', e);
+          setFavoriteIds(localFavs);
+        }
+      } else {
+        // Chưa đăng nhập: Dùng local
+        await favoriteLocal.clearSyncedStatus();
+        setFavoriteIds(localFavs);
+      }
+    };
+
+    loadAndSyncFavorites();
+  }, [isAuthenticated]);
 
   useEffect(() => {
     fetchCafes();
   }, []);
 
-  // Bộ lọc logic
+  // 2. Xử lý Thích/Bỏ thích (Toggle Favorite)
+  const handleToggleFavorite = async (cafeId: string) => {
+    const isFav = favoriteIds.includes(cafeId);
+    const updated = isFav ? favoriteIds.filter((id) => id !== cafeId) : [...favoriteIds, cafeId];
+
+    // Cập nhật UI trước (Optimistic Update)
+    setFavoriteIds(updated);
+
+    try {
+      await favoriteLocal.setLocalFavorites(updated);
+      if (isFav) {
+        if (isAuthenticated) {
+          await favoriteApi.removeFavorite(cafeId);
+        }
+      } else {
+        if (isAuthenticated) {
+          await favoriteApi.addFavorite(cafeId);
+        }
+      }
+    } catch (error) {
+      console.error('[ExploreScreen] Error toggling favorite:', error);
+      // Rollback
+      const oldFavs = await favoriteLocal.getLocalFavorites();
+      setFavoriteIds(oldFavs);
+      Alert.alert('Thông báo', 'Không thể cập nhật trạng thái yêu thích. Vui lòng thử lại sau.');
+    }
+  };
+
+  // 3. Bộ lọc logic & Sắp xếp
   useEffect(() => {
     let result = cafes;
 
@@ -83,14 +150,26 @@ export function ExploreScreen() {
       );
     }
 
-    setFilteredCafes(result);
-  }, [searchQuery, selectedCity, selectedTrackType, cafes]);
+    // Lọc chỉ xem cơ sở đã thích
+    if (filterFavorites) {
+      result = result.filter((c) => favoriteIds.includes(c.id));
+    }
+
+    // Sắp xếp: Ưu tiên các cơ sở được thích lên đầu tiên
+    const sorted = [...result].sort((a, b) => {
+      const isFavA = favoriteIds.includes(a.id);
+      const isFavB = favoriteIds.includes(b.id);
+      if (isFavA && !isFavB) return -1;
+      if (!isFavA && isFavB) return 1;
+      return 0;
+    });
+
+    setFilteredCafes(sorted);
+  }, [searchQuery, selectedCity, selectedTrackType, cafes, favoriteIds, filterFavorites]);
 
   const handleSelectCafe = (cafeId: string) => {
-    router.push({
-      pathname: '/explore-map',
-      params: { cafeId },
-    } as any);
+    // Điều hướng sang màn hình Chi tiết chi nhánh thay vì Explore Map
+    router.push(`/cafe-detail/${cafeId}` as any);
   };
 
   const handleOpenMap = () => {
@@ -108,14 +187,30 @@ export function ExploreScreen() {
           )
         : null;
 
+    const isFav = favoriteIds.includes(item.id);
+
     return (
       <Pressable
         onPress={() => handleSelectCafe(item.id)}
         className="mx-5 mb-4 overflow-hidden rounded-2xl border border-slate-800 bg-[#0f172a]/60 shadow-md active:bg-slate-900/60"
       >
-        <Image source={{ uri: item.image }} className="h-44 w-full object-cover bg-slate-900" />
+        <View className="relative h-44 w-full bg-slate-900">
+          <Image source={{ uri: item.image }} className="h-full w-full object-cover" />
+          <Pressable
+            onPress={(e) => {
+              e.stopPropagation();
+              handleToggleFavorite(item.id);
+            }}
+            className="absolute top-3 right-3 size-9 items-center justify-center rounded-full bg-black/40 active:bg-black/60"
+          >
+            <Heart
+              color={isFav ? '#ef4444' : '#ffffff'}
+              fill={isFav ? '#ef4444' : 'transparent'}
+              size={18}
+            />
+          </Pressable>
+        </View>
         
-        {/* Glow hiệu ứng khi được click */}
         <View className="p-4">
           <View className="flex-row justify-between items-start">
             <View className="flex-1 pr-2">
@@ -128,7 +223,9 @@ export function ExploreScreen() {
             </View>
             <View className="flex-row items-center gap-1 bg-amber-500/10 px-2 py-1 rounded-lg">
               <Star color="#f59e0b" fill="#f59e0b" size={12} />
-              <Text className="text-[11px] text-amber-500 font-bold">5.0</Text>
+              <Text className="text-[11px] text-amber-500 font-bold">
+                {item.rating > 0 ? item.rating.toFixed(1) : '5.0'}
+              </Text>
             </View>
           </View>
 
@@ -239,13 +336,30 @@ export function ExploreScreen() {
           })}
         </ScrollView>
 
-        {/* Lọc Track Type */}
+        {/* Lọc Track Type & Lọc đã thích */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerClassName="px-5 gap-1.5 mt-2"
           className="py-1"
         >
+          {/* Lọc Yêu thích nhanh */}
+          <Pressable
+            onPress={() => setFilterFavorites(!filterFavorites)}
+            className={`rounded-xl border px-3.5 py-1.5 flex-row items-center gap-1 ${
+              filterFavorites
+                ? 'border-[#ef4444] bg-[#ef4444]/20'
+                : 'border-slate-800 bg-[#0f172a]/40'
+            }`}
+          >
+            <Heart color={filterFavorites ? '#ef4444' : '#94a3b8'} fill={filterFavorites ? '#ef4444' : 'transparent'} size={11} />
+            <Text
+              className={`text-[11px] font-bold ${filterFavorites ? 'text-[#ef4444]' : 'text-slate-400'}`}
+            >
+              Cơ sở đã thích
+            </Text>
+          </Pressable>
+
           {TRACK_TYPES.map((type) => {
             const isSelected = selectedTrackType === type;
             return (
@@ -307,3 +421,4 @@ export function ExploreScreen() {
     </SafeAreaView>
   );
 }
+

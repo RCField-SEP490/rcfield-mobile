@@ -1,5 +1,5 @@
 import { api } from '@/shared/lib/api';
-import type { Cafe, CafeSearchParams } from '../types/explore.types';
+import type { Cafe, CafeSearchParams, PublicPackage, Review } from '../types/explore.types';
 
 export const CAFE_PLACEHOLDER_IMAGE =
   'https://images.unsplash.com/photo-1554118811-1e0d58224f24?q=80&w=600&auto=format&fit=crop';
@@ -49,8 +49,8 @@ export async function getCafes(params: CafeSearchParams = {}): Promise<Cafe[]> {
         providerId: cafe.providerId,
         name: cafe.name,
         slug: cafe.slug,
-        rating: 0,
-        reviewsCount: 0,
+        rating: toNumber(cafe.rating) || 0,
+        reviewsCount: toNumber(cafe.reviewsCount) || 0,
         phone: cafe.phone,
         status: cafe.status,
         address: cafe.address,
@@ -73,6 +73,10 @@ export async function getCafes(params: CafeSearchParams = {}): Promise<Cafe[]> {
         longitude: lng || null,
         availableVehicles: [],
         operatingHours: cafe.operatingHours,
+        amenities: Array.isArray(cafe.amenities)
+          ? cafe.amenities.map((a: any) => ({ id: a.id, title: a.title }))
+          : [],
+        rules: Array.isArray(cafe.rules) ? cafe.rules : [],
       };
     });
   } catch (error) {
@@ -80,3 +84,118 @@ export async function getCafes(params: CafeSearchParams = {}): Promise<Cafe[]> {
     return [];
   }
 }
+
+export async function getCafeById(cafeId: string): Promise<Cafe | null> {
+  try {
+    const response = await api.get(`/cafes/${cafeId}`);
+    const cafe = response.data?.data;
+    if (!cafe) return null;
+
+    const slotFeeRate = toNumber(cafe.slotFeeRate);
+    const lat = toNumber(cafe.latitude);
+    const lng = toNumber(cafe.longitude);
+
+    return {
+      id: cafe.id,
+      providerId: cafe.providerId,
+      name: cafe.name,
+      slug: cafe.slug,
+      rating: toNumber(cafe.rating) || 0,
+      reviewsCount: toNumber(cafe.reviewsCount) || 0,
+      phone: cafe.phone,
+      status: cafe.status,
+      address: cafe.address,
+      district: cafe.district,
+      city: cafe.city,
+      image: cafe.coverImageUrl || CAFE_PLACEHOLDER_IMAGE,
+      images: cafe.coverImageUrl ? [cafe.coverImageUrl] : [CAFE_PLACEHOLDER_IMAGE],
+      priceRange: slotFeeRate > 0 ? `${slotFeeRate.toLocaleString('vi-VN')} đ/slot` : 'Chưa cập nhật',
+      slotDurationMinutes: cafe.slotDurationMinutes,
+      slotFeeRate,
+      maxConcurrentBookings: cafe.maxConcurrentBookings,
+      minBookingNoticeMinutes: cafe.minBookingNoticeMinutes,
+      byocCapacity: cafe.byocCapacity,
+      trackTypes: Array.isArray(cafe.trackTypes) ? cafe.trackTypes.map(formatTrackType) : [],
+      trackTypeIds: Array.isArray(cafe.trackTypes) ? cafe.trackTypes.map((t: any) => t.id) : [],
+      features: [],
+      description: cafe.description || 'Cơ sở chưa cập nhật mô tả.',
+      coordinates: { x: 50, y: 50 },
+      latitude: lat || null,
+      longitude: lng || null,
+      availableVehicles: [],
+      operatingHours: cafe.operatingHours,
+      amenities: Array.isArray(cafe.amenities)
+        ? cafe.amenities.map((a: any) => ({ id: a.id, title: a.title }))
+        : [],
+      rules: Array.isArray(cafe.rules) ? cafe.rules : [],
+    };
+  } catch (error) {
+    console.error('[ExploreAPI] Error fetching cafe by id:', error);
+    return null;
+  }
+}
+
+export async function listCafeImages(cafeId: string): Promise<string[]> {
+  try {
+    const response = await api.get(`/cafes/${cafeId}/images`);
+    const imagesData = response.data?.data || [];
+    return imagesData.map((img: any) => img.url).filter(Boolean);
+  } catch (error) {
+    console.error('[ExploreAPI] Error fetching cafe images:', error);
+    return [];
+  }
+}
+
+export async function listCafeReviews(cafeId: string): Promise<Review[]> {
+  try {
+    const response = await api.get(`/cafes/${cafeId}/reviews`);
+    const reviewsData = response.data?.data || [];
+    return reviewsData.map((rev: any): Review => ({
+      id: rev.id,
+      rating: toNumber(rev.rating),
+      comment: rev.comment || '',
+      createdAt: rev.createdAt || rev.created_at || '',
+      user: rev.user ? {
+        fullName: rev.user.fullName || rev.user.full_name || 'Khách hàng',
+        avatarUrl: rev.user.avatarUrl || rev.user.avatar_url || null,
+      } : null,
+      ownerResponse: rev.ownerResponse || rev.owner_response || null,
+    }));
+  } catch (error) {
+    console.error('[ExploreAPI] Error fetching cafe reviews:', error);
+    return [];
+  }
+}
+
+export async function listPublicPackages(cafeId: string): Promise<PublicPackage[]> {
+  try {
+    const response = await api.get(`/cafes/${cafeId}/packages/public`);
+    const pkgs = response.data?.data || [];
+    return pkgs.map((pkg: any): PublicPackage => ({
+      id: pkg.id,
+      name: pkg.name,
+      description: pkg.description || null,
+      price: toNumber(pkg.price),
+      slot_count: toNumber(pkg.slotCount || pkg.slot_count),
+      valid_days: toNumber(pkg.validDays || pkg.valid_days),
+      applicable_play_modes: Array.isArray(pkg.applicablePlayModes) ? pkg.applicablePlayModes : [],
+      benefits: Array.isArray(pkg.benefits) ? pkg.benefits : [],
+      is_popular: !!(pkg.isPopular || pkg.is_popular),
+    }));
+  } catch (error) {
+    console.error('[ExploreAPI] Error fetching public packages:', error);
+    return [];
+  }
+}
+
+export async function purchasePackage(
+  cafeId: string,
+  packageId: string
+): Promise<{ payment_url: string; confirmed: boolean }> {
+  const response = await api.post('/customer-packages/purchase', {
+    cafeId,
+    packageId,
+  });
+  return response.data?.data;
+}
+

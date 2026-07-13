@@ -160,10 +160,10 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
     const slotStart = new Date(booking.slotStart);
     const diffHours = (slotStart.getTime() - now.getTime()) / (1000 * 60 * 60);
 
-    const slotFee = Number(booking.paymentComponents?.find((c: any) => c.type === 'SLOT_FEE')?.amount || 0);
-    const rentalFee = Number(booking.paymentComponents?.find((c: any) => c.type === 'RENTAL_FEE')?.amount || 0);
-    const deposit = Number(booking.paymentComponents?.find((c: any) => c.type === 'SECURITY_DEPOSIT')?.amount || 0);
-    const fnb = Number(booking.paymentComponents?.find((c: any) => c.type === 'FNB_PREORDER')?.amount || 0);
+    const slotFee = Number(booking.payment_components?.find((c: any) => c.type === 'SLOT_FEE')?.amount || 0);
+    const rentalFee = Number(booking.payment_components?.find((c: any) => c.type === 'RENTAL_FEE')?.amount || 0);
+    const deposit = Number(booking.payment_components?.find((c: any) => c.type === 'SECURITY_DEPOSIT')?.amount || 0);
+    const fnb = Number(booking.payment_components?.find((c: any) => c.type === 'FNB_PREORDER')?.amount || 0);
 
     let refundSlotFee = 0;
     let policyText = '';
@@ -235,13 +235,13 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
   );
   const snapshotFnbPreorder = Number(snapshot?.fnb_total ?? snapshot?.fnb_preorder_fee ?? 0);
 
-  const slotFee = Number(booking.paymentComponents?.find((c: any) => c.type === 'SLOT_FEE')?.amount ?? snapshotSlotFee);
-  const rentalFee = Number(booking.paymentComponents?.find((c: any) => c.type === 'RENTAL_FEE')?.amount ?? snapshotRentalFee);
+  const slotFee = Number(booking.payment_components?.find((c: any) => c.type === 'SLOT_FEE')?.amount ?? snapshotSlotFee);
+  const rentalFee = Number(booking.payment_components?.find((c: any) => c.type === 'RENTAL_FEE')?.amount ?? snapshotRentalFee);
   const discountAmount = Number(booking.discountAmount ?? 0);
-  const depositComponent = booking.paymentComponents?.find((c: any) => c.type === 'SECURITY_DEPOSIT');
+  const depositComponent = booking.payment_components?.find((c: any) => c.type === 'SECURITY_DEPOSIT');
   const depositAmount = Number(depositComponent?.amount ?? snapshotDeposit);
   const fnbPreorderFee = Number(
-    booking.paymentComponents?.find(
+    booking.payment_components?.find(
       (c: any) =>
         (c.type === 'FB_PREORDER' || c.type === 'FNB_PREORDER') &&
         (c.status === 'HELD' || c.status === 'REFUNDED')
@@ -255,7 +255,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
   const isSessionActive = session && ['ACTIVE', 'EXTENDING', 'CHECKED_IN', 'CHECKING_OUT'].includes(session.status);
 
   // Quyết toán cuối phiên (Counter Bill & Reconciliation)
-  const onsiteComponents = booking.paymentComponents?.filter((c: any) =>
+  const onsiteComponents = booking.payment_components?.filter((c: any) =>
     !['SLOT_FEE', 'RENTAL_FEE', 'SECURITY_DEPOSIT'].includes(c.type) &&
     !((c.type === 'FNB_PREORDER' || c.type === 'FB_PREORDER') && (c.status === 'HELD' || c.status === 'REFUNDED'))
   ) || [];
@@ -271,9 +271,9 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
   const totalCounterServiceBill = counterComponents.reduce((sum: number, c: any) => sum + Number(c.amount), 0);
   const totalCounterBill = totalCounterServiceBill + damageExceedingDeposit;
 
-  const isPaid = !booking.paymentComponents?.some((c: any) => c.status === 'PENDING');
+  const isPaid = !booking.payment_components?.some((c: any) => c.status === 'PENDING');
 
-  const transactions = booking.paymentTransactions ?? [];
+  const transactions = booking.payment_transactions ?? [];
   const gatewayLabel = (gateway: string) =>
     gateway === 'DIRECT' ? 'Tiền mặt' : gateway === 'MOCK' ? 'DEV Mock' : 'VNPay Online';
 
@@ -304,24 +304,22 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
       </View>
 
       <ScrollView contentContainerClassName="px-5 py-5 pb-12" showsVerticalScrollIndicator={false}>
-        {/* Mã QR Code Check-in (Ẩn nếu đã checkout hoặc bị hủy) */}
+        {/* Mã QR Code Check-in — dùng endpoint BE /bookings/:id/qr (Ẩn nếu đã checkout hoặc bị hủy) */}
         {booking.status !== 'CANCELLED' && booking.status !== 'NO_SHOW' && (!session || session.status !== 'COMPLETED') && (
           <View className="items-center mb-6 rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-6 shadow-2xl">
             <View className="bg-white p-3 rounded-2xl shadow-lg mb-4">
-              {booking.checkInCode ? (
-                <Image
-                  source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${booking.checkInCode}` }}
-                  className="size-48 rounded-xl"
-                />
-              ) : (
-                <View className="size-48 justify-center items-center bg-slate-100 rounded-xl">
-                  <ActivityIndicator color="#ea580c" />
-                </View>
-              )}
+              <Image
+                source={{
+                  uri: `${process.env.EXPO_PUBLIC_API_URL}/bookings/${bookingId}/qr`,
+                  headers: { 'Cache-Control': 'no-cache' },
+                }}
+                className="size-48 rounded-xl"
+                onError={() => console.warn('[BookingQR] QR image load failed for', bookingId)}
+              />
             </View>
             <Text className="text-slate-400 text-xs font-bold tracking-widest uppercase">Mã check-in của bạn</Text>
             <Text className="text-white text-xl font-mono mt-1" weight="700">
-              {booking.checkInCode ?? 'CHƯA CÓ MÃ'}
+              {bookingId.slice(0, 8).toUpperCase()}
             </Text>
             <Text className="text-slate-400 text-[11px] text-center font-medium mt-2 leading-4">
               Đưa mã QR này cho nhân viên tại quầy để check-in nhận làn đua và nhận xe thuê của bạn.

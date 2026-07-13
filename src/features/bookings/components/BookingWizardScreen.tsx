@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { View, ScrollView, Pressable, ActivityIndicator, Alert } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 
@@ -19,10 +19,16 @@ import { bookingWizardApi, type TrackConfig, type VehicleCatalog, type MenuItem,
 interface BookingWizardScreenProps {
   cafeId: string;
   preselectedVehicleId?: string;
+  preselectedFnb?: Record<string, number>;
 }
 
-export function BookingWizardScreen({ cafeId, preselectedVehicleId }: BookingWizardScreenProps) {
+export function BookingWizardScreen({
+  cafeId,
+  preselectedVehicleId,
+  preselectedFnb,
+}: BookingWizardScreenProps) {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   // Wizard state
   const [currentStep, setCurrentStep] = useState<number>(1);
@@ -43,7 +49,8 @@ export function BookingWizardScreen({ cafeId, preselectedVehicleId }: BookingWiz
   const [participants, setParticipants] = useState<number>(1);
   const [companions, setCompanions] = useState<Companion[]>([]);
   const [selectedVehicleIds, setSelectedVehicleIds] = useState<string[]>([]);
-  const [fnbQuantities, setFnbQuantities] = useState<Record<string, number>>({});
+  const [fnbQuantities, setFnbQuantities] = useState<Record<string, number>>(() => preselectedFnb ?? {});
+
   const [selectedPackageId, setSelectedPackageId] = useState<string | null>(null);
   const [appliedPromo, setAppliedPromo] = useState<PromoValidationResult | null>(null);
 
@@ -354,7 +361,7 @@ export function BookingWizardScreen({ cafeId, preselectedVehicleId }: BookingWiz
       ) : (
         <View className="flex-1">
           <ScrollView
-            contentContainerClassName="px-5 py-5 pb-24"
+            contentContainerClassName="px-5 py-5 pb-40"
             showsVerticalScrollIndicator={false}
           >
             {/* Stepper progress */}
@@ -372,6 +379,9 @@ export function BookingWizardScreen({ cafeId, preselectedVehicleId }: BookingWiz
                 setSelectedSlots={setSelectedSlots}
                 playMode={playMode}
                 setPlayMode={setPlayMode}
+                selectedVehicleIds={selectedVehicleIds}
+                setSelectedVehicleIds={setSelectedVehicleIds}
+                catalogs={catalogs}
               />
             )}
 
@@ -428,7 +438,10 @@ export function BookingWizardScreen({ cafeId, preselectedVehicleId }: BookingWiz
           </ScrollView>
 
           {/* Action Bottom Bar */}
-          <View className="absolute bottom-0 left-0 right-0 border-t border-slate-900 bg-[#0f172a]/95 px-5 py-3.5 flex-row justify-between items-center shadow-lg">
+          <View
+            style={{ paddingBottom: Math.max(insets.bottom, 16), paddingTop: 14 }}
+            className="absolute bottom-0 left-0 right-0 border-t border-slate-900 bg-[#0f172a]/95 px-5 flex-row justify-between items-center shadow-lg"
+          >
             <View>
               <Text className="text-[10px] text-slate-400 font-semibold">Tạm tính</Text>
               <Text className="text-[16px] text-[#f97316]" weight="700">
