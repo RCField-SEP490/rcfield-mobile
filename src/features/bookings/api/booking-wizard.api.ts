@@ -174,7 +174,7 @@ export const bookingWizardApi = {
   },
 
   cancelBooking: async (bookingId: string, reason: string): Promise<any> => {
-    const response = await api.patch(`/bookings/${bookingId}/cancel`, { reason });
+    const response = await api.post(`/bookings/${bookingId}/cancel`, { reason });
     return response.data?.data;
   },
 
