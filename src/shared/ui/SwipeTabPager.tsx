@@ -1,7 +1,6 @@
-import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View, type ColorValue } from 'react-native';
 import PagerView from 'react-native-pager-view';
-import { usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CalendarDays, Compass, Home, UserRound, type LucideIcon } from 'lucide-react-native';
 
@@ -25,15 +24,13 @@ type MainTab = {
 
 const MAIN_TABS: MainTab[] = [
   { key: 'home', title: 'Home', href: '/', Icon: Home, Screen: HomeScreen },
-  { key: 'explore', title: 'Kh\u00e1m ph\u00e1', href: '/explore', Icon: Compass, Screen: ExploreScreen },
+  { key: 'explore', title: 'Khám phá', href: '/explore', Icon: Compass, Screen: ExploreScreen },
   { key: 'bookings', title: 'Bookings', href: '/bookings', Icon: CalendarDays, Screen: BookingListScreen },
   { key: 'profile', title: 'Profile', href: '/profile', Icon: UserRound, Screen: ProfileScreen },
 ];
 
-function getTabIndex(pathname: string | null) {
-  const index = MAIN_TABS.findIndex((tab) => tab.href === pathname);
-  return index === -1 ? 0 : index;
-}
+// Biến toàn cục lưu giữ tab đang active để khôi phục chính xác khi Back từ trang con về
+let globalActiveTabIdx = 0;
 
 const PagerScreen = memo(function PagerScreen({
   Screen,
@@ -80,22 +77,24 @@ const TabBarItem = memo(function TabBarItem({
   );
 });
 
-export function InstagramTabPager() {
-  const pathname = usePathname();
+export function SwipeTabPager() {
   const insets = useSafeAreaInsets();
   const pagerRef = useRef<PagerView>(null);
-  const initialIndex = useMemo(() => getTabIndex(pathname), [pathname]);
-  const [activeIndex, setActiveIndex] = useState(initialIndex);
-  const activeIndexRef = useRef(initialIndex);
+  const [activeIndex, setActiveIndex] = useState(globalActiveTabIdx);
+  const activeIndexRef = useRef(globalActiveTabIdx);
 
   const setActiveTab = useCallback((index: number) => {
     activeIndexRef.current = index;
     setActiveIndex(index);
+    globalActiveTabIdx = index; // Cập nhật biến global
   }, []);
 
   const handlePageSelected = useCallback(
     (event: { nativeEvent: { position: number } }) => {
-      setActiveTab(event.nativeEvent.position);
+      const position = event.nativeEvent.position;
+      if (position !== activeIndexRef.current) {
+        setActiveTab(position);
+      }
     },
     [setActiveTab],
   );
@@ -107,24 +106,18 @@ export function InstagramTabPager() {
 
     activeIndexRef.current = index;
     setActiveIndex(index);
-    pagerRef.current?.setPage(index);
-  }, []);
+    globalActiveTabIdx = index; // Cập nhật biến global
 
-  useEffect(() => {
-    const nextIndex = getTabIndex(pathname);
-    if (nextIndex !== activeIndexRef.current) {
-      activeIndexRef.current = nextIndex;
-      setActiveIndex(nextIndex);
-      pagerRef.current?.setPageWithoutAnimation(nextIndex);
-    }
-  }, [pathname]);
+    // Bấm bottom tab thì xuất hiện liền lập tức không có animation trượt theo yêu cầu
+    pagerRef.current?.setPageWithoutAnimation(index);
+  }, []);
 
   return (
     <View style={styles.container}>
       <PagerView
         ref={pagerRef}
         style={styles.pager}
-        initialPage={initialIndex}
+        initialPage={globalActiveTabIdx}
         offscreenPageLimit={1}
         overScrollMode="never"
         onPageSelected={handlePageSelected}
@@ -153,7 +146,7 @@ export function InstagramTabPager() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#0b0b0b',
   },
   pager: {
     flex: 1,
