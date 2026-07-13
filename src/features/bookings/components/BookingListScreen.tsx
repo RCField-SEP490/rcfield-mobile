@@ -248,7 +248,7 @@ export function BookingListScreen() {
 
           {/* Row 3: Cảnh báo hạn thanh toán cho đơn PENDING */}
           {item.status === 'PENDING' && item.paymentExpiresAt && (
-            <View className="flex-row items-center gap-1.5 rounded-lg bg-amber-500/5 border border-amber-500/10 p-2">
+            <View className="flex-row items-center gap-1.5 rounded-lg bg-amber-500/5 border border-amber-500/10 p-2 mt-3">
               <AlertTriangle color="#f59e0b" size={12} />
               <Text className="text-amber-500 text-[10px] font-semibold flex-1">
                 Hạn thanh toán:{' '}

@@ -16,12 +16,16 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { queryClient } from '@/shared/lib/query-client';
 import { useAuthStore } from '@/shared/store/auth-store';
+import { wsClient } from '@/shared/lib/websocket';
+import { GestureWrapper } from '@/shared/ui/GestureWrapper';
 
 void SplashScreen.preventAutoHideAsync();
 
 export function AppProvider({ children }: PropsWithChildren) {
   const colorScheme = useColorScheme();
   const initializeSession = useAuthStore((state) => state.initializeSession);
+  const accessToken = useAuthStore((state) => state.accessToken);
+  const isInitialized = useAuthStore((state) => state.isInitialized);
   const [fontsLoaded, fontError] = useFonts({
     BeVietnamPro_400Regular,
     BeVietnamPro_500Medium,
@@ -45,6 +49,19 @@ export function AppProvider({ children }: PropsWithChildren) {
     void initializeSession();
   }, [initializeSession]);
 
+  useEffect(() => {
+    if (isInitialized) {
+      if (accessToken) {
+        wsClient.connect();
+      } else {
+        wsClient.disconnect();
+      }
+    }
+    return () => {
+      wsClient.disconnect();
+    };
+  }, [accessToken, isInitialized]);
+
   if (!fontsLoaded) {
     return null;
   }
@@ -54,7 +71,9 @@ export function AppProvider({ children }: PropsWithChildren) {
       <SafeAreaProvider>
         <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
           <QueryClientProvider client={queryClient}>
-            {children}
+            <GestureWrapper>
+              {children}
+            </GestureWrapper>
             <StatusBar style="auto" />
           </QueryClientProvider>
         </ThemeProvider>

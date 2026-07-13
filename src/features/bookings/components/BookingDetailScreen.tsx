@@ -24,10 +24,13 @@ import {
   View,
   Modal,
   TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { bookingWizardApi } from '@/features/bookings/api/booking-wizard.api';
+import { wsClient } from '@/shared/lib/websocket';
 import { Text } from '@/shared/ui/Text';
 import { cn } from '@/shared/lib/utils';
 
@@ -48,11 +51,72 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
   const [cancelModalVisible, setCancelModalVisible] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
 
+  const [sessionDetail, setSessionDetail] = useState<any>(null);
+
+  const checkInPhotos = useMemo(() => {
+    if (!sessionDetail?.inspections) return [];
+    const insp = sessionDetail.inspections.find((i: any) => i.type === 'CHECK_IN');
+    return insp?.photos || [];
+  }, [sessionDetail]);
+
+  const checkOutPhotos = useMemo(() => {
+    if (!sessionDetail?.inspections) return [];
+    const insp = sessionDetail.inspections.find((i: any) => i.type === 'CHECK_OUT');
+    return insp?.photos || [];
+  }, [sessionDetail]);
+
+  const renderPhotoGrid = (photos: any[], label: string) => {
+    return (
+      <View className="flex-1 space-y-2">
+        <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider text-center mb-1">
+          {label}
+        </Text>
+        {photos.length > 0 ? (
+          <View className="flex-row flex-wrap gap-1.5 justify-between">
+            {photos.map((p: any, idx: number) => (
+              <View key={idx} className="w-[48%] aspect-square rounded-lg bg-slate-900 border border-slate-800 overflow-hidden relative">
+                <Image
+                  source={{ uri: p.url }}
+                  className="w-full h-full object-cover"
+                />
+                <View className="absolute bottom-1 left-1 bg-black/70 px-1 py-0.5 rounded">
+                  <Text className="text-[7.5px] text-slate-300 uppercase font-black tracking-wide">
+                    {p.angle || 'PHOTO'}
+                  </Text>
+                </View>
+              </View>
+            ))}
+            {Array.from({ length: Math.max(0, 4 - photos.length) }).map((_, idx) => (
+              <View key={`placeholder-${idx}`} className="w-[48%] aspect-square rounded-lg bg-slate-950 border border-slate-900/60 justify-center items-center">
+                <Camera color="#1e293b" size={14} />
+              </View>
+            ))}
+          </View>
+        ) : (
+          <View className="w-full aspect-square rounded-xl bg-slate-950 border border-slate-850 justify-center items-center gap-1.5 p-4">
+            <Camera color="#475569" size={24} />
+            <Text className="text-slate-500 text-[9px] font-bold">Chưa cập nhật ảnh</Text>
+          </View>
+        )}
+      </View>
+    );
+  };
+
   const loadBookingDetail = useCallback(async () => {
     setLoading(true);
     try {
       const data = await bookingWizardApi.getBooking(bookingId);
       setBooking(data);
+      if (data?.session?.id) {
+        try {
+          const sessData = await bookingWizardApi.getSessionDetail(data.session.id);
+          setSessionDetail(sessData);
+        } catch (sessErr) {
+          console.error('[BookingDetailScreen] Failed to load session detail:', sessErr);
+        }
+      } else {
+        setSessionDetail(null);
+      }
     } catch (error) {
       console.error('Failed to load booking detail:', error);
       Alert.alert('Lỗi', 'Không thể tải thông tin chi tiết lượt đặt sân.');
@@ -63,6 +127,27 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
 
   useEffect(() => {
     loadBookingDetail();
+  }, [loadBookingDetail]);
+
+  useEffect(() => {
+    const unsubscribe = wsClient.subscribe((event, data) => {
+      if (
+        [
+          'SESSION_CHECKIN_INSPECTION',
+          'SESSION_CHECKOUT_INSPECTION',
+          'CUSTOMER_PAYMENT_CONFIRMED',
+          'SESSION_EXTENSION_PROPOSED',
+          'SESSION_FNB_ORDER_ADDED',
+        ].includes(event)
+      ) {
+        console.log(`[BookingDetailScreen] WebSocket event '${event}' received, reloading...`);
+        loadBookingDetail();
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
   }, [loadBookingDetail]);
 
   // Hủy Lịch Đặt
@@ -102,7 +187,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
         if (match) hostAndPort = match[1];
       }
 
-      const returnUrl = `http://${hostAndPort}/api/v1/bookings/vnpay-return`;
+      const returnUrl = `http://${hostAndPort}/api/payments/vnpay-return`;
       const res = await bookingWizardApi.createCheckout(bookingId, returnUrl);
 
       if (res.payment_url) {
@@ -136,7 +221,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
         if (match) hostAndPort = match[1];
       }
 
-      const returnUrl = `http://${hostAndPort}/api/v1/bookings/vnpay-return`;
+      const returnUrl = `http://${hostAndPort}/api/payments/vnpay-return`;
       const res = await bookingWizardApi.createCheckoutAdditionalPayment(bookingId, returnUrl);
 
       if (res.payment_url) {
@@ -369,7 +454,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                 </View>
                 <View className="w-[1.5px] h-8 bg-emerald-500/50 mt-1" />
               </View>
-              <View className="flex-grow pt-0.5">
+              <View className="flex-1 pt-0.5">
                 <Text className="text-white text-sm" weight="600">Khởi tạo & Đặt sân thành công</Text>
                 <Text className="text-slate-400 text-xs mt-0.5 font-semibold">Đã tạo đơn đặt lịch chơi lúc {new Date(booking.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} ngày {new Date(booking.createdAt).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}</Text>
               </View>
@@ -387,7 +472,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                 </View>
                 <View className={cn("w-[1.5px] h-8 mt-1", booking.status !== 'PENDING' ? 'bg-emerald-500/50' : 'bg-slate-800')} />
               </View>
-              <View className="flex-grow pt-0.5">
+              <View className="flex-1 pt-0.5">
                 <Text className="text-white text-sm" weight="600">Thanh toán hóa đơn</Text>
                 <Text className="text-slate-400 text-xs mt-0.5 font-semibold">
                   {booking.status === 'PENDING' ? 'Đang chờ xử lý thanh toán...' : 'Đã thanh toán thành công qua cổng VNPay'}
@@ -407,12 +492,12 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                 </View>
                 <View className={cn("w-[1.5px] h-8 mt-1", session ? 'bg-emerald-500/50' : 'bg-slate-800')} />
               </View>
-              <View className="flex-grow pt-0.5">
+              <View className="flex-1 pt-0.5">
                 <Text className="text-white text-sm" weight="600">Bàn giao & Check-in tại sân</Text>
                 <Text className="text-slate-400 text-xs mt-0.5 font-semibold">
                   {session?.actualStartAt
                     ? `Nhân viên check-in đã bàn giao xe lúc ${new Date(session.actualStartAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`
-                    : 'Đưa mã check-in cho nhân viên tại quầy để bàn giao xe và check-in'}
+                    : 'Đưa mã check-in cho nhân viên tại quầy\nđể bàn giao xe và check-in'}
                 </Text>
               </View>
             </View>
@@ -428,14 +513,14 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                   )}
                 </View>
               </View>
-              <View className="flex-grow pt-0.5">
+              <View className="flex-1 pt-0.5">
                 <Text className="text-white text-sm" weight="600">Trạng thái chơi & Kết thúc</Text>
                 <Text className="text-slate-400 text-xs mt-0.5 font-semibold">
                   {session?.status === 'COMPLETED'
                     ? 'Đã hoàn thành phiên chơi và checkout xe đua.'
                     : isSessionActive
-                    ? 'Ca chơi đang hoạt động trên track.'
-                    : 'Chưa bắt đầu ca chơi.'}
+                      ? 'Ca chơi đang hoạt động trên track.'
+                      : 'Chưa bắt đầu ca chơi.'}
                 </Text>
               </View>
             </View>
@@ -559,7 +644,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
         )}
 
         {/* Trình đối chiếu hình ảnh Check-in/Check-out (Handover Photos) */}
-        {session && (session.status === 'COMPLETED' || session.status === 'CHECKING_OUT') && (
+        {session && (session.status === 'ACTIVE' || session.status === 'COMPLETED' || session.status === 'CHECKING_OUT') && (
           <View className="rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-5 shadow-2xl mb-6">
             <View className="flex-row items-center gap-2 mb-3.5 border-b border-slate-800/80 pb-2">
               <Camera color="#f97316" size={16} />
@@ -569,37 +654,17 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
             </View>
 
             <View className="space-y-4">
-              <View className="flex-row gap-3">
-                {/* Check-in Photo */}
-                <View className="flex-1 space-y-1.5">
-                  <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider text-center">Ảnh bàn giao Check-in</Text>
-                  {session.checkInPhotoUrl ? (
-                    <Image source={{ uri: session.checkInPhotoUrl }} className="w-full h-24 rounded-xl bg-slate-900 object-cover border border-slate-800" />
-                  ) : (
-                    <View className="w-full h-24 rounded-xl bg-slate-950 border border-slate-800/80 justify-center items-center">
-                      <Camera color="#475569" size={20} />
-                      <Text className="text-slate-500 text-[9px] font-bold mt-1">Chưa cập nhật</Text>
-                    </View>
-                  )}
-                </View>
+              <View className="flex-row gap-4">
+                {/* Check-in Photos Grid */}
+                {renderPhotoGrid(checkInPhotos, 'Ảnh bàn giao Check-in')}
 
-                {/* Check-out Photo */}
-                <View className="flex-1 space-y-1.5">
-                  <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider text-center">Ảnh bàn giao Check-out</Text>
-                  {session.checkOutPhotoUrl ? (
-                    <Image source={{ uri: session.checkOutPhotoUrl }} className="w-full h-24 rounded-xl bg-slate-900 object-cover border border-slate-800" />
-                  ) : (
-                    <View className="w-full h-24 rounded-xl bg-slate-950 border border-slate-800/80 justify-center items-center">
-                      <Camera color="#475569" size={20} />
-                      <Text className="text-slate-500 text-[9px] font-bold mt-1">Chưa cập nhật</Text>
-                    </View>
-                  )}
-                </View>
+                {/* Check-out Photos Grid */}
+                {renderPhotoGrid(checkOutPhotos, 'Ảnh bàn giao Check-out')}
               </View>
-              {session.damageNotes && (
+              {sessionDetail?.damageNotes && (
                 <View className="rounded-lg bg-red-500/5 border border-red-500/10 p-2.5">
                   <Text className="text-red-400 text-[10px] font-bold uppercase tracking-wide">Ghi chú hư hại từ nhân viên:</Text>
-                  <Text className="text-slate-300 text-xs font-semibold leading-4 mt-0.5">{session.damageNotes}</Text>
+                  <Text className="text-slate-300 text-xs font-semibold leading-4 mt-0.5">{sessionDetail.damageNotes}</Text>
                 </View>
               )}
             </View>
@@ -623,8 +688,8 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                 {booking.status === 'PENDING'
                   ? 'Sẽ thanh toán qua VNPAY'
                   : prepaidTx
-                  ? `Đã trả qua ${gatewayLabel(prepaidTx.gateway)}`
-                  : 'Đã trả qua VNPAY'}
+                    ? `Đã trả qua ${gatewayLabel(prepaidTx.gateway)}`
+                    : 'Đã trả qua VNPAY'}
               </Text>
             </View>
 
@@ -659,7 +724,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                   <Text className="text-emerald-400 text-xs font-bold">-{discountAmount.toLocaleString('vi-VN')}đ</Text>
                 </View>
               )}
-              
+
               {/* Dòng gạch chân mờ và Tổng đã trả */}
               <View className="w-full h-[1px] bg-slate-800/60 my-1" />
               <View className="flex-row justify-between">
@@ -768,7 +833,6 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
         )}
       </ScrollView>
 
-      {/* Modal Hủy Đặt Lịch */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -776,60 +840,65 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
         onRequestClose={() => setCancelModalVisible(false)}
       >
         <View className="flex-1 bg-black/60 justify-end">
-          <View className="bg-[#0f172a] rounded-t-3xl border-t border-slate-800 p-6 space-y-4">
-            <View className="flex-row justify-between items-center border-b border-slate-800 pb-3">
-              <Text className="text-white text-base" weight="700">Xác nhận hủy đặt lịch</Text>
-              <Pressable onPress={() => setCancelModalVisible(false)}>
-                <Text className="text-slate-400 text-xs font-bold">Đóng</Text>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+          >
+            <View className="bg-[#0f172a] rounded-t-3xl border-t border-slate-800 p-6 pb-10 space-y-4">
+              <View className="flex-row justify-between items-center border-b border-slate-800 pb-3">
+                <Text className="text-white text-base" weight="700">Xác nhận hủy đặt lịch</Text>
+                <Pressable onPress={() => setCancelModalVisible(false)}>
+                  <Text className="text-slate-400 text-xs font-bold">Đóng</Text>
+                </Pressable>
+              </View>
+
+              {refundEstimation && (
+                <View className="rounded-xl bg-amber-500/5 border border-amber-500/10 p-3 space-y-2 mt-6">
+                  <Text className="text-amber-500 text-xs font-bold uppercase tracking-wider">
+                    ⚠️ Chính sách hoàn phí chi tiết:
+                  </Text>
+                  <Text className="text-slate-300 text-xs leading-4 font-semibold">
+                    • {refundEstimation.policyText}{'\n'}
+                    • Phí thuê xe & dịch vụ F&B: Hoàn 100%
+                  </Text>
+                  <View className="w-full h-[1px] bg-slate-800/80 my-1" />
+                  <View className="flex-row justify-between items-center">
+                    <Text className="text-slate-400 text-xs font-bold">Tổng tiền hoàn dự kiến:</Text>
+                    <Text className="text-emerald-400 text-sm font-black">
+                      {refundEstimation.totalRefund.toLocaleString('vi-VN')}đ
+                    </Text>
+                  </View>
+                </View>
+              )}
+
+              <View className="space-y-1.5 mt-4">
+                <Text className="text-slate-400 text-xs font-bold uppercase tracking-wider">Nhập lý do hủy đặt lịch</Text>
+                <TextInput
+                  className="w-full min-h-[70px] rounded-xl border border-slate-800 bg-slate-950 p-3 text-white text-xs font-medium leading-4 mt-3"
+                  multiline={true}
+                  placeholder="Nhập lý do hủy lịch chơi của bạn..."
+                  placeholderTextColor="#475569"
+                  value={cancelReason}
+                  onChangeText={setCancelReason}
+                />
+              </View>
+
+              <Pressable
+                className="h-11 flex-row items-center justify-center rounded-xl bg-red-600 active:bg-red-700 gap-2 mt-2 shadow-md"
+                onPress={handleCancelBooking}
+                disabled={cancelling}
+              >
+                {cancelling ? (
+                  <ActivityIndicator color="#ffffff" size="small" />
+                ) : (
+                  <>
+                    <RotateCcw color="#ffffff" size={15} />
+                    <Text className="text-white text-xs font-bold">Xác nhận hủy đơn</Text>
+                  </>
+                )}
               </Pressable>
             </View>
-
-            {refundEstimation && (
-              <View className="rounded-xl bg-amber-500/5 border border-amber-500/10 p-3 space-y-2">
-                <Text className="text-amber-500 text-xs font-bold uppercase tracking-wider">
-                  ⚠️ Chính sách hoàn phí chi tiết:
-                </Text>
-                <Text className="text-slate-300 text-xs leading-4 font-semibold">
-                  • {refundEstimation.policyText}{'\n'}
-                  • Phí thuê xe & dịch vụ F&B: Hoàn 100%
-                </Text>
-                <View className="w-full h-[1px] bg-slate-800/80 my-1" />
-                <View className="flex-row justify-between items-center">
-                  <Text className="text-slate-400 text-xs font-bold">Tổng tiền hoàn dự kiến:</Text>
-                  <Text className="text-emerald-400 text-sm font-black">
-                    {refundEstimation.totalRefund.toLocaleString('vi-VN')}đ
-                  </Text>
-                </View>
-              </View>
-            )}
-
-            <View className="space-y-1.5">
-              <Text className="text-slate-400 text-xs font-bold uppercase tracking-wider">Nhập lý do hủy đặt lịch</Text>
-              <TextInput
-                className="w-full min-h-[70px] rounded-xl border border-slate-800 bg-slate-950 p-3 text-white text-xs font-medium leading-4"
-                multiline={true}
-                placeholder="Nhập lý do hủy lịch chơi của bạn..."
-                placeholderTextColor="#475569"
-                value={cancelReason}
-                onChangeText={setCancelReason}
-              />
-            </View>
-
-            <Pressable
-              className="h-11 flex-row items-center justify-center rounded-xl bg-red-600 active:bg-red-700 gap-2 mt-2 shadow-md"
-              onPress={handleCancelBooking}
-              disabled={cancelling}
-            >
-              {cancelling ? (
-                <ActivityIndicator color="#ffffff" size="small" />
-              ) : (
-                <>
-                  <RotateCcw color="#ffffff" size={15} />
-                  <Text className="text-white text-xs font-bold">Xác nhận hủy đơn</Text>
-                </>
-              )}
-            </Pressable>
-          </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
     </SafeAreaView>

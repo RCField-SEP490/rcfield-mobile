@@ -174,7 +174,21 @@ export const bookingWizardApi = {
   },
 
   cancelBooking: async (bookingId: string, reason: string): Promise<any> => {
-    const response = await api.patch(`/bookings/${bookingId}/cancel`, { reason });
+    const response = await api.post(`/bookings/${bookingId}/cancel`, { reason });
+    return response.data?.data;
+  },
+
+  getSessionDetail: async (sessionId: string): Promise<any> => {
+    const response = await api.get(`/sessions/${sessionId}`);
+    return response.data?.data;
+  },
+
+  confirmInspection: async (
+    sessionId: string,
+    inspectionId: string,
+    payload: { agreed: boolean; disagreementNote?: string }
+  ): Promise<any> => {
+    const response = await api.post(`/sessions/${sessionId}/inspections/${inspectionId}/confirm`, payload);
     return response.data?.data;
   },
 };
