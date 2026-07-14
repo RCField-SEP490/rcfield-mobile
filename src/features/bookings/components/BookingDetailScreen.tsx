@@ -1,5 +1,4 @@
 import { useRouter } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
 import {
   Calendar,
   Clock,
@@ -35,6 +34,8 @@ import { bookingWizardApi } from '@/features/bookings/api/booking-wizard.api';
 import { wsClient } from '@/shared/lib/websocket';
 import { Text } from '@/shared/ui/Text';
 import { cn } from '@/shared/lib/utils';
+import { getVnpayReturnUrl } from '@/shared/lib/vnpay-return-url';
+import { openVnpayPaymentSession } from '@/shared/lib/vnpay-browser';
 
 interface BookingDetailScreenProps {
   bookingId: string;
@@ -211,30 +212,11 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
   const handlePayment = async () => {
     setSubmittingPayment(true);
     try {
-      // Host IP LAN được phân tách từ URL API của Mobile
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.4:3000/api/v1';
-      let hostAndPort = '192.168.1.4:3000';
-      let host = '192.168.1.4';
-      try {
-        const urlObj = new URL(apiUrl);
-        hostAndPort = urlObj.host;
-        host = urlObj.hostname;
-      } catch {
-        const match = apiUrl.match(/https?:\/\/([^\/:]+)/);
-        if (match) {
-          host = match[1];
-          hostAndPort = match[1] + ':3000';
-        }
-      }
-
-      const expoDeepLink = `exp://${host}:8081`;
-      const returnUrl = `http://${hostAndPort}/api/payments/vnpay-return?mobile_redirect=${encodeURIComponent(expoDeepLink)}`;
+      const returnUrl = getVnpayReturnUrl();
       const res = await bookingWizardApi.createCheckout(bookingId, returnUrl);
 
       if (res.payment_url) {
-        // Mở trình duyệt in-app
-        await WebBrowser.openBrowserAsync(res.payment_url);
-        // Khi người dùng đóng trình duyệt, reload lại data
+        await openVnpayPaymentSession(res.payment_url);
         loadBookingDetail();
       } else {
         Alert.alert('Lỗi', 'Không tìm thấy URL thanh toán VNPay.');
@@ -252,27 +234,11 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
     if (submittingAdditionalPayment) return;
     setSubmittingAdditionalPayment(true);
     try {
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.4:3000/api/v1';
-      let hostAndPort = '192.168.1.4:3000';
-      let host = '192.168.1.4';
-      try {
-        const urlObj = new URL(apiUrl);
-        hostAndPort = urlObj.host;
-        host = urlObj.hostname;
-      } catch {
-        const match = apiUrl.match(/https?:\/\/([^\/:]+)/);
-        if (match) {
-          host = match[1];
-          hostAndPort = match[1] + ':3000';
-        }
-      }
-
-      const expoDeepLink = `exp://${host}:8081`;
-      const returnUrl = `http://${hostAndPort}/api/payments/vnpay-return?mobile_redirect=${encodeURIComponent(expoDeepLink)}`;
+      const returnUrl = getVnpayReturnUrl();
       const res = await bookingWizardApi.createCheckoutAdditionalPayment(bookingId, returnUrl);
 
       if (res.payment_url) {
-        await WebBrowser.openBrowserAsync(res.payment_url);
+        await openVnpayPaymentSession(res.payment_url);
         loadBookingDetail();
       } else {
         Alert.alert('Lỗi', 'Không tìm thấy URL thanh toán VNPay.');
