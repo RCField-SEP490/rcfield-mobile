@@ -13,9 +13,10 @@ export function GestureWrapper({ children }: GestureWrapperProps) {
   const segments = useSegments();
 
   const gesture = Gesture.Pan()
-    .runOnJS(true)            // Chạy trên JS thread để gọi router.back an toàn không crash native
-    .activeOffsetX([15, 15])  // Kích hoạt khi vuốt từ trái sang phải để back
-    .failOffsetY([-35, 35])   // Bỏ qua nếu vuốt dọc (tránh xung đột Scroll dọc của con)
+    .runOnJS(true) // Chạy trên JS thread để gọi router.back an toàn không crash native
+    .hitSlop({ left: 0, width: 32 })
+    .activeOffsetX(20)
+    .failOffsetY([-35, 35]) // Bỏ qua nếu vuốt dọc (tránh xung đột Scroll dọc của con)
     .onEnd((event) => {
       // Bỏ qua trang bản đồ ứng dụng
       if (pathname && pathname.includes('explore-map')) {

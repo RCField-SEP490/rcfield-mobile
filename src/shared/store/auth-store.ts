@@ -9,6 +9,7 @@ import type {
 } from '@/features/auth/types/auth.types';
 import { secureTokenStorage } from '@/shared/lib/secure-storage';
 import { setTokenRevokedCallback } from '@/shared/lib/api';
+import { unregisterCurrentPushTokenAsync } from '@/shared/lib/push-notifications';
 
 interface AuthState {
   accessToken: string | null;
@@ -144,6 +145,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   logout: async () => {
     const refreshToken = useAuthStore.getState().refreshToken;
     try {
+      await unregisterCurrentPushTokenAsync();
       if (refreshToken) {
         await logoutSession(refreshToken);
       }

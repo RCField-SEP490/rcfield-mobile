@@ -144,17 +144,19 @@ class WebSocketClient {
   }
 
   private handleInAppNotification(event: string, data: any) {
+    const role = useAuthStore.getState().role;
+
     switch (event) {
       case 'SESSION_CHECKIN_INSPECTION':
         Alert.alert(
           'Biên bản bàn giao xe',
-          'Nhân viên trực ca vừa bàn giao xe và bắt đầu phiên chơi của bạn. Lượt chơi hiện đã có hiệu lực!'
+          'Nhân viên trực ca vừa bàn giao xe và bắt đầu phiên chơi của bạn. Lượt chơi hiện đã có hiệu lực.'
         );
         break;
       case 'SESSION_CHECKOUT_INSPECTION':
         Alert.alert(
           'Biên bản trả xe',
-          'Nhân viên trực ca vừa thực hiện kiểm tra và nhận lại xe. Vui lòng kiểm tra và xác nhận biên bản.',
+          'Nhân viên trực ca vừa kiểm tra và nhận lại xe. Vui lòng xem ảnh, checklist và xác nhận biên bản.',
           [
             {
               text: 'Kiểm tra ngay',
@@ -172,33 +174,71 @@ class WebSocketClient {
         );
         break;
       case 'CUSTOMER_CHECKIN_CONFIRMED':
-        Alert.alert(
-          'Check-in thành công',
-          'Phiên chơi của bạn đã chính thức bắt đầu. Chúc bạn chơi vui vẻ!'
-        );
+        if (role !== 'customer') {
+          Alert.alert('Khách đã xác nhận nhận xe', 'Biên bản nhận xe đã được khách ghi nhận.');
+        }
         break;
       case 'CUSTOMER_CHECKOUT_CONFIRMED':
-        Alert.alert(
-          'Hoàn thành phiên chơi',
-          'Biên bản trả xe đã được xác nhận hoàn tất. Phiên chơi của bạn đã kết thúc!'
-        );
+        if (role !== 'customer') {
+          Alert.alert('Khách đã xác nhận trả xe', 'Checkout đã hoàn tất hoặc đang chờ xử lý thanh toán phát sinh.');
+        }
+        break;
+      case 'CUSTOMER_INSPECTION_DISPUTED':
+        if (role !== 'customer') {
+          Alert.alert(
+            'Khách từ chối biên bản',
+            data?.disagreementNote
+              ? `Lý do: ${data.disagreementNote}`
+              : 'Khách đã phản hồi sai lệch. Vui lòng kiểm tra lại phiên.'
+          );
+        }
         break;
       case 'CUSTOMER_PAYMENT_CONFIRMED':
         Alert.alert(
           'Thanh toán thành công',
-          'Đã nhận được khoản thanh toán hóa đơn / phí phát sinh cho đơn đặt sân của bạn.'
+          'Đã ghi nhận khoản thanh toán hóa đơn hoặc phí phát sinh cho đơn đặt sân.'
         );
         break;
       case 'SESSION_EXTENSION_PROPOSED':
         Alert.alert(
           'Yêu cầu gia hạn ca chơi',
-          `Nhân viên vừa đề xuất gia hạn ca chơi thêm ${data.extraMinutes} phút với phí phát sinh là ${Number(data.additionalFee).toLocaleString('vi-VN')}đ.`
+          `Nhân viên vừa đề xuất gia hạn ca chơi thêm ${data.extraMinutes} phút với phí phát sinh ${Number(data.additionalFee).toLocaleString('vi-VN')}đ.`,
+          [
+            {
+              text: 'Phản hồi',
+              onPress: () => {
+                if (data?.sessionId) {
+                  router.push({
+                    pathname: '/customer/extension/[sessionId]',
+                    params: { sessionId: data.sessionId },
+                  } as any);
+                }
+              },
+            },
+            { text: 'Để sau', style: 'cancel' },
+          ]
         );
+        break;
+      case 'CUSTOMER_EXTENSION_APPROVED':
+        if (role !== 'customer') {
+          Alert.alert(
+            'Khách đồng ý gia hạn',
+            `Khách đã đồng ý gia hạn thêm ${data?.extraMinutes || ''} phút.`
+          );
+        }
+        break;
+      case 'CUSTOMER_EXTENSION_REJECTED':
+        if (role !== 'customer') {
+          Alert.alert(
+            'Khách từ chối gia hạn',
+            `Khách đã từ chối gia hạn thêm ${data?.extraMinutes || ''} phút.`
+          );
+        }
         break;
       case 'SESSION_FNB_ORDER_ADDED':
         Alert.alert(
           'Gọi món thành công',
-          `Món ăn/nước uống mới trị giá ${Number(data.totalAmount).toLocaleString('vi-VN')}đ đã được thêm thành công vào lượt chơi.`
+          `Món ăn/nước uống mới trị giá ${Number(data.totalAmount).toLocaleString('vi-VN')}đ đã được thêm vào phiên chạy.`
         );
         break;
     }

@@ -19,8 +19,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { getMyBookings, type BookingListItem, type BookingStatus } from '@/features/bookings/api/booking.api';
+import { NotificationBellButton } from '@/features/notifications/components/NotificationBellButton';
 import { Text } from '@/shared/ui/Text';
 import { cn } from '@/shared/lib/utils';
+import { useAuthStore } from '@/shared/store/auth-store';
 
 // ── 6 category filter theo yêu cầu ──────────────────────────────────────────
 type FilterKey = 'ALL' | BookingStatus;
@@ -75,12 +77,20 @@ function resolveIconColor(textClass: string): string {
 
 export function BookingListScreen() {
   const router = useRouter();
+  const role = useAuthStore((state) => state.role);
   const [activeTab, setActiveTab] = useState<FilterKey>('ALL');
   const [bookings, setBookings] = useState<BookingListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchBookings = useCallback(async (isRefresh = false) => {
+    if (role !== 'customer') {
+      setBookings([]);
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+
     if (isRefresh) {
       setRefreshing(true);
     } else {
@@ -125,7 +135,7 @@ export function BookingListScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [role]);
 
   useEffect(() => {
     fetchBookings();
@@ -277,12 +287,17 @@ export function BookingListScreen() {
 
       {/* Header */}
       <View className="px-5 pt-3 pb-4">
-        <Text className="text-white text-3xl" variant="title" weight="700">
-          Lịch sử đặt sân
-        </Text>
-        <Text className="mt-1 text-[13px] text-slate-400 font-semibold">
-          Quản lý và xem tiến trình các lượt chơi của bạn.
-        </Text>
+        <View className="flex-row items-start justify-between gap-3">
+          <View className="flex-1">
+            <Text className="text-white text-3xl" variant="title" weight="700">
+              Lịch sử đặt sân
+            </Text>
+            <Text className="mt-1 text-[13px] text-slate-400 font-semibold">
+              Quản lý và xem tiến trình các lượt chơi của bạn.
+            </Text>
+          </View>
+          <NotificationBellButton size="md" />
+        </View>
       </View>
 
 

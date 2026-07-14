@@ -1,5 +1,4 @@
 import { useRouter } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
 import {
   Calendar,
   Clock,
@@ -13,6 +12,7 @@ import {
   Camera,
   User,
   CreditCard,
+  Star,
 } from 'lucide-react-native';
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import {
@@ -35,6 +35,8 @@ import { bookingWizardApi } from '@/features/bookings/api/booking-wizard.api';
 import { wsClient } from '@/shared/lib/websocket';
 import { Text } from '@/shared/ui/Text';
 import { cn } from '@/shared/lib/utils';
+import { getVnpayReturnUrl } from '@/shared/lib/vnpay-return-url';
+import { openVnpayPaymentSession } from '@/shared/lib/vnpay-browser';
 
 interface BookingDetailScreenProps {
   bookingId: string;
@@ -211,30 +213,11 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
   const handlePayment = async () => {
     setSubmittingPayment(true);
     try {
-      // Host IP LAN được phân tách từ URL API của Mobile
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.4:3000/api/v1';
-      let hostAndPort = '192.168.1.4:3000';
-      let host = '192.168.1.4';
-      try {
-        const urlObj = new URL(apiUrl);
-        hostAndPort = urlObj.host;
-        host = urlObj.hostname;
-      } catch {
-        const match = apiUrl.match(/https?:\/\/([^\/:]+)/);
-        if (match) {
-          host = match[1];
-          hostAndPort = match[1] + ':3000';
-        }
-      }
-
-      const expoDeepLink = `exp://${host}:8081`;
-      const returnUrl = `http://${hostAndPort}/api/payments/vnpay-return?mobile_redirect=${encodeURIComponent(expoDeepLink)}`;
+      const returnUrl = getVnpayReturnUrl();
       const res = await bookingWizardApi.createCheckout(bookingId, returnUrl);
 
       if (res.payment_url) {
-        // Mở trình duyệt in-app
-        await WebBrowser.openBrowserAsync(res.payment_url);
-        // Khi người dùng đóng trình duyệt, reload lại data
+        await openVnpayPaymentSession(res.payment_url);
         loadBookingDetail();
       } else {
         Alert.alert('Lỗi', 'Không tìm thấy URL thanh toán VNPay.');
@@ -252,27 +235,11 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
     if (submittingAdditionalPayment) return;
     setSubmittingAdditionalPayment(true);
     try {
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.4:3000/api/v1';
-      let hostAndPort = '192.168.1.4:3000';
-      let host = '192.168.1.4';
-      try {
-        const urlObj = new URL(apiUrl);
-        hostAndPort = urlObj.host;
-        host = urlObj.hostname;
-      } catch {
-        const match = apiUrl.match(/https?:\/\/([^\/:]+)/);
-        if (match) {
-          host = match[1];
-          hostAndPort = match[1] + ':3000';
-        }
-      }
-
-      const expoDeepLink = `exp://${host}:8081`;
-      const returnUrl = `http://${hostAndPort}/api/payments/vnpay-return?mobile_redirect=${encodeURIComponent(expoDeepLink)}`;
+      const returnUrl = getVnpayReturnUrl();
       const res = await bookingWizardApi.createCheckoutAdditionalPayment(bookingId, returnUrl);
 
       if (res.payment_url) {
-        await WebBrowser.openBrowserAsync(res.payment_url);
+        await openVnpayPaymentSession(res.payment_url);
         loadBookingDetail();
       } else {
         Alert.alert('Lỗi', 'Không tìm thấy URL thanh toán VNPay.');
@@ -385,6 +352,37 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
   // Session thực tế
   const session = booking.session;
   const isSessionActive = session && ['ACTIVE', 'EXTENDING', 'CHECKED_IN', 'CHECKING_OUT'].includes(session.status);
+  const pendingInspection = sessionDetail?.inspections?.find(
+    (inspection: any) => inspection.customerConfirmed !== true && inspection.type === 'CHECK_OUT'
+  );
+  const pendingExtension =
+    sessionDetail?.extensionProposal?.status === 'PENDING' ? sessionDetail.extensionProposal : null;
+
+  const handleOpenInspectionReview = () => {
+    if (!session?.id || !pendingInspection?.inspectionId) return;
+    router.push({
+      pathname: '/customer/inspections/[sessionId]',
+      params: {
+        sessionId: session.id,
+        inspectionId: pendingInspection.inspectionId,
+      },
+    } as any);
+  };
+
+  const handleOpenExtensionResponse = () => {
+    if (!session?.id || !pendingExtension) return;
+    router.push({
+      pathname: '/customer/extension/[sessionId]',
+      params: { sessionId: session.id },
+    } as any);
+  };
+
+  const handleOpenReview = () => {
+    router.push({
+      pathname: '/customer/review/[bookingId]',
+      params: { bookingId },
+    } as any);
+  };
 
   // Quyết toán cuối phiên (Counter Bill & Reconciliation)
   const onsiteComponents = booking.payment_components?.filter((c: any) =>
@@ -486,6 +484,81 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
             </View>
           </View>
         )}
+
+        {pendingInspection ? (
+          <View className="mb-6 rounded-2xl border border-orange-500/20 bg-orange-500/10 p-4 shadow-lg">
+            <View className="flex-row items-start gap-3">
+              <AlertTriangle color="#f97316" size={20} style={{ marginTop: 2 }} />
+              <View className="flex-1">
+                <Text className="text-orange-400 text-[14px]" weight="700">
+                  Cần xác nhận biên bản trả xe
+                </Text>
+                <Text className="mt-1 text-xs leading-4 text-slate-300 font-semibold">
+                  Nhân viên đã gửi biên bản checkout. Bạn cần xem và đồng ý để phiên chơi hoàn tất.
+                </Text>
+              </View>
+            </View>
+            <Pressable
+              className="mt-3 h-10 flex-row items-center justify-center rounded-xl bg-[#ea580c] active:bg-[#f97316] gap-1.5 shadow-md"
+              onPress={handleOpenInspectionReview}
+            >
+              <CheckCircle2 color="#ffffff" size={15} />
+              <Text className="text-white text-xs font-bold">
+                Xem và xác nhận biên bản
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {pendingExtension ? (
+          <View className="mb-6 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 shadow-lg">
+            <View className="flex-row items-start gap-3">
+              <Clock color="#34d399" size={20} style={{ marginTop: 2 }} />
+              <View className="flex-1">
+                <Text className="text-emerald-300 text-[14px]" weight="700">
+                  Staff đề xuất gia hạn +{pendingExtension.extraMinutes} phút
+                </Text>
+                <Text className="mt-1 text-xs leading-4 text-slate-300 font-semibold">
+                  Phí phát sinh {Number(pendingExtension.additionalFee || 0).toLocaleString('vi-VN')}đ. Bạn cần phản hồi để staff cập nhật giờ chơi.
+                </Text>
+              </View>
+            </View>
+            <Pressable
+              className="mt-3 h-10 flex-row items-center justify-center rounded-xl bg-emerald-600 active:bg-emerald-500 gap-1.5 shadow-md"
+              onPress={handleOpenExtensionResponse}
+            >
+              <CheckCircle2 color="#ffffff" size={15} />
+              <Text className="text-white text-xs font-bold">
+                Xem yêu cầu gia hạn
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {(booking.status === 'COMPLETED' || session?.status === 'COMPLETED') ? (
+          <View className="mb-6 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 shadow-lg">
+            <View className="flex-row items-start gap-3">
+              <Star color="#f59e0b" size={20} style={{ marginTop: 2 }} />
+              <View className="flex-1">
+                <Text className="text-amber-300 text-[14px]" weight="700">
+                  Đánh giá trải nghiệm sau phiên
+                </Text>
+                <Text className="mt-1 text-xs leading-4 text-slate-300 font-semibold">
+                  Gửi đánh giá về sân, xe và nhân viên sau khi checkout hoàn tất.
+                </Text>
+              </View>
+            </View>
+            <Pressable
+              className="mt-3 h-10 flex-row items-center justify-center rounded-xl bg-amber-500 active:bg-amber-400 gap-1.5 shadow-md"
+              onPress={handleOpenReview}
+            >
+              <Star color="#ffffff" fill="#ffffff" size={15} />
+              <Text className="text-white text-xs font-bold">
+                Đánh giá ngay
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         {/* Timeline đứng tiến trình (Booking Lifecycle) */}
         <View className="rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-5 shadow-2xl mb-6">

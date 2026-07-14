@@ -11,7 +11,9 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.rcfield.mobile",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "RCField cần quyền truy cập vị trí của bạn để định vị và tìm kiếm các chi nhánh sân đua gần nhất."
+        "NSLocationWhenInUseUsageDescription": "RCField cần quyền truy cập vị trí của bạn để định vị và tìm kiếm các chi nhánh sân đua gần nhất.",
+        "NSCameraUsageDescription": "RCField cần quyền camera để nhân viên chụp ảnh kiểm xe khi nhận và trả xe.",
+        "NSPhotoLibraryUsageDescription": "RCField cần quyền thư viện ảnh để nhân viên chọn ảnh kiểm xe khi nhận và trả xe."
       }
     },
     "android": {
@@ -24,9 +26,13 @@
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [
-        "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION",
-        "FOREGROUND_SERVICE"
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.CAMERA",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
@@ -36,6 +42,14 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "RCField cần quyền thư viện ảnh để nhân viên chọn ảnh kiểm xe.",
+          "cameraPermission": "RCField cần quyền camera để nhân viên chụp ảnh kiểm xe."
+        }
+      ],
+      "expo-notifications",
       [
         "expo-splash-screen",
         {
@@ -49,6 +63,13 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "ac1ceb9e-df2e-4875-a5e4-2d655ce5e086"
+      }
+    },
+    "owner": "tomishere0712"
   }
 }

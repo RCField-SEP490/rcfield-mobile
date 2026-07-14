@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -28,9 +28,11 @@ import {
 
 import { useAuthStore } from '@/shared/store/auth-store';
 import { Text } from '@/shared/ui/Text';
+import { requestMainTab } from '@/shared/ui/main-tab-events';
 import { getMyBookings, type BookingListItem } from '@/features/bookings/api/booking.api';
 import { getMyPackages, type MyPackageResponse } from '@/features/packages/api/package.api';
 import { getCafes } from '@/features/explore/api/explore.api';
+import { NotificationBellButton } from '@/features/notifications/components/NotificationBellButton';
 import type { Cafe } from '@/features/explore/types/explore.types';
 
 function getInitials(name: string) {
@@ -144,42 +146,49 @@ export function HomeScreen() {
 
   const displayName = user?.fullName ?? user?.email ?? 'Khách hàng';
   const greeting = useMemo(() => getGreeting(), []);
+  const isCustomer = user?.role === 'customer';
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      // 1. Fetch Bookings
-      const bookingsResult = await getMyBookings({ limit: 10 });
+      if (!isCustomer) {
+        const cafesResult = await getCafes();
+        setUpcomingBooking(null);
+        setActivePackages([]);
+        setFeaturedCafes(cafesResult.slice(0, 5));
+        return;
+      }
+
+      const [bookingsResult, packagesResult, cafesResult] = await Promise.all([
+        getMyBookings({ limit: 10 }),
+        getMyPackages('ACTIVE'),
+        getCafes(),
+      ]);
+
       const now = new Date();
       const upcoming = bookingsResult.data
         .filter((b) => (b.status === 'CONFIRMED' || b.status === 'PENDING') && new Date(b.slotStart) > now)
         .sort((a, b) => new Date(a.slotStart).getTime() - new Date(b.slotStart).getTime())[0] || null;
       setUpcomingBooking(upcoming);
-
-      // 2. Fetch Packages
-      const packagesResult = await getMyPackages('ACTIVE');
       setActivePackages(packagesResult);
-
-      // 3. Fetch Cafes nổi bật
-      const cafesResult = await getCafes();
       setFeaturedCafes(cafesResult.slice(0, 5));
     } catch (err) {
       console.error('[HomeScreen] Error loading dashboard:', err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [isCustomer]);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   const handleNavigateToExplore = () => {
-    router.push('/(tabs)/explore');
+    requestMainTab(1);
   };
 
   const handleNavigateToBookings = () => {
-    router.push('/(tabs)/bookings');
+    requestMainTab(2);
   };
 
   const handleSelectCafe = (cafeId: string) => {
@@ -234,6 +243,7 @@ export function HomeScreen() {
                 </Text>
               </View>
             </View>
+            <NotificationBellButton size="md" />
           </View>
 
           {/* Hero Promo Banner (Bổ sung mới theo Web) */}
@@ -324,7 +334,7 @@ export function HomeScreen() {
             </Pressable>
 
             <Pressable
-              onPress={() => router.push('/customer/packages')}
+              onPress={() => router.push('/customer/packages' as any)}
               className="flex-1 flex-col items-center gap-2 rounded-2xl border border-slate-800 bg-[#0f172a]/50 py-3.5 shadow-sm active:bg-slate-900/50"
             >
               <View className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-600/10 border border-violet-500/20">
@@ -453,7 +463,7 @@ export function HomeScreen() {
                   return (
                     <Pressable
                       key={pkg.id}
-                      onPress={() => router.push('/customer/packages')}
+                      onPress={() => router.push('/customer/packages' as any)}
                       className="w-64 rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-4 shadow-sm active:bg-slate-900/60"
                     >
                       <View className="flex-row justify-between items-start">

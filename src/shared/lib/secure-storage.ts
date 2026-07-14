@@ -2,23 +2,40 @@ import * as SecureStore from 'expo-secure-store';
 
 import { STORAGE_KEYS } from '@/shared/constants';
 
+let cachedAccessToken: string | null | undefined;
+let cachedRefreshToken: string | null | undefined;
+
 export const secureTokenStorage = {
-  getAccessToken() {
-    return SecureStore.getItemAsync(STORAGE_KEYS.accessToken);
+  async getAccessToken() {
+    if (cachedAccessToken !== undefined) {
+      return cachedAccessToken;
+    }
+
+    cachedAccessToken = await SecureStore.getItemAsync(STORAGE_KEYS.accessToken);
+    return cachedAccessToken;
   },
   setAccessToken(token: string) {
+    cachedAccessToken = token;
     return SecureStore.setItemAsync(STORAGE_KEYS.accessToken, token);
   },
   deleteAccessToken() {
+    cachedAccessToken = null;
     return SecureStore.deleteItemAsync(STORAGE_KEYS.accessToken);
   },
-  getRefreshToken() {
-    return SecureStore.getItemAsync(STORAGE_KEYS.refreshToken);
+  async getRefreshToken() {
+    if (cachedRefreshToken !== undefined) {
+      return cachedRefreshToken;
+    }
+
+    cachedRefreshToken = await SecureStore.getItemAsync(STORAGE_KEYS.refreshToken);
+    return cachedRefreshToken;
   },
   setRefreshToken(token: string) {
+    cachedRefreshToken = token;
     return SecureStore.setItemAsync(STORAGE_KEYS.refreshToken, token);
   },
   deleteRefreshToken() {
+    cachedRefreshToken = null;
     return SecureStore.deleteItemAsync(STORAGE_KEYS.refreshToken);
   },
   async clearTokens() {

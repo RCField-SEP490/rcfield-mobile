@@ -18,6 +18,10 @@ import { queryClient } from '@/shared/lib/query-client';
 import { useAuthStore } from '@/shared/store/auth-store';
 import { wsClient } from '@/shared/lib/websocket';
 import { GestureWrapper } from '@/shared/ui/GestureWrapper';
+import {
+  registerPushNotificationsAsync,
+  startNotificationResponseListener,
+} from '@/shared/lib/push-notifications';
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -53,6 +57,9 @@ export function AppProvider({ children }: PropsWithChildren) {
     if (isInitialized) {
       if (accessToken) {
         wsClient.connect();
+        void registerPushNotificationsAsync().catch((error) => {
+          console.warn('[Push] Failed to register push token:', error);
+        });
       } else {
         wsClient.disconnect();
       }
@@ -61,6 +68,10 @@ export function AppProvider({ children }: PropsWithChildren) {
       wsClient.disconnect();
     };
   }, [accessToken, isInitialized]);
+
+  useEffect(() => {
+    return startNotificationResponseListener();
+  }, []);
 
   if (!fontsLoaded) {
     return null;

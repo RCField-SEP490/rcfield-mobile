@@ -75,17 +75,37 @@ export async function changePassword(payload: ChangePasswordRequest): Promise<vo
   });
 }
 
-export async function uploadImage(uri: string, usage = 'profile-avatar'): Promise<{ publicId: string; url: string }> {
-  const formData = new FormData();
-  
+type UploadImageOptions = {
+  fileName?: string;
+  mimeType?: string;
+  timeoutMs?: number;
+};
+
+const DEFAULT_IMAGE_UPLOAD_TIMEOUT_MS = 90000;
+
+function getUploadFileInfo(uri: string, options?: UploadImageOptions) {
   const uriParts = uri.split('/');
-  const fileName = uriParts[uriParts.length - 1] || 'image.jpg';
-  const fileType = fileName.split('.').pop() || 'jpg';
+  const rawFileName = options?.fileName || uriParts[uriParts.length - 1] || 'image.jpg';
+  const fileName = rawFileName.includes('.') ? rawFileName : `${rawFileName}.jpg`;
+  const extension = fileName.split('.').pop()?.split('?')[0]?.toLowerCase() || 'jpg';
+  const mimeType =
+    options?.mimeType || `image/${extension === 'jpg' ? 'jpeg' : extension}`;
+
+  return { fileName, mimeType };
+}
+
+export async function uploadImage(
+  uri: string,
+  usage = 'profile-avatar',
+  options: UploadImageOptions = {},
+): Promise<{ publicId: string; url: string }> {
+  const formData = new FormData();
+  const { fileName, mimeType } = getUploadFileInfo(uri, options);
   
   formData.append('file', {
-    uri: uri,
+    uri,
     name: fileName,
-    type: `image/${fileType === 'jpg' ? 'jpeg' : fileType}`,
+    type: mimeType,
   } as any);
   formData.append('usage', usage);
   
@@ -96,6 +116,7 @@ export async function uploadImage(uri: string, usage = 'profile-avatar'): Promis
       headers: {
         'Content-Type': 'multipart/form-data',
       },
+      timeout: options.timeoutMs ?? DEFAULT_IMAGE_UPLOAD_TIMEOUT_MS,
     }
   );
   
@@ -126,5 +147,4 @@ export async function resetPasswordWithCode(payload: ResetPasswordRequest): Prom
 export async function logoutSession(refreshToken: string): Promise<void> {
   await api.post(API_ENDPOINTS.auth.logout, { refresh_token: refreshToken });
 }
-
 

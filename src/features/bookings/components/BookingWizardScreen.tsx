@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { View, ScrollView, Pressable, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, DeviceEventEmitter, BackHandler } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
@@ -8,6 +7,8 @@ import { useRouter } from 'expo-router';
 import { Text } from '@/shared/ui/Text';
 import { getCafes } from '@/features/explore/api/explore.api';
 import type { Cafe } from '@/features/explore/types/explore.types';
+import { getVnpayReturnUrl } from '@/shared/lib/vnpay-return-url';
+import { openVnpayPaymentSession } from '@/shared/lib/vnpay-browser';
 
 import { StepperBar } from './StepperBar';
 import { TrackSelectionStep } from './TrackSelectionStep';
@@ -284,24 +285,7 @@ export function BookingWizardScreen({
       const payload = getBookingPayload();
       const booking = await bookingWizardApi.createBooking(payload);
 
-      // Build dynamic returnUrl from EXPO_PUBLIC_API_URL to handle local IP redirection for VNPAY callback
-      const apiEndpoint = process.env.EXPO_PUBLIC_API_URL || '';
-      let customReturnUrl: string | undefined;
-      if (apiEndpoint.includes('/api/v1')) {
-        const baseHost = apiEndpoint.split('/api/v1')[0];
-        
-        // Tự động phân tách IP từ API để tạo Deep Link cho Expo Go
-        let host = '192.168.1.4';
-        try {
-          const match = apiEndpoint.match(/https?:\/\/([^\/:]+)/);
-          if (match) host = match[1];
-        } catch (e) {
-          console.warn('[BookingWizard] Failed to parse API host, using fallback', e);
-        }
-        const expoDeepLink = `exp://${host}:8081`;
-        
-        customReturnUrl = `${baseHost}/api/payments/vnpay-return?mobile_redirect=${encodeURIComponent(expoDeepLink)}`;
-      }
+      const customReturnUrl = getVnpayReturnUrl();
 
       // Create VNPay checkout url
       const checkout = await bookingWizardApi.createCheckout(booking.booking_id, customReturnUrl);
@@ -314,8 +298,7 @@ export function BookingWizardScreen({
       }
 
       if (checkout.payment_url) {
-        // Open VNPay checkout URL in In-App Browser for seamless checkout flow
-        await WebBrowser.openBrowserAsync(checkout.payment_url);
+        await openVnpayPaymentSession(checkout.payment_url);
 
         // After browser is closed, check the latest status of this booking from backend
         setSubmitting(true);

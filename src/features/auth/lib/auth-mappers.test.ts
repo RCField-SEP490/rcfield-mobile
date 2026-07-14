@@ -47,6 +47,20 @@ describe('auth mappers', () => {
     });
   });
 
+  it('uses cafeId as assignedCafeId fallback', () => {
+    expect(
+      mapBackendUser({
+        cafeId: 'cafe-token-1',
+        email: 'staff@example.com',
+        id: 'user-staff',
+        role: 'STAFF',
+      }),
+    ).toMatchObject({
+      assignedCafeId: 'cafe-token-1',
+      role: 'staff',
+    });
+  });
+
   it('maps token names from backend login response', () => {
     expect(
       mapLoginResponse({

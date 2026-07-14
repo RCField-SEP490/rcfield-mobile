@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
 import {
   ChevronLeft,
   Heart,
@@ -39,6 +38,8 @@ import {
 } from '../api/explore.api';
 import { favoriteApi, favoriteLocal } from '../api/favorite.api';
 import { bookingWizardApi } from '@/features/bookings/api/booking-wizard.api';
+import { getVnpayReturnUrl } from '@/shared/lib/vnpay-return-url';
+import { openVnpayPaymentSession } from '@/shared/lib/vnpay-browser';
 import type { Cafe, PublicPackage, Review } from '../types/explore.types';
 import type { TrackConfig, VehicleCatalog, MenuItem } from '@/features/bookings/api/booking-wizard.api';
 
@@ -243,35 +244,15 @@ export function CafeDetailScreen({ cafeId }: CafeDetailScreenProps) {
 
     setPurchasingPkgId(pkg.id);
     try {
-      // Host IP LAN được phân tách từ URL API của Mobile để VNPay redirect đúng Deep Link Expo
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.4:3000/api/v1';
-      let hostAndPort = '192.168.1.4:3000';
-      let host = '192.168.1.4';
-      try {
-        const urlObj = new URL(apiUrl);
-        hostAndPort = urlObj.host;
-        host = urlObj.hostname;
-      } catch {
-        const match = apiUrl.match(/https?:\/\/([^\/:]+)/);
-        if (match) {
-          host = match[1];
-          hostAndPort = match[1] + ':3000';
-        }
-      }
-
-      const expoDeepLink = `exp://${host}:8081`;
-      const returnUrl = `http://${hostAndPort}/api/payments/vnpay-return?mobile_redirect=${encodeURIComponent(expoDeepLink)}`;
-
-      const result = await purchasePackage(cafeId, pkg.id, returnUrl);
+      const result = await purchasePackage(cafeId, pkg.id, getVnpayReturnUrl());
       if (result.payment_url) {
-        // Mở trình duyệt WebView thanh toán VNPay
-        await WebBrowser.openBrowserAsync(result.payment_url);
+        await openVnpayPaymentSession(result.payment_url);
         Alert.alert(
           'Mua gói hội viên',
           'Yêu cầu mua gói chơi hội viên của bạn đang được hệ thống xử lý. Bạn có muốn chuyển tới trang quản lý gói để kiểm tra không?',
           [
             { text: 'Ở lại chi nhánh', style: 'cancel' },
-            { text: 'Xem gói của tôi', onPress: () => router.push('/customer/packages') }
+            { text: 'Xem gói của tôi', onPress: () => router.push('/customer/packages' as any) }
           ]
         );
       } else {

@@ -25,12 +25,18 @@ import {
 import { bookingWizardApi } from '@/features/bookings/api/booking-wizard.api';
 import { Text } from '@/shared/ui/Text';
 
+function formatCurrency(value?: number) {
+  return `${Number(value || 0).toLocaleString('vi-VN')}đ`;
+}
+
 export default function InspectionReviewScreen() {
   const { sessionId, inspectionId } = useLocalSearchParams<{
-    sessionId: string;
-    inspectionId: string;
+    sessionId?: string | string[];
+    inspectionId?: string | string[];
   }>();
   const router = useRouter();
+  const normalizedSessionId = Array.isArray(sessionId) ? sessionId[0] : sessionId;
+  const normalizedInspectionId = Array.isArray(inspectionId) ? inspectionId[0] : inspectionId;
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -50,40 +56,65 @@ export default function InspectionReviewScreen() {
   // Tìm inspection đang hiển thị
   const inspection = useMemo(() => {
     if (!sessionDetail?.inspections) return null;
-    if (inspectionId) {
-      return sessionDetail.inspections.find((i: any) => i.inspectionId === inspectionId);
+    if (normalizedInspectionId) {
+      return sessionDetail.inspections.find((i: any) => i.inspectionId === normalizedInspectionId);
     }
     // Nếu không truyền inspectionId, lấy cái mới nhất
     return sessionDetail.inspections[sessionDetail.inspections.length - 1];
-  }, [sessionDetail, inspectionId]);
+  }, [sessionDetail, normalizedInspectionId]);
 
   const photos = useMemo(() => {
     return inspection?.photos || [];
   }, [inspection]);
 
   const checklist = useMemo(() => {
-    return inspection?.checklist || [];
+    return (inspection?.checklist || []).map((item: any) => ({
+      ...item,
+      label: item.label || item.itemLabel || 'Hạng mục kiểm tra',
+      notes: item.notes || item.note || '',
+      status: item.status || 'OK',
+    }));
   }, [inspection]);
 
+  const isCheckIn = inspection?.type === 'CHECK_IN';
+  const canRespond = !!inspection && !isCheckIn && inspection.customerConfirmed !== true;
+
+  const damageSummary = useMemo(() => {
+    const claim = sessionDetail?.damageClaim;
+    if (!inspection?.damageFlagged && !claim) return null;
+
+    const estimatedCost = Number(claim?.estimatedCost ?? inspection?.estimatedCost ?? 0);
+    const damageMultiplier = Number(claim?.damageMultiplier ?? inspection?.damageMultiplier ?? 1);
+    const finalCharge = Number(claim?.finalCharge ?? inspection?.finalCharge ?? estimatedCost * damageMultiplier);
+
+    return {
+      description:
+        claim?.description || inspection?.damageDescription || inspection?.staffNotes || 'Có ghi nhận hư hỏng cần xác nhận.',
+      estimatedCost,
+      damageMultiplier,
+      finalCharge,
+    };
+  }, [inspection, sessionDetail]);
+
   const handleAutoConfirm = useCallback(async () => {
-    if (!inspection) return;
+    if (!inspection || !normalizedSessionId || !canRespond) return;
     try {
-      await bookingWizardApi.confirmInspection(sessionId, inspection.inspectionId, {
+      await bookingWizardApi.confirmInspection(normalizedSessionId, inspection.inspectionId, {
         agreed: true,
       });
-      Alert.alert('Hết giờ', 'Đã tự động xác nhận đồng ý biên bản bàn giao/trả xe.');
+      Alert.alert('Hết giờ', 'Đã tự động xác nhận đồng ý biên bản trả xe.');
       router.back();
     } catch (err) {
       console.error('Auto-confirm inspection failed:', err);
     }
-  }, [inspection, sessionId, router]);
+  }, [canRespond, inspection, normalizedSessionId, router]);
 
   // Load chi tiết session
   const fetchSessionDetail = useCallback(async () => {
     setLoading(true);
     try {
-      if (sessionId) {
-        const data = await bookingWizardApi.getSessionDetail(sessionId);
+      if (normalizedSessionId) {
+        const data = await bookingWizardApi.getSessionDetail(normalizedSessionId);
         setSessionDetail(data);
       }
     } catch (error) {
@@ -92,7 +123,7 @@ export default function InspectionReviewScreen() {
     } finally {
       setLoading(false);
     }
-  }, [sessionId]);
+  }, [normalizedSessionId]);
 
   useEffect(() => {
     fetchSessionDetail();
@@ -100,6 +131,10 @@ export default function InspectionReviewScreen() {
 
   // Countdown logic
   useEffect(() => {
+    if (!canRespond) {
+      return;
+    }
+
     if (timeLeft <= 0) {
       // Hết hạn ký nhận, tự động đồng ý
       handleAutoConfirm();
@@ -109,7 +144,7 @@ export default function InspectionReviewScreen() {
       setTimeLeft((prev) => prev - 1);
     }, 1000);
     return () => clearInterval(timer);
-  }, [timeLeft, handleAutoConfirm]);
+  }, [canRespond, timeLeft, handleAutoConfirm]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -118,13 +153,13 @@ export default function InspectionReviewScreen() {
   };
 
   const handleConfirm = async () => {
-    if (!inspection) return;
+    if (!inspection || !normalizedSessionId || !canRespond) return;
     setSubmitting(true);
     try {
-      await bookingWizardApi.confirmInspection(sessionId, inspection.inspectionId, {
+      await bookingWizardApi.confirmInspection(normalizedSessionId, inspection.inspectionId, {
         agreed: true,
       });
-      Alert.alert('Thành công', `Bạn đã đồng ý biên bản và hoàn tất xác nhận ${isCheckIn ? 'nhận' : 'trả'} xe.`);
+      Alert.alert('Thành công', 'Bạn đã đồng ý biên bản trả xe và hoàn tất xác nhận checkout.');
       router.back();
     } catch (error) {
       console.error('Confirm inspection failed:', error);
@@ -135,14 +170,14 @@ export default function InspectionReviewScreen() {
   };
 
   const handleReject = async () => {
-    if (!inspection) return;
+    if (!inspection || !normalizedSessionId || !canRespond) return;
     if (!disagreementNote.trim()) {
       Alert.alert('Lỗi', 'Vui lòng nhập lý do từ chối biên bản kiểm xe.');
       return;
     }
     setSubmitting(true);
     try {
-      await bookingWizardApi.confirmInspection(sessionId, inspection.inspectionId, {
+      await bookingWizardApi.confirmInspection(normalizedSessionId, inspection.inspectionId, {
         agreed: false,
         disagreementNote,
       });
@@ -187,7 +222,6 @@ export default function InspectionReviewScreen() {
     );
   }
 
-  const isCheckIn = inspection.type === 'CHECK_IN';
   const currentPhoto = photos[currentPhotoIdx];
 
   return (
@@ -207,25 +241,38 @@ export default function InspectionReviewScreen() {
           <View className="flex-row justify-between items-start">
             <View className="flex-1 pr-2">
               <Text className="text-orange-500 font-bold text-[10px] uppercase tracking-wider mb-1">
-                {isCheckIn ? 'QUY TRÌNH BÀN GIAO XE (CHECK-IN)' : 'QUY TRÌNH SERIOUS INSPECTION (TRẢ XE)'}
+                {isCheckIn ? 'QUY TRÌNH BÀN GIAO XE (CHECK-IN)' : 'QUY TRÌNH KIỂM XE TRẢ (CHECK-OUT)'}
               </Text>
               <Text className="text-white font-bold text-lg leading-6 mb-1">
                 {isCheckIn ? 'Kiểm Tra Tình Trạng Bàn Giao' : 'Kiểm Tra Tình Trạng Trả Xe'}
               </Text>
               <Text className="text-slate-400 text-[10px] font-semibold leading-4">
-                Phiên chơi: <Text className="text-slate-300 font-mono">{sessionId.substring(0, 8)}</Text> {'\n'}
+                Phiên chơi:{' '}
+                <Text className="text-slate-300 font-mono">
+                  {normalizedSessionId?.substring(0, 8).toUpperCase()}
+                </Text>{' '}
+                {'\n'}
                 Nhân viên: <Text className="text-slate-300">{sessionDetail?.staffName || 'Nhân viên trực ca'}</Text>
               </Text>
             </View>
 
-            {/* Countdown Badge */}
-            <View className="bg-red-500/10 border border-red-500/20 px-3 py-2 rounded-xl flex-row items-center gap-1.5">
-              <Clock color="#ef4444" size={14} />
-              <View>
-                <Text className="text-red-400 text-[8px] font-bold uppercase tracking-wider">Hết hạn sau</Text>
-                <Text className="text-red-400 font-mono text-xs font-black">{formatTime(timeLeft)}</Text>
+            {canRespond ? (
+              <View className="bg-red-500/10 border border-red-500/20 px-3 py-2 rounded-xl flex-row items-center gap-1.5">
+                <Clock color="#ef4444" size={14} />
+                <View>
+                  <Text className="text-red-400 text-[8px] font-bold uppercase tracking-wider">Hết hạn sau</Text>
+                  <Text className="text-red-400 font-mono text-xs font-black">{formatTime(timeLeft)}</Text>
+                </View>
               </View>
-            </View>
+            ) : (
+              <View className="bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 rounded-xl flex-row items-center gap-1.5">
+                <CheckCircle2 color="#34d399" size={14} />
+                <View>
+                  <Text className="text-emerald-300 text-[8px] font-bold uppercase tracking-wider">Trạng thái</Text>
+                  <Text className="text-emerald-300 text-xs font-black">Đã ghi nhận</Text>
+                </View>
+              </View>
+            )}
           </View>
         </View>
 
@@ -236,6 +283,40 @@ export default function InspectionReviewScreen() {
             Lưu ý: Vui lòng xem kỹ các góc ảnh chụp thực tế dưới đây. Bất kỳ điểm sai lệch nào cần được phản hồi ngay để staff kiểm tra lại trước khi tiếp tục quy trình.
           </Text>
         </View>
+
+        {damageSummary ? (
+          <View className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 mt-4 shadow-xl">
+            <View className="flex-row items-start gap-2.5">
+              <AlertTriangle color="#ef4444" size={17} />
+              <View className="flex-1">
+                <Text className="text-red-300 font-bold text-xs uppercase tracking-wider">
+                  Hư hỏng/phí phát sinh
+                </Text>
+                <Text className="text-red-100/80 text-[11px] leading-4 mt-1">
+                  {damageSummary.description}
+                </Text>
+              </View>
+            </View>
+            <View className="mt-3 rounded-xl border border-red-500/20 bg-slate-950/50 p-3">
+              <View className="flex-row justify-between gap-3">
+                <Text className="text-red-100/60 text-[11px]">Chi phí dự kiến</Text>
+                <Text className="text-red-100 text-[11px] font-bold">
+                  {formatCurrency(damageSummary.estimatedCost)}
+                </Text>
+              </View>
+              <View className="mt-2 flex-row justify-between gap-3">
+                <Text className="text-red-100/60 text-[11px]">Hệ số hư hỏng</Text>
+                <Text className="text-red-100 text-[11px] font-bold">x{damageSummary.damageMultiplier}</Text>
+              </View>
+              <View className="mt-2 flex-row justify-between gap-3">
+                <Text className="text-red-100/60 text-[11px]">Tổng tính phí</Text>
+                <Text className="text-red-300 text-[12px] font-black">
+                  {formatCurrency(damageSummary.finalCharge)}
+                </Text>
+              </View>
+            </View>
+          </View>
+        ) : null}
 
         {/* Photo Section */}
         <View className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 mt-4 shadow-xl">
@@ -347,8 +428,18 @@ export default function InspectionReviewScreen() {
                   key={idx}
                   className="flex-row items-center gap-3 p-3 rounded-xl bg-slate-950 border border-slate-900/60"
                 >
-                  <View className="bg-emerald-500/10 p-1.5 rounded-full border border-emerald-500/20">
-                    <CheckCircle2 color="#10b981" size={14} />
+                  <View
+                    className={`p-1.5 rounded-full border ${
+                      item.status === 'OK'
+                        ? 'bg-emerald-500/10 border-emerald-500/20'
+                        : 'bg-amber-500/10 border-amber-500/20'
+                    }`}
+                  >
+                    {item.status === 'OK' ? (
+                      <CheckCircle2 color="#10b981" size={14} />
+                    ) : (
+                      <AlertTriangle color="#f59e0b" size={14} />
+                    )}
                   </View>
                   <View className="flex-1">
                     <Text className="text-slate-200 text-xs font-semibold">{item.label}</Text>
@@ -356,6 +447,11 @@ export default function InspectionReviewScreen() {
                       <Text className="text-slate-500 text-[10px] mt-0.5">Ghi chú: {item.notes}</Text>
                     ) : null}
                   </View>
+                  <Text
+                    className={`text-[9px] font-bold ${item.status === 'OK' ? 'text-emerald-400' : 'text-amber-400'}`}
+                  >
+                    {item.status}
+                  </Text>
                 </View>
               ))}
             </View>
@@ -370,35 +466,46 @@ export default function InspectionReviewScreen() {
         </View>
 
         {/* Action Buttons */}
-        <View className="mt-6 gap-3">
-          <TouchableOpacity
-            disabled={submitting}
-            onPress={handleConfirm}
-            className="w-full bg-[#0a0f1d] border border-orange-500/30 h-12 rounded-xl justify-center items-center shadow-lg active:opacity-80 flex-row gap-2"
-          >
-            {submitting ? (
-              <ActivityIndicator size="small" color="#f97316" />
-            ) : (
-              <>
-                <CheckCircle2 color="#f97316" size={16} />
-                <Text className="text-orange-500 font-bold text-xs uppercase tracking-wider">
-                  Tôi đồng ý biên bản {isCheckIn ? 'nhận xe' : 'trả xe'} & Hoàn tất
-                </Text>
-              </>
-            )}
-          </TouchableOpacity>
+        {canRespond ? (
+          <View className="mt-6 gap-3">
+            <TouchableOpacity
+              disabled={submitting}
+              onPress={handleConfirm}
+              className="w-full bg-[#0a0f1d] border border-orange-500/30 h-12 rounded-xl justify-center items-center shadow-lg active:opacity-80 flex-row gap-2"
+            >
+              {submitting ? (
+                <ActivityIndicator size="small" color="#f97316" />
+              ) : (
+                <>
+                  <CheckCircle2 color="#f97316" size={16} />
+                  <Text className="text-orange-500 font-bold text-xs uppercase tracking-wider">
+                    Tôi đồng ý biên bản trả xe & Hoàn tất
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            disabled={submitting}
-            onPress={() => setRejectModalVisible(true)}
-            className="w-full bg-red-500/5 border border-red-500/20 h-12 rounded-xl justify-center items-center active:opacity-80 flex-row gap-2 mt-2"
-          >
-            <XCircle color="#ef4444" size={16} />
-            <Text className="text-red-400 font-bold text-xs uppercase tracking-wider">
-              Tôi phát hiện sai lệch / Từ chối {isCheckIn ? 'nhận xe' : 'trả xe'}
-            </Text>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity
+              disabled={submitting}
+              onPress={() => setRejectModalVisible(true)}
+              className="w-full bg-red-500/5 border border-red-500/20 h-12 rounded-xl justify-center items-center active:opacity-80 flex-row gap-2 mt-2"
+            >
+              <XCircle color="#ef4444" size={16} />
+              <Text className="text-red-400 font-bold text-xs uppercase tracking-wider">
+                Tôi phát hiện sai lệch / Từ chối trả xe
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View className="mt-6 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4">
+            <View className="flex-row items-center gap-2">
+              <CheckCircle2 color="#34d399" size={16} />
+              <Text className="text-emerald-300 text-xs font-bold">
+                Biên bản này đã được ghi nhận, không cần thao tác thêm.
+              </Text>
+            </View>
+          </View>
+        )}
       </ScrollView>
 
       {/* Modal Zoom ảnh */}

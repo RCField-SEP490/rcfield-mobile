@@ -2,13 +2,26 @@ import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View, type ColorValue } from 'react-native';
 import PagerView from 'react-native-pager-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { CalendarDays, Compass, Home, UserRound, type LucideIcon } from 'lucide-react-native';
+import {
+  CalendarDays,
+  ClipboardCheck,
+  Coffee,
+  Compass,
+  Home,
+  UserRound,
+  type LucideIcon,
+} from 'lucide-react-native';
 import { usePathname } from 'expo-router';
 
 import { BookingListScreen } from '@/features/bookings/components/BookingListScreen';
 import { ExploreScreen } from '@/features/explore/components/ExploreScreen';
 import { HomeScreen } from '@/features/home/components/HomeScreen';
 import { ProfileScreen } from '@/features/profile/components/ProfileScreen';
+import { StaffBookingsScreen } from '@/features/staff/components/StaffBookingsScreen';
+import { StaffFnbOrdersScreen } from '@/features/staff/components/StaffFnbOrdersScreen';
+import { StaffHomeScreen } from '@/features/staff/components/StaffHomeScreen';
+import { useAuthStore } from '@/shared/store/auth-store';
+import { subscribeMainTabRequests } from '@/shared/ui/main-tab-events';
 
 const ACTIVE_COLOR = '#10b981';
 const INACTIVE_COLOR = '#64748b';
@@ -18,15 +31,22 @@ const TAB_BAR_HEIGHT = 56;
 type MainTab = {
   key: string;
   title: string;
-  href: '/' | '/explore' | '/bookings' | '/profile';
+  href: string;
   Icon: LucideIcon;
   Screen: React.ComponentType;
 };
 
-const MAIN_TABS: MainTab[] = [
+const CUSTOMER_TABS: MainTab[] = [
   { key: 'home', title: 'Home', href: '/', Icon: Home, Screen: HomeScreen },
   { key: 'explore', title: 'Khám phá', href: '/explore', Icon: Compass, Screen: ExploreScreen },
   { key: 'bookings', title: 'Bookings', href: '/bookings', Icon: CalendarDays, Screen: BookingListScreen },
+  { key: 'profile', title: 'Profile', href: '/profile', Icon: UserRound, Screen: ProfileScreen },
+];
+
+const STAFF_TABS: MainTab[] = [
+  { key: 'staff-home', title: 'Trực ca', href: '/', Icon: ClipboardCheck, Screen: StaffHomeScreen },
+  { key: 'staff-bookings', title: 'Lịch', href: '/bookings', Icon: CalendarDays, Screen: StaffBookingsScreen },
+  { key: 'staff-fnb', title: 'F&B', href: '/staff/fnb', Icon: Coffee, Screen: StaffFnbOrdersScreen },
   { key: 'profile', title: 'Profile', href: '/profile', Icon: UserRound, Screen: ProfileScreen },
 ];
 
@@ -34,13 +54,15 @@ const MAIN_TABS: MainTab[] = [
 let globalActiveTabIdx = 0;
 
 const PagerScreen = memo(function PagerScreen({
+  isLoaded,
   Screen,
 }: {
+  isLoaded: boolean;
   Screen: React.ComponentType;
 }) {
   return (
     <View style={styles.page} collapsable={false}>
-      <Screen />
+      {isLoaded ? <Screen /> : null}
     </View>
   );
 });
@@ -80,15 +102,18 @@ const TabBarItem = memo(function TabBarItem({
 
 export function SwipeTabPager() {
   const insets = useSafeAreaInsets();
+  const role = useAuthStore((state) => state.role);
+  const tabs = role === 'staff' ? STAFF_TABS : CUSTOMER_TABS;
   const pagerRef = useRef<PagerView>(null);
   const [activeIndex, setActiveIndex] = useState(globalActiveTabIdx);
+  const [loadedIndexes, setLoadedIndexes] = useState(() => new Set([globalActiveTabIdx]));
   const activeIndexRef = useRef(globalActiveTabIdx);
   const pathname = usePathname();
 
   // Lắng nghe thay đổi của route để đồng bộ hóa tab hiện tại
   useEffect(() => {
     console.log('[SwipeTabPager] Pathname changed to:', pathname);
-    const matchedIndex = MAIN_TABS.findIndex((tab) => {
+    const matchedIndex = tabs.findIndex((tab) => {
       if (tab.href === '/') {
         return pathname === '/' || pathname === '/(tabs)' || pathname === '/(tabs)/';
       }
@@ -107,17 +132,65 @@ export function SwipeTabPager() {
       if (targetIndex !== activeIndexRef.current) {
         activeIndexRef.current = targetIndex;
         setActiveIndex(targetIndex);
+        setLoadedIndexes((previous) => {
+          if (previous.has(targetIndex)) {
+            return previous;
+          }
+          const next = new Set(previous);
+          next.add(targetIndex);
+          return next;
+        });
         globalActiveTabIdx = targetIndex;
         pagerRef.current?.setPageWithoutAnimation(targetIndex);
       }
     }
-  }, [pathname]);
+  }, [pathname, tabs]);
+
+  const markTabLoaded = useCallback((index: number) => {
+    setLoadedIndexes((previous) => {
+      if (previous.has(index)) {
+        return previous;
+      }
+
+      const next = new Set(previous);
+      next.add(index);
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (activeIndexRef.current < tabs.length) {
+      markTabLoaded(activeIndexRef.current);
+      return;
+    }
+
+    activeIndexRef.current = 0;
+    globalActiveTabIdx = 0;
+    setActiveIndex(0);
+    setLoadedIndexes(new Set([0]));
+    pagerRef.current?.setPageWithoutAnimation(0);
+  }, [markTabLoaded, tabs.length]);
+
+  useEffect(() => {
+    return subscribeMainTabRequests((index) => {
+      if (index < 0 || index >= tabs.length || index === activeIndexRef.current) {
+        return;
+      }
+
+      activeIndexRef.current = index;
+      setActiveIndex(index);
+      markTabLoaded(index);
+      globalActiveTabIdx = index;
+      pagerRef.current?.setPageWithoutAnimation(index);
+    });
+  }, [markTabLoaded, tabs.length]);
 
   const setActiveTab = useCallback((index: number) => {
     activeIndexRef.current = index;
     setActiveIndex(index);
+    markTabLoaded(index);
     globalActiveTabIdx = index; // Cập nhật biến global
-  }, []);
+  }, [markTabLoaded]);
 
   const handlePageSelected = useCallback(
     (event: { nativeEvent: { position: number } }) => {
@@ -136,29 +209,30 @@ export function SwipeTabPager() {
 
     activeIndexRef.current = index;
     setActiveIndex(index);
+    markTabLoaded(index);
     globalActiveTabIdx = index; // Cập nhật biến global
 
     // Bấm bottom tab thì xuất hiện liền lập tức không có animation trượt theo yêu cầu
     pagerRef.current?.setPageWithoutAnimation(index);
-  }, []);
+  }, [markTabLoaded]);
 
   return (
     <View style={styles.container}>
       <PagerView
         ref={pagerRef}
         style={styles.pager}
-        initialPage={globalActiveTabIdx}
+        initialPage={Math.min(globalActiveTabIdx, tabs.length - 1)}
         offscreenPageLimit={1}
         overScrollMode="never"
         onPageSelected={handlePageSelected}
       >
-        {MAIN_TABS.map(({ key, Screen }) => (
-          <PagerScreen key={key} Screen={Screen} />
+        {tabs.map(({ key, Screen }, index) => (
+          <PagerScreen key={key} isLoaded={loadedIndexes.has(index)} Screen={Screen} />
         ))}
       </PagerView>
 
       <View style={[styles.tabBar, { height: TAB_BAR_HEIGHT + insets.bottom, paddingBottom: insets.bottom }]}>
-        {MAIN_TABS.map(({ key, title, Icon }, index) => (
+        {tabs.map(({ key, title, Icon }, index) => (
           <TabBarItem
             key={key}
             index={index}
