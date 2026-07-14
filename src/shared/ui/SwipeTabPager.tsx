@@ -94,13 +94,22 @@ export function SwipeTabPager() {
       }
       return pathname === tab.href || pathname === `/(tabs)${tab.href}`;
     });
-    console.log('[SwipeTabPager] Matched index:', matchedIndex, 'Active index ref:', activeIndexRef.current);
+    console.log('[SwipeTabPager] Matched index:', matchedIndex, 'Active index ref:', activeIndexRef.current, 'Global active index:', globalActiveTabIdx);
 
     if (matchedIndex !== -1 && matchedIndex !== activeIndexRef.current) {
-      activeIndexRef.current = matchedIndex;
-      setActiveIndex(matchedIndex);
-      globalActiveTabIdx = matchedIndex;
-      pagerRef.current?.setPageWithoutAnimation(matchedIndex);
+      // Nếu matchedIndex là 0 (Home tab) nhưng globalActiveTabIdx đang ở tab khác (do back từ subpage về),
+      // thì giữ nguyên tab hiện tại bằng cách khôi phục lại globalActiveTabIdx
+      let targetIndex = matchedIndex;
+      if (matchedIndex === 0 && globalActiveTabIdx !== 0) {
+        targetIndex = globalActiveTabIdx;
+      }
+
+      if (targetIndex !== activeIndexRef.current) {
+        activeIndexRef.current = targetIndex;
+        setActiveIndex(targetIndex);
+        globalActiveTabIdx = targetIndex;
+        pagerRef.current?.setPageWithoutAnimation(targetIndex);
+      }
     }
   }, [pathname]);
 

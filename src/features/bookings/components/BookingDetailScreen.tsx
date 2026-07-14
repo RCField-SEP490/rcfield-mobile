@@ -26,6 +26,8 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  AppState,
+  AppStateStatus,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -66,32 +68,48 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
   }, [sessionDetail]);
 
   const renderPhotoGrid = (photos: any[], label: string) => {
+    const isByoc = booking?.playMode === 'BYOC';
+
     return (
       <View className="flex-1 space-y-2">
         <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider text-center mb-1">
           {label}
         </Text>
         {photos.length > 0 ? (
-          <View className="flex-row flex-wrap gap-1.5 justify-between">
-            {photos.map((p: any, idx: number) => (
-              <View key={idx} className="w-[48%] aspect-square rounded-lg bg-slate-900 border border-slate-800 overflow-hidden relative">
-                <Image
-                  source={{ uri: p.url }}
-                  className="w-full h-full object-cover"
-                />
-                <View className="absolute bottom-1 left-1 bg-black/70 px-1 py-0.5 rounded">
-                  <Text className="text-[7.5px] text-slate-300 uppercase font-black tracking-wide">
-                    {p.angle || 'PHOTO'}
-                  </Text>
+          isByoc ? (
+            <View className="w-full aspect-square rounded-lg bg-slate-900 border border-slate-800 overflow-hidden relative">
+              <Image
+                source={{ uri: photos[0].url }}
+                className="w-full h-full object-cover"
+              />
+              <View className="absolute bottom-1 left-1 bg-black/70 px-1 py-0.5 rounded">
+                <Text className="text-[7.5px] text-slate-300 uppercase font-black tracking-wide">
+                  {photos[0].angle || 'PHOTO'}
+                </Text>
+              </View>
+            </View>
+          ) : (
+            <View className="flex-row flex-wrap gap-1.5 justify-between">
+              {photos.map((p: any, idx: number) => (
+                <View key={idx} className="w-[48%] aspect-square rounded-lg bg-slate-900 border border-slate-800 overflow-hidden relative">
+                  <Image
+                    source={{ uri: p.url }}
+                    className="w-full h-full object-cover"
+                  />
+                  <View className="absolute bottom-1 left-1 bg-black/70 px-1 py-0.5 rounded">
+                    <Text className="text-[7.5px] text-slate-300 uppercase font-black tracking-wide">
+                      {p.angle || 'PHOTO'}
+                    </Text>
+                  </View>
                 </View>
-              </View>
-            ))}
-            {Array.from({ length: Math.max(0, 4 - photos.length) }).map((_, idx) => (
-              <View key={`placeholder-${idx}`} className="w-[48%] aspect-square rounded-lg bg-slate-950 border border-slate-900/60 justify-center items-center">
-                <Camera color="#1e293b" size={14} />
-              </View>
-            ))}
-          </View>
+              ))}
+              {Array.from({ length: Math.max(0, 4 - photos.length) }).map((_, idx) => (
+                <View key={`placeholder-${idx}`} className="w-[48%] aspect-square rounded-lg bg-slate-950 border border-slate-900/60 justify-center items-center">
+                  <Camera color="#1e293b" size={14} />
+                </View>
+              ))}
+            </View>
+          )
         ) : (
           <View className="w-full aspect-square rounded-xl bg-slate-950 border border-slate-850 justify-center items-center gap-1.5 p-4">
             <Camera color="#475569" size={24} />
@@ -135,9 +153,12 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
         [
           'SESSION_CHECKIN_INSPECTION',
           'SESSION_CHECKOUT_INSPECTION',
+          'CUSTOMER_CHECKIN_CONFIRMED',
+          'CUSTOMER_CHECKOUT_CONFIRMED',
           'CUSTOMER_PAYMENT_CONFIRMED',
           'SESSION_EXTENSION_PROPOSED',
           'SESSION_FNB_ORDER_ADDED',
+          'BOOKING_REVIEW_REQUEST',
         ].includes(event)
       ) {
         console.log(`[BookingDetailScreen] WebSocket event '${event}' received, reloading...`);
@@ -147,6 +168,20 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
 
     return () => {
       unsubscribe();
+    };
+  }, [loadBookingDetail]);
+
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'active') {
+        console.log('[BookingDetailScreen] App status is active, reloading booking detail...');
+        loadBookingDetail();
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => {
+      subscription.remove();
     };
   }, [loadBookingDetail]);
 

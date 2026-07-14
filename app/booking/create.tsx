@@ -1,5 +1,5 @@
 import React from 'react';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, Stack } from 'expo-router';
 import { BookingWizardScreen } from '@/features/bookings/components/BookingWizardScreen';
 import { View } from 'react-native';
 import { Text } from '@/shared/ui/Text';
@@ -28,11 +28,14 @@ export default function BookingCreateRoute() {
   }
 
   return (
-    <BookingWizardScreen
-      cafeId={cafeId}
-      preselectedVehicleId={vehicleId}
-      preselectedFnb={preselectedFnb}
-    />
+    <>
+      <Stack.Screen options={{ gestureEnabled: false }} />
+      <BookingWizardScreen
+        cafeId={cafeId}
+        preselectedVehicleId={vehicleId}
+        preselectedFnb={preselectedFnb}
+      />
+    </>
   );
 }
 
