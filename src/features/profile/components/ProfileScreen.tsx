@@ -16,7 +16,6 @@ import {
   Gem,
   Award,
   ShieldCheck,
-  Heart,
 } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -35,21 +34,34 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { getMe, updateMe, changePassword, uploadImage } from '@/features/auth/api/auth.api';
 import { getMyBookings } from '@/features/bookings/api/booking.api';
+import { getCafeById } from '@/features/explore/api/explore.api';
+import { NotificationBellButton } from '@/features/notifications/components/NotificationBellButton';
 import { useAuthStore } from '@/shared/store/auth-store';
 import { Text } from '@/shared/ui/Text';
 
 export function ProfileScreen() {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
+  const role = useAuthStore((state) => state.role);
+  const assignedCafeId = useAuthStore((state) => state.assignedCafeId);
   const setUser = useAuthStore((state) => state.setUser);
   const logout = useAuthStore((state) => state.logout);
 
   const displayName = user?.fullName ?? user?.email ?? 'RCField User';
   const email = user?.email ?? 'user@rcfield.vn';
+  const isCustomer = role === 'customer';
 
   const [bookingCount, setBookingCount] = useState(0);
+  const [assignedCafeName, setAssignedCafeName] = useState('');
+  const [assignedCafeAddress, setAssignedCafeAddress] = useState('');
+  const [loadingAssignedCafe, setLoadingAssignedCafe] = useState(false);
 
   useEffect(() => {
+    if (!isCustomer) {
+      setBookingCount(0);
+      return;
+    }
+
     getMyBookings({ limit: 1 })
       .then((res) => {
         setBookingCount(res.total);
@@ -57,7 +69,37 @@ export function ProfileScreen() {
       .catch((err) => {
         console.error('Error fetching bookings total for profile stats:', err);
       });
-  }, []);
+  }, [isCustomer]);
+
+  useEffect(() => {
+    if (isCustomer || !assignedCafeId) {
+      setAssignedCafeName('');
+      setAssignedCafeAddress('');
+      setLoadingAssignedCafe(false);
+      return;
+    }
+
+    let mounted = true;
+    setLoadingAssignedCafe(true);
+    getCafeById(assignedCafeId)
+      .then((cafe) => {
+        if (!mounted) return;
+        setAssignedCafeName(cafe?.name ?? '');
+        setAssignedCafeAddress(cafe?.address ?? '');
+      })
+      .catch((err) => {
+        console.error('Error fetching assigned cafe detail:', err);
+      })
+      .finally(() => {
+        if (mounted) {
+          setLoadingAssignedCafe(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [assignedCafeId, isCustomer]);
 
   const { points, memberTier, pointsToNextTier, progress, tierColor, tierBg, nextTierLabel } = useMemo(() => {
     const pts = bookingCount * 500;
@@ -381,13 +423,19 @@ export function ProfileScreen() {
           showsVerticalScrollIndicator={false}
         >
           {/* Header Màn hình */}
-          <View className="mb-6">
-            <Text className="text-white text-3xl" variant="title" weight="700">
-              Hồ sơ cá nhân
-            </Text>
-            <Text className="mt-1.5 text-[14px] leading-5 text-slate-400 font-semibold">
-              Quản lý thông tin tài khoản, bảo mật và cài đặt thông báo của bạn.
-            </Text>
+          <View className="mb-6 flex-row items-start justify-between gap-3">
+            <View className="flex-1">
+              <Text className="text-white text-3xl" variant="title" weight="700">
+                Hồ sơ cá nhân
+              </Text>
+              <Text className="mt-1.5 text-[14px] leading-5 text-slate-400 font-semibold">
+                {isCustomer
+                  ? 'Quản lý thông tin tài khoản, bảo mật và tuỳ chọn cá nhân.'
+                  : 'Quản lý thông tin tài khoản và bảo mật trực ca của bạn.'}
+              </Text>
+            </View>
+
+            <NotificationBellButton />
           </View>
 
           {/* Section: Avatar */}
@@ -443,88 +491,137 @@ export function ProfileScreen() {
             </Text>
           </View>
 
-          {/* Section: Hạng thành viên & Điểm tin cậy (Premium Loyaty Card) */}
-          <View className="rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-5 shadow-2xl mb-6 relative overflow-hidden">
-            {/* Thanh màu phản quang theo hạng */}
-            <View className="absolute top-0 right-0 left-0 h-[3px]" style={{ backgroundColor: tierColor }} />
-            
-            <View className="flex-row items-center justify-between mb-3.5">
-              <Text className="text-[12px] font-bold text-white uppercase tracking-wider">
-                Hạng thành viên
-              </Text>
-              <View className={`px-2.5 py-0.5 rounded-full border ${tierBg}`}>
-                <Text className="text-[9px] font-black uppercase tracking-wide" style={{ color: tierColor }}>
-                  {memberTier}
-                </Text>
-              </View>
-            </View>
+          {isCustomer ? (
+            /* Section: Hạng thành viên & Điểm tin cậy (Premium Loyaty Card) */
+            <View className="rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-5 shadow-2xl mb-6 relative overflow-hidden">
+              {/* Thanh màu phản quang theo hạng */}
+              <View className="absolute top-0 right-0 left-0 h-[3px]" style={{ backgroundColor: tierColor }} />
 
-            <View className="flex-row items-center gap-4 mb-4">
-              <View className="size-12 rounded-xl bg-slate-900 border border-slate-800 justify-center items-center shadow-lg">
-                {memberTier.includes('Gold') ? (
-                  <Crown color={tierColor} size={22} />
-                ) : memberTier.includes('Platinum') ? (
-                  <Gem color={tierColor} size={22} />
-                ) : memberTier.includes('Silver') ? (
-                  <ShieldCheck color={tierColor} size={22} />
-                ) : (
-                  <Award color={tierColor} size={22} />
-                )}
-              </View>
-              <View className="flex-1">
-                <View className="flex-row items-baseline gap-1">
-                  <Text className="text-xl text-white font-extrabold" style={{ color: tierColor }}>
-                    {points.toLocaleString('vi-VN')}
-                  </Text>
-                  <Text className="text-slate-400 text-xs font-bold">
-                    điểm
+              <View className="flex-row items-center justify-between mb-3.5">
+                <Text className="text-[12px] font-bold text-white uppercase tracking-wider">
+                  Hạng thành viên
+                </Text>
+                <View className={`px-2.5 py-0.5 rounded-full border ${tierBg}`}>
+                  <Text className="text-[9px] font-black uppercase tracking-wide" style={{ color: tierColor }}>
+                    {memberTier}
                   </Text>
                 </View>
-                <Text className="text-[11px] text-slate-400 font-semibold mt-0.5">
-                  Tích lũy từ {bookingCount} lượt chơi đã đặt
-                </Text>
+              </View>
+
+              <View className="flex-row items-center gap-4 mb-4">
+                <View className="size-12 rounded-xl bg-slate-900 border border-slate-800 justify-center items-center shadow-lg">
+                  {memberTier.includes('Gold') ? (
+                    <Crown color={tierColor} size={22} />
+                  ) : memberTier.includes('Platinum') ? (
+                    <Gem color={tierColor} size={22} />
+                  ) : memberTier.includes('Silver') ? (
+                    <ShieldCheck color={tierColor} size={22} />
+                  ) : (
+                    <Award color={tierColor} size={22} />
+                  )}
+                </View>
+                <View className="flex-1">
+                  <View className="flex-row items-baseline gap-1">
+                    <Text className="text-xl text-white font-extrabold" style={{ color: tierColor }}>
+                      {points.toLocaleString('vi-VN')}
+                    </Text>
+                    <Text className="text-slate-400 text-xs font-bold">
+                      điểm
+                    </Text>
+                  </View>
+                  <Text className="text-[11px] text-slate-400 font-semibold mt-0.5">
+                    Tích lũy từ {bookingCount} lượt chơi đã đặt
+                  </Text>
+                </View>
+              </View>
+
+              {/* Thanh tiến trình thăng hạng */}
+              {pointsToNextTier > 0 ? (
+                <View className="space-y-1.5">
+                  <View className="flex-row justify-between text-[10.5px] font-bold">
+                    <Text className="text-slate-400">Tiến trình lên {nextTierLabel}</Text>
+                    <Text style={{ color: tierColor }}>Còn {pointsToNextTier.toLocaleString('vi-VN')} điểm</Text>
+                  </View>
+                  <View className="h-2 w-full bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+                    <View
+                      className="h-full rounded-full"
+                      style={{ width: `${progress}%`, backgroundColor: tierColor }}
+                    />
+                  </View>
+                </View>
+              ) : (
+                <View className="rounded-lg bg-sky-500/5 border border-sky-500/10 py-2 items-center">
+                  <Text className="text-[10px] text-sky-400 font-black tracking-wide uppercase">
+                    🏆 Bạn đã đạt hạng thành viên cao nhất!
+                  </Text>
+                </View>
+              )}
+
+              {/* Điểm uy tín (Trust Score) */}
+              <View className="w-full h-[1px] bg-slate-800/80 my-4" />
+              <View className="flex-row items-center justify-between">
+                <View className="flex-1 pr-4">
+                  <Text className="text-[13px] font-bold text-white">Điểm uy tín (Trust Score)</Text>
+                  <Text className="text-[10px] text-slate-400 font-semibold leading-4 mt-0.5">
+                    Quyết định quyền hạn đặt lịch chơi và hoàn tiền của bạn.
+                  </Text>
+                </View>
+                <View className="flex-row items-baseline gap-0.5">
+                  <Text className="text-lg font-black text-emerald-500">
+                    {user?.trustScore ?? 100}
+                  </Text>
+                  <Text className="text-slate-400 text-xs font-bold">/100</Text>
+                </View>
               </View>
             </View>
-
-            {/* Thanh tiến trình thăng hạng */}
-            {pointsToNextTier > 0 ? (
-              <View className="space-y-1.5">
-                <View className="flex-row justify-between text-[10.5px] font-bold">
-                  <Text className="text-slate-400">Tiến trình lên {nextTierLabel}</Text>
-                  <Text style={{ color: tierColor }}>Còn {pointsToNextTier.toLocaleString('vi-VN')} điểm</Text>
+          ) : (
+            <View className="rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-5 shadow-2xl mb-6">
+              <View className="mb-4 flex-row items-center justify-between">
+                <View>
+                  <Text className="text-[12px] font-bold text-white uppercase tracking-wider">
+                    Vai trò tài khoản
+                  </Text>
+                  <Text className="mt-1 text-[11px] text-slate-400">
+                    Hồ sơ vận hành dùng cho ứng dụng staff mobile.
+                  </Text>
                 </View>
-                <View className="h-2 w-full bg-slate-950 rounded-full overflow-hidden border border-slate-800">
-                  <View 
-                    className="h-full rounded-full" 
-                    style={{ width: `${progress}%`, backgroundColor: tierColor }} 
-                  />
+                <View className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1">
+                  <Text className="text-[10px] uppercase text-emerald-400" weight="700">
+                    {role ?? 'staff'}
+                  </Text>
                 </View>
               </View>
-            ) : (
-              <View className="rounded-lg bg-sky-500/5 border border-sky-500/10 py-2 items-center">
-                <Text className="text-[10px] text-sky-400 font-black tracking-wide uppercase">
-                  🏆 Bạn đã đạt hạng thành viên cao nhất!
-                </Text>
-              </View>
-            )}
 
-            {/* Điểm uy tín (Trust Score) */}
-            <View className="w-full h-[1px] bg-slate-800/80 my-4" />
-            <View className="flex-row items-center justify-between">
-              <View className="flex-1 pr-4">
-                <Text className="text-[13px] font-bold text-white">Điểm uy tín (Trust Score)</Text>
-                <Text className="text-[10px] text-slate-400 font-semibold leading-4 mt-0.5">
-                  Quyết định quyền hạn đặt lịch chơi và hoàn tiền của bạn.
-                </Text>
-              </View>
-              <View className="flex-row items-baseline gap-0.5">
-                <Text className="text-lg font-black text-emerald-500">
-                  {user?.trustScore ?? 100}
-                </Text>
-                <Text className="text-slate-400 text-xs font-bold">/100</Text>
+              <View className="gap-3">
+                <View className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+                  <Text className="text-[11px] uppercase text-slate-500" weight="700">
+                    Chi nhánh được phân công
+                  </Text>
+                  <Text className="mt-1 text-[13px] text-white" weight="700">
+                    {assignedCafeId
+                      ? assignedCafeName ||
+                        (loadingAssignedCafe
+                          ? `Đang tải tên chi nhánh #${assignedCafeId.slice(0, 8).toUpperCase()}`
+                          : `Không tải được tên chi nhánh #${assignedCafeId.slice(0, 8).toUpperCase()}`)
+                      : 'Chưa được phân công chi nhánh'}
+                  </Text>
+                  {assignedCafeAddress ? (
+                    <Text className="mt-1 text-[11px] leading-4 text-slate-500">
+                      {assignedCafeAddress}
+                    </Text>
+                  ) : null}
+                </View>
+                <View className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+                  <Text className="text-[11px] uppercase text-slate-500" weight="700">
+                    Quyền thao tác
+                  </Text>
+                  <Text className="mt-1 text-[12px] leading-5 text-slate-300">
+                    Check-in lịch hôm nay, cập nhật đơn F&B và xem chi tiết phiên chạy.
+                  </Text>
+                </View>
               </View>
             </View>
-          </View>
+          )}
 
           {/* Section: Thông tin cơ bản */}
           <View className="rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-5 shadow-2xl mb-6">
@@ -624,53 +721,55 @@ export function ProfileScreen() {
             </View>
           </View>
 
-          {/* Section: Cài đặt thông báo */}
-          <View className="rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-5 shadow-2xl mb-6">
-            <View className="flex-row items-center mb-4 gap-2 border-b border-slate-800/80 pb-2">
-              <Bell color="#f97316" size={18} />
-              <Text className="text-[15px] font-bold text-white uppercase tracking-wider">
-                Cài đặt nhận thông báo
-              </Text>
-            </View>
-
-            <View className="gap-4">
-              <View className="flex-row items-center justify-between">
-                <View className="flex-1 pr-4">
-                  <Text className="text-[14px] font-semibold text-white">
-                    Email Marketing
-                  </Text>
-                  <Text className="text-[11px] text-slate-400 font-medium leading-4 mt-0.5">
-                    Nhận thông tin tin tức khuyến mãi, giải đua và các sự kiện hấp dẫn từ hệ thống.
-                  </Text>
-                </View>
-                <Switch
-                  value={emailMarketing}
-                  onValueChange={setEmailMarketing}
-                  trackColor={{ false: '#1e293b', true: '#ea580c' }}
-                  thumbColor="#ffffff"
-                />
+          {isCustomer ? (
+            /* Section: Cài đặt thông báo */
+            <View className="rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-5 shadow-2xl mb-6">
+              <View className="flex-row items-center mb-4 gap-2 border-b border-slate-800/80 pb-2">
+                <Bell color="#f97316" size={18} />
+                <Text className="text-[15px] font-bold text-white uppercase tracking-wider">
+                  Cài đặt nhận thông báo
+                </Text>
               </View>
 
-              <View className="w-full h-[1px] bg-slate-800/80" />
-
-              <View className="flex-row items-center justify-between">
-                <View className="flex-1 pr-4">
-                  <Text className="text-[14px] font-semibold text-white">
-                    SMS Booking Reminders
-                  </Text>
-                  <Text className="text-[11px] text-slate-400 font-medium leading-4 mt-0.5">
-                    Tự động nhận tin nhắn SMS nhắc nhở lịch đặt sân 1 tiếng trước khi bắt đầu.
-                  </Text>
+              <View className="gap-4">
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-1 pr-4">
+                    <Text className="text-[14px] font-semibold text-white">
+                      Email Marketing
+                    </Text>
+                    <Text className="text-[11px] text-slate-400 font-medium leading-4 mt-0.5">
+                      Nhận thông tin tin tức khuyến mãi, giải đua và các sự kiện hấp dẫn từ hệ thống.
+                    </Text>
+                  </View>
+                  <Switch
+                    value={emailMarketing}
+                    onValueChange={setEmailMarketing}
+                    trackColor={{ false: '#1e293b', true: '#ea580c' }}
+                    thumbColor="#ffffff"
+                  />
                 </View>
-                <Switch
-                  value={smsReminder}
-                  onValueChange={setSmsReminder}
-                  trackColor={{ false: '#1e293b', true: '#ea580c' }}
-                  thumbColor="#ffffff"
-                />
+
+                <View className="w-full h-[1px] bg-slate-800/80" />
+
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-1 pr-4">
+                    <Text className="text-[14px] font-semibold text-white">
+                      SMS Booking Reminders
+                    </Text>
+                    <Text className="text-[11px] text-slate-400 font-medium leading-4 mt-0.5">
+                      Tự động nhận tin nhắn SMS nhắc nhở lịch đặt sân 1 tiếng trước khi bắt đầu.
+                    </Text>
+                  </View>
+                  <Switch
+                    value={smsReminder}
+                    onValueChange={setSmsReminder}
+                    trackColor={{ false: '#1e293b', true: '#ea580c' }}
+                    thumbColor="#ffffff"
+                  />
+                </View>
               </View>
             </View>
-          </View>
+          ) : null}
 
           {/* Section: Đổi mật khẩu */}
           <View className="rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-5 shadow-2xl mb-6">
@@ -807,25 +906,15 @@ export function ProfileScreen() {
             </View>
           </View>
 
-          {/* Section: Hành động khác (Đăng xuất, Xóa tài khoản, Wishlist) */}
+          {/* Section: Hành động khác */}
           <View className="gap-3.5">
             <Pressable
               className="h-12 flex-row items-center justify-center rounded-xl border border-slate-800 bg-[#0f172a]/60 active:bg-slate-900/60 gap-2.5"
-              onPress={() => router.push('/customer/packages')}
+              onPress={() => router.push('/customer/packages' as any)}
             >
               <Gem color="#a855f7" fill="#a855f7" size={18} />
               <Text className="text-[14px] text-slate-200 font-bold">
                 Gói hội viên của tôi
-              </Text>
-            </Pressable>
-
-            <Pressable
-              className="h-12 flex-row items-center justify-center rounded-xl border border-slate-800 bg-[#0f172a]/60 active:bg-slate-900/60 gap-2.5"
-              onPress={() => router.push('/favorites')}
-            >
-              <Heart color="#ef4444" fill="#ef4444" size={18} />
-              <Text className="text-[14px] text-slate-200 font-bold">
-                Cơ sở yêu thích (Wishlist)
               </Text>
             </Pressable>
 

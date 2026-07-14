@@ -51,6 +51,7 @@ export function ExploreScreen() {
   const [selectedTrackType, setSelectedTrackType] = useState('Tất cả');
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
   const [filterFavorites, setFilterFavorites] = useState(false);
+  const favoriteCount = favoriteIds.length;
 
   const fetchCafes = async () => {
     setLoading(true);
@@ -280,12 +281,34 @@ export function ExploreScreen() {
 
       {/* Header Title */}
       <View className="px-5 pt-4 pb-2">
-        <Text className="text-[22px] text-white" weight="700">
-          Khám phá chi nhánh
-        </Text>
-        <Text className="text-[12px] text-slate-400 mt-0.5 font-semibold">
-          Tìm kiếm và đặt lịch sân chạy RC của bạn
-        </Text>
+        <View className="flex-row items-start justify-between gap-3">
+          <View className="flex-1">
+            <Text className="text-[22px] text-white" weight="700">
+              Khám phá chi nhánh
+            </Text>
+            <Text className="text-[12px] text-slate-400 mt-0.5 font-semibold">
+              Tìm kiếm và đặt lịch sân chạy RC của bạn
+            </Text>
+          </View>
+
+          <Pressable
+            className="relative size-11 items-center justify-center rounded-2xl border border-slate-800 bg-[#0f172a]/80 active:bg-slate-900"
+            onPress={() => router.push('/favorites' as any)}
+          >
+            <Heart
+              color={favoriteCount > 0 ? '#ef4444' : '#94a3b8'}
+              fill={favoriteCount > 0 ? '#ef4444' : 'transparent'}
+              size={20}
+            />
+            {favoriteCount > 0 ? (
+              <View className="absolute -right-1 -top-1 min-w-5 rounded-full border-2 border-[#0b0f19] bg-red-500 px-1.5 py-0.5">
+                <Text className="text-center text-[9px] font-black text-white">
+                  {favoriteCount > 9 ? '9+' : favoriteCount}
+                </Text>
+              </View>
+            ) : null}
+          </Pressable>
+        </View>
       </View>
 
       {/* Tìm kiếm */}
@@ -421,4 +444,3 @@ export function ExploreScreen() {
     </SafeAreaView>
   );
 }
-
