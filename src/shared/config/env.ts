@@ -4,6 +4,7 @@ export const env = {
   googleClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ?? '',
   googleClientIdAndroid: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID ?? '',
   googleClientIdIos: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS ?? '',
+  easProjectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID ?? '',
 };
 
 if (!env.apiUrl) {
@@ -13,4 +14,3 @@ if (!env.apiUrl) {
 if (!env.googleClientId) {
   console.warn('Missing EXPO_PUBLIC_GOOGLE_CLIENT_ID configuration. Please set it in your local .env file.');
 }
-
