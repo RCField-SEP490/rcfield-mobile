@@ -12,7 +12,7 @@ export function mapBackendRole(role: string): UserRole {
 
 export function mapBackendUser(user: BackendLoginUser): AuthUser {
   return {
-    assignedCafeId: user.assignedCafeId,
+    assignedCafeId: user.assignedCafeId ?? user.cafeId ?? null,
     avatarUrl: user.avatarUrl ?? user.avatar_url ?? undefined,
     email: user.email,
     fullName: user.fullName ?? user.full_name ?? user.email,
@@ -26,7 +26,7 @@ export function mapBackendUser(user: BackendLoginUser): AuthUser {
 
 export function mapBackendProfile(profile: BackendProfile): AuthUser {
   return {
-    assignedCafeId: profile.assignedCafeId,
+    assignedCafeId: profile.assignedCafeId ?? profile.cafeId ?? null,
     avatarUrl: profile.avatarUrl ?? undefined,
     email: profile.email,
     fullName: profile.fullName,

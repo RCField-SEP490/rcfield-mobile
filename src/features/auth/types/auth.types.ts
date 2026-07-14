@@ -29,6 +29,7 @@ export interface BackendLoginUser {
   assignedCafeId?: string | null;
   avatarUrl?: string | null;
   avatar_url?: string | null;
+  cafeId?: string | null;
   email: string;
   fullName?: string;
   full_name?: string;
@@ -48,6 +49,7 @@ export interface BackendLoginResponse {
 export interface BackendProfile {
   assignedCafeId?: string | null;
   avatarUrl?: string | null;
+  cafeId?: string | null;
   email: string;
   fullName: string;
   id: string;
@@ -87,5 +89,4 @@ export interface ChangePasswordRequest {
   currentPassword: string;
   newPassword: string;
 }
-
 
