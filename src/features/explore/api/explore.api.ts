@@ -190,11 +190,11 @@ export async function listPublicPackages(cafeId: string): Promise<PublicPackage[
 
 export async function purchasePackage(
   cafeId: string,
-  packageId: string
+  packageId: string,
+  returnUrl?: string,
 ): Promise<{ payment_url: string; confirmed: boolean }> {
-  const response = await api.post('/customer-packages/purchase', {
-    cafeId,
-    packageId,
+  const response = await api.post(`/cafes/${cafeId}/packages/${packageId}/purchase`, {
+    return_url: returnUrl,
   });
   return response.data?.data;
 }

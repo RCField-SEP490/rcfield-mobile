@@ -1,8 +1,9 @@
-import React, { memo, useCallback, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View, type ColorValue } from 'react-native';
 import PagerView from 'react-native-pager-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CalendarDays, Compass, Home, UserRound, type LucideIcon } from 'lucide-react-native';
+import { usePathname } from 'expo-router';
 
 import { BookingListScreen } from '@/features/bookings/components/BookingListScreen';
 import { ExploreScreen } from '@/features/explore/components/ExploreScreen';
@@ -82,6 +83,26 @@ export function SwipeTabPager() {
   const pagerRef = useRef<PagerView>(null);
   const [activeIndex, setActiveIndex] = useState(globalActiveTabIdx);
   const activeIndexRef = useRef(globalActiveTabIdx);
+  const pathname = usePathname();
+
+  // Lắng nghe thay đổi của route để đồng bộ hóa tab hiện tại
+  useEffect(() => {
+    console.log('[SwipeTabPager] Pathname changed to:', pathname);
+    const matchedIndex = MAIN_TABS.findIndex((tab) => {
+      if (tab.href === '/') {
+        return pathname === '/' || pathname === '/(tabs)' || pathname === '/(tabs)/';
+      }
+      return pathname === tab.href || pathname === `/(tabs)${tab.href}`;
+    });
+    console.log('[SwipeTabPager] Matched index:', matchedIndex, 'Active index ref:', activeIndexRef.current);
+
+    if (matchedIndex !== -1 && matchedIndex !== activeIndexRef.current) {
+      activeIndexRef.current = matchedIndex;
+      setActiveIndex(matchedIndex);
+      globalActiveTabIdx = matchedIndex;
+      pagerRef.current?.setPageWithoutAnimation(matchedIndex);
+    }
+  }, [pathname]);
 
   const setActiveTab = useCallback((index: number) => {
     activeIndexRef.current = index;

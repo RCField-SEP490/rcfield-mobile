@@ -179,15 +179,21 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
       // Host IP LAN được phân tách từ URL API của Mobile
       const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.4:3000/api/v1';
       let hostAndPort = '192.168.1.4:3000';
+      let host = '192.168.1.4';
       try {
         const urlObj = new URL(apiUrl);
         hostAndPort = urlObj.host;
+        host = urlObj.hostname;
       } catch {
-        const match = apiUrl.match(/https?:\/\/([^\/]+)/);
-        if (match) hostAndPort = match[1];
+        const match = apiUrl.match(/https?:\/\/([^\/:]+)/);
+        if (match) {
+          host = match[1];
+          hostAndPort = match[1] + ':3000';
+        }
       }
 
-      const returnUrl = `http://${hostAndPort}/api/payments/vnpay-return`;
+      const expoDeepLink = `exp://${host}:8081`;
+      const returnUrl = `http://${hostAndPort}/api/payments/vnpay-return?mobile_redirect=${encodeURIComponent(expoDeepLink)}`;
       const res = await bookingWizardApi.createCheckout(bookingId, returnUrl);
 
       if (res.payment_url) {
@@ -213,15 +219,21 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
     try {
       const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.4:3000/api/v1';
       let hostAndPort = '192.168.1.4:3000';
+      let host = '192.168.1.4';
       try {
         const urlObj = new URL(apiUrl);
         hostAndPort = urlObj.host;
+        host = urlObj.hostname;
       } catch {
-        const match = apiUrl.match(/https?:\/\/([^\/]+)/);
-        if (match) hostAndPort = match[1];
+        const match = apiUrl.match(/https?:\/\/([^\/:]+)/);
+        if (match) {
+          host = match[1];
+          hostAndPort = match[1] + ':3000';
+        }
       }
 
-      const returnUrl = `http://${hostAndPort}/api/payments/vnpay-return`;
+      const expoDeepLink = `exp://${host}:8081`;
+      const returnUrl = `http://${hostAndPort}/api/payments/vnpay-return?mobile_redirect=${encodeURIComponent(expoDeepLink)}`;
       const res = await bookingWizardApi.createCheckoutAdditionalPayment(bookingId, returnUrl);
 
       if (res.payment_url) {

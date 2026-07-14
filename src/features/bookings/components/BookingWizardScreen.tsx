@@ -278,7 +278,18 @@ export function BookingWizardScreen({
       let customReturnUrl: string | undefined;
       if (apiEndpoint.includes('/api/v1')) {
         const baseHost = apiEndpoint.split('/api/v1')[0];
-        customReturnUrl = `${baseHost}/api/payments/vnpay-return`;
+        
+        // Tự động phân tách IP từ API để tạo Deep Link cho Expo Go
+        let host = '192.168.1.4';
+        try {
+          const match = apiEndpoint.match(/https?:\/\/([^\/:]+)/);
+          if (match) host = match[1];
+        } catch (e) {
+          console.warn('[BookingWizard] Failed to parse API host, using fallback', e);
+        }
+        const expoDeepLink = `exp://${host}:8081`;
+        
+        customReturnUrl = `${baseHost}/api/payments/vnpay-return?mobile_redirect=${encodeURIComponent(expoDeepLink)}`;
       }
 
       // Create VNPay checkout url
