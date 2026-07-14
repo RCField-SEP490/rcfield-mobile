@@ -324,11 +324,7 @@ export function HomeScreen() {
             </Pressable>
 
             <Pressable
-              onPress={() =>
-                React['startTransition'](() => {
-                  Alert.alert('Gói chơi', 'Tính năng mua Gói hội viên trực tiếp đang được nâng cấp.');
-                })
-              }
+              onPress={() => router.push('/customer/packages')}
               className="flex-1 flex-col items-center gap-2 rounded-2xl border border-slate-800 bg-[#0f172a]/50 py-3.5 shadow-sm active:bg-slate-900/50"
             >
               <View className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-600/10 border border-violet-500/20">
@@ -455,9 +451,10 @@ export function HomeScreen() {
                 {activePackages.map((pkg) => {
                   const usedPercent = pkg.slots_total > 0 ? ((pkg.slots_total - pkg.slots_remaining) / pkg.slots_total) * 100 : 0;
                   return (
-                    <View
+                    <Pressable
                       key={pkg.id}
-                      className="w-64 rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-4 shadow-sm"
+                      onPress={() => router.push('/customer/packages')}
+                      className="w-64 rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-4 shadow-sm active:bg-slate-900/60"
                     >
                       <View className="flex-row justify-between items-start">
                         <View className="flex-1 pr-2">
@@ -494,7 +491,7 @@ export function HomeScreen() {
                           Hạn dùng: {formatExpiryDate(pkg.expires_at)}
                         </Text>
                       </View>
-                    </View>
+                    </Pressable>
                   );
                 })}
               </ScrollView>

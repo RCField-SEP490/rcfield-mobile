@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { View, ScrollView, Pressable, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, DeviceEventEmitter } from 'react-native';
+import { View, ScrollView, Pressable, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, DeviceEventEmitter, BackHandler } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
@@ -240,7 +240,18 @@ export function BookingWizardScreen({
     const sub = DeviceEventEmitter.addListener('WIZARD_SWIPE_BACK', () => {
       handleBack();
     });
-    return () => sub.remove();
+
+    const onBackPress = () => {
+      handleBack();
+      return true; // Chặn hành động back mặc định của hệ thống
+    };
+
+    const backHandlerSub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+
+    return () => {
+      sub.remove();
+      backHandlerSub.remove();
+    };
   }, [handleBack]);
 
   // 4. Booking submission
@@ -278,7 +289,18 @@ export function BookingWizardScreen({
       let customReturnUrl: string | undefined;
       if (apiEndpoint.includes('/api/v1')) {
         const baseHost = apiEndpoint.split('/api/v1')[0];
-        customReturnUrl = `${baseHost}/api/payments/vnpay-return`;
+        
+        // Tự động phân tách IP từ API để tạo Deep Link cho Expo Go
+        let host = '192.168.1.4';
+        try {
+          const match = apiEndpoint.match(/https?:\/\/([^\/:]+)/);
+          if (match) host = match[1];
+        } catch (e) {
+          console.warn('[BookingWizard] Failed to parse API host, using fallback', e);
+        }
+        const expoDeepLink = `exp://${host}:8081`;
+        
+        customReturnUrl = `${baseHost}/api/payments/vnpay-return?mobile_redirect=${encodeURIComponent(expoDeepLink)}`;
       }
 
       // Create VNPay checkout url

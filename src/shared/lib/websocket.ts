@@ -41,6 +41,7 @@ class WebSocketClient {
   private ws: WebSocket | null = null;
   private listeners = new Set<WsCallback>();
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private isConnecting = false;
   private connectedToken: string | null = null;
   private rejectedToken: string | null = null;
@@ -90,6 +91,7 @@ class WebSocketClient {
           clearTimeout(this.reconnectTimer);
           this.reconnectTimer = null;
         }
+        this.startHeartbeat();
       };
 
       socket.onmessage = (e) => {
@@ -120,6 +122,7 @@ class WebSocketClient {
         this.connectedToken = null;
         this.isConnecting = false;
         this.intentionalDisconnect = false;
+        this.stopHeartbeat();
 
         if (wasIntentional) {
           return;
@@ -144,17 +147,17 @@ class WebSocketClient {
     switch (event) {
       case 'SESSION_CHECKIN_INSPECTION':
         Alert.alert(
-          'Bien ban ban giao xe',
-          'Nhan vien truc ca vua ban giao xe va bat dau phien choi cua ban. Luot choi hien da co hieu luc!'
+          'Biên bản bàn giao xe',
+          'Nhân viên trực ca vừa bàn giao xe và bắt đầu phiên chơi của bạn. Lượt chơi hiện đã có hiệu lực!'
         );
         break;
       case 'SESSION_CHECKOUT_INSPECTION':
         Alert.alert(
-          'Bien ban tra xe',
-          'Nhan vien truc ca vua thuc hien kiem tra va nhan lai xe. Vui long kiem tra va xac nhan bien ban.',
+          'Biên bản trả xe',
+          'Nhân viên trực ca vừa thực hiện kiểm tra và nhận lại xe. Vui lòng kiểm tra và xác nhận biên bản.',
           [
             {
-              text: 'Kiem tra ngay',
+              text: 'Kiểm tra ngay',
               onPress: () => {
                 if (data?.sessionId) {
                   router.push({
@@ -164,26 +167,38 @@ class WebSocketClient {
                 }
               },
             },
-            { text: 'De sau', style: 'cancel' },
+            { text: 'Để sau', style: 'cancel' },
           ]
+        );
+        break;
+      case 'CUSTOMER_CHECKIN_CONFIRMED':
+        Alert.alert(
+          'Check-in thành công',
+          'Phiên chơi của bạn đã chính thức bắt đầu. Chúc bạn chơi vui vẻ!'
+        );
+        break;
+      case 'CUSTOMER_CHECKOUT_CONFIRMED':
+        Alert.alert(
+          'Hoàn thành phiên chơi',
+          'Biên bản trả xe đã được xác nhận hoàn tất. Phiên chơi của bạn đã kết thúc!'
         );
         break;
       case 'CUSTOMER_PAYMENT_CONFIRMED':
         Alert.alert(
-          'Thanh toan thanh cong',
-          'Da nhan duoc khoan thanh toan hoa don / phi phat sinh cho don dat san cua ban.'
+          'Thanh toán thành công',
+          'Đã nhận được khoản thanh toán hóa đơn / phí phát sinh cho đơn đặt sân của bạn.'
         );
         break;
       case 'SESSION_EXTENSION_PROPOSED':
         Alert.alert(
-          'Yeu cau gia han ca choi',
-          `Nhan vien vua de xuat gia han ca choi them ${data.extraMinutes} phut voi phi phat sinh la ${Number(data.additionalFee).toLocaleString('vi-VN')}d.`
+          'Yêu cầu gia hạn ca chơi',
+          `Nhân viên vừa đề xuất gia hạn ca chơi thêm ${data.extraMinutes} phút với phí phát sinh là ${Number(data.additionalFee).toLocaleString('vi-VN')}đ.`
         );
         break;
       case 'SESSION_FNB_ORDER_ADDED':
         Alert.alert(
-          'Goi mon thanh cong',
-          `Mon an/nuoc uong moi tri gia ${Number(data.totalAmount).toLocaleString('vi-VN')}d da duoc them thanh cong vao phong chay.`
+          'Gọi món thành công',
+          `Món ăn/nước uống mới trị giá ${Number(data.totalAmount).toLocaleString('vi-VN')}đ đã được thêm thành công vào lượt chơi.`
         );
         break;
     }
@@ -212,6 +227,7 @@ class WebSocketClient {
   }
 
   public disconnect() {
+    this.stopHeartbeat();
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
@@ -229,6 +245,23 @@ class WebSocketClient {
     }
 
     console.log('[WS] Disconnected');
+  }
+
+  private startHeartbeat() {
+    this.stopHeartbeat();
+    this.heartbeatTimer = setInterval(() => {
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        console.log('[WS] Sending ping to keep-alive');
+        this.ws.send('ping');
+      }
+    }, 30000); // 30 seconds
+  }
+
+  private stopHeartbeat() {
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
   }
 }
 

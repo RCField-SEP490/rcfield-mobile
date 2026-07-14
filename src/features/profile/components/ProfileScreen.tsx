@@ -811,6 +811,16 @@ export function ProfileScreen() {
           <View className="gap-3.5">
             <Pressable
               className="h-12 flex-row items-center justify-center rounded-xl border border-slate-800 bg-[#0f172a]/60 active:bg-slate-900/60 gap-2.5"
+              onPress={() => router.push('/customer/packages')}
+            >
+              <Gem color="#a855f7" fill="#a855f7" size={18} />
+              <Text className="text-[14px] text-slate-200 font-bold">
+                Gói hội viên của tôi
+              </Text>
+            </Pressable>
+
+            <Pressable
+              className="h-12 flex-row items-center justify-center rounded-xl border border-slate-800 bg-[#0f172a]/60 active:bg-slate-900/60 gap-2.5"
               onPress={() => router.push('/favorites')}
             >
               <Heart color="#ef4444" fill="#ef4444" size={18} />
