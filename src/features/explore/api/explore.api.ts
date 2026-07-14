@@ -1,4 +1,5 @@
 import { api } from '@/shared/lib/api';
+import { getVnpayReturnUrl } from '@/shared/lib/vnpay-return-url';
 import type { Cafe, CafeSearchParams, PublicPackage, Review } from '../types/explore.types';
 
 export const CAFE_PLACEHOLDER_IMAGE =
@@ -194,8 +195,7 @@ export async function purchasePackage(
   returnUrl?: string,
 ): Promise<{ payment_url: string; confirmed: boolean }> {
   const response = await api.post(`/cafes/${cafeId}/packages/${packageId}/purchase`, {
-    return_url: returnUrl,
+    return_url: returnUrl ?? getVnpayReturnUrl(),
   });
   return response.data?.data;
 }
-

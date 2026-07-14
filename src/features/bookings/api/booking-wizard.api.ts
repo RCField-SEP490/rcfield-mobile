@@ -191,4 +191,9 @@ export const bookingWizardApi = {
     const response = await api.post(`/sessions/${sessionId}/inspections/${inspectionId}/confirm`, payload);
     return response.data?.data;
   },
+
+  respondExtension: async (sessionId: string, approved: boolean): Promise<any> => {
+    const response = await api.post(`/sessions/${sessionId}/extensions/respond`, { approved });
+    return response.data?.data;
+  },
 };
