@@ -16,6 +16,7 @@ import {
   Gem,
   Award,
   ShieldCheck,
+  Heart,
 } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -31,6 +32,8 @@ import {
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useColorScheme } from 'nativewind';
+import * as SecureStore from 'expo-secure-store';
 
 import { getMe, updateMe, changePassword, uploadImage } from '@/features/auth/api/auth.api';
 import { getMyBookings } from '@/features/bookings/api/booking.api';
@@ -41,11 +44,15 @@ import { Text } from '@/shared/ui/Text';
 
 export function ProfileScreen() {
   const router = useRouter();
+  const { colorScheme, setColorScheme } = useColorScheme();
   const user = useAuthStore((state) => state.user);
   const role = useAuthStore((state) => state.role);
   const assignedCafeId = useAuthStore((state) => state.assignedCafeId);
   const setUser = useAuthStore((state) => state.setUser);
   const logout = useAuthStore((state) => state.logout);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+
+  // Hooks được gọi không điều kiện ở đây
 
   const displayName = user?.fullName ?? user?.email ?? 'RCField User';
   const email = user?.email ?? 'user@rcfield.vn';
@@ -232,6 +239,7 @@ export function ProfileScreen() {
 
   // Tự động đồng bộ profile từ server khi load màn hình
   useEffect(() => {
+    if (!isAuthenticated) return;
     let mounted = true;
     getMe()
       .then((profile) => {
@@ -245,7 +253,7 @@ export function ProfileScreen() {
     return () => {
       mounted = false;
     };
-  }, [setUser]);
+  }, [setUser, isAuthenticated]);
 
   // Hàm lưu thông tin cá nhân
   const handleSaveProfile = async (nextAvatarUrl = form.avatarUrl) => {
@@ -407,15 +415,58 @@ export function ProfileScreen() {
     );
   };
 
+  if (!isAuthenticated) {
+    return (
+      <SafeAreaView className="flex-1 bg-[#f8fafc] dark:bg-[#0b0f19] justify-center items-center px-8" edges={['top', 'left', 'right']}>
+        {/* Background Glows */}
+        <View className="absolute -top-20 -right-20 w-80 h-80 rounded-full bg-[#f97316]/5 blur-3xl pointer-events-none" />
+        <View className="absolute bottom-10 -left-20 w-80 h-80 rounded-full bg-[#6366f1]/5 blur-3xl pointer-events-none" />
+
+        <View className="size-16 rounded-full bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 justify-center items-center mb-4">
+          <User color="#f97316" size={28} />
+        </View>
+        <Text className="text-slate-900 dark:text-white text-lg font-bold text-center">
+          Yêu cầu đăng nhập
+        </Text>
+        <Text className="mt-2 text-slate-500 dark:text-slate-400 text-sm text-center leading-5 font-semibold max-w-xs mb-6">
+          Vui lòng đăng nhập tài khoản của bạn để xem và quản lý thông tin hồ sơ cá nhân.
+        </Text>
+        <Pressable
+          className="w-full h-11 items-center justify-center rounded-xl bg-[#ea580c] active:bg-[#f97316] shadow-md mb-4"
+          onPress={() => router.push('/(auth)/login')}
+        >
+          <Text className="text-white text-sm font-bold">Đăng nhập ngay</Text>
+        </Pressable>
+
+        {/* Nút chuyển đổi Theme nhanh cho Guest */}
+        <View className="flex-row items-center gap-3 mt-6">
+          <Text className="text-slate-500 dark:text-slate-400 text-xs font-bold">Giao diện:</Text>
+          <Pressable
+            onPress={async () => {
+              const nextTheme = colorScheme === 'dark' ? 'light' : 'dark';
+              setColorScheme(nextTheme);
+              await SecureStore.setItemAsync('rcfield_theme', nextTheme);
+            }}
+            className="px-3.5 py-1.5 rounded-lg bg-slate-200 dark:bg-slate-800 active:bg-slate-300 dark:active:bg-slate-700"
+          >
+            <Text className="text-slate-800 dark:text-slate-200 text-xs font-bold">
+              {colorScheme === 'dark' ? 'Chế độ Sáng' : 'Chế độ Tối'}
+            </Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
-    <SafeAreaView className="flex-1 bg-[#0b0f19]" edges={['top', 'left', 'right']}>
-      {/* Background Glows (Hiệu ứng ánh sáng thể thao) */}
-      <View className="absolute -top-20 -right-20 w-80 h-80 rounded-full bg-[#f97316]/10 blur-3xl pointer-events-none" />
-      <View className="absolute bottom-10 -left-20 w-80 h-80 rounded-full bg-[#6366f1]/10 blur-3xl pointer-events-none" />
+    <SafeAreaView className="flex-grow flex-1 bg-[#f8fafc] dark:bg-[#0b0f19]" edges={['top', 'left', 'right']}>
+      {/* Background Glows (Hiển thị mờ ở light mode và rõ ở dark mode) */}
+      <View className="absolute -top-20 -right-20 w-80 h-80 rounded-full bg-[#f97316]/5 dark:bg-[#f97316]/10 blur-3xl pointer-events-none" />
+      <View className="absolute bottom-10 -left-20 w-80 h-80 rounded-full bg-[#6366f1]/5 dark:bg-[#6366f1]/10 blur-3xl pointer-events-none" />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        className="flex-1"
+        className="flex-grow flex-1"
       >
         <ScrollView
           contentContainerClassName="flex-grow px-5 py-6 pb-12"
@@ -425,10 +476,10 @@ export function ProfileScreen() {
           {/* Header Màn hình */}
           <View className="mb-6 flex-row items-start justify-between gap-3">
             <View className="flex-1">
-              <Text className="text-white text-3xl" variant="title" weight="700">
+              <Text className="text-slate-900 dark:text-white text-3xl" variant="title" weight="700">
                 Hồ sơ cá nhân
               </Text>
-              <Text className="mt-1.5 text-[14px] leading-5 text-slate-400 font-semibold">
+              <Text className="mt-1.5 text-[14px] leading-5 text-slate-500 dark:text-slate-400 font-semibold">
                 {isCustomer
                   ? 'Quản lý thông tin tài khoản, bảo mật và tuỳ chọn cá nhân.'
                   : 'Quản lý thông tin tài khoản và bảo mật trực ca của bạn.'}
@@ -439,9 +490,9 @@ export function ProfileScreen() {
           </View>
 
           {/* Section: Avatar */}
-          <View className="items-center mb-6 rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-6 shadow-2xl">
+          <View className="items-center mb-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-6 shadow-2xl">
             <Pressable
-              className="relative group size-24 rounded-full border-2 border-slate-700 overflow-hidden bg-slate-900 justify-center items-center"
+              className="relative group size-24 rounded-full border-2 border-slate-350 dark:border-slate-700 overflow-hidden bg-slate-100 dark:bg-slate-900 justify-center items-center"
               onPress={handleSelectAvatar}
               disabled={uploadingAvatar}
             >
@@ -465,40 +516,40 @@ export function ProfileScreen() {
 
             <View className="flex-row gap-3 mt-4">
               <Pressable
-                className="px-4 py-2 rounded-xl bg-slate-900 border border-slate-700 active:bg-slate-800"
+                className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 active:bg-slate-200 dark:active:bg-slate-800"
                 onPress={handleSelectAvatar}
                 disabled={uploadingAvatar || savingProfile}
               >
-                <Text className="text-[13px] text-slate-200 font-bold">
+                <Text className="text-[13px] text-slate-800 dark:text-slate-200 font-bold">
                   Tải ảnh mới
                 </Text>
               </Pressable>
               
               {form.avatarUrl ? (
                 <Pressable
-                  className="px-4 py-2 rounded-xl bg-red-950/20 border border-red-900/30 active:bg-red-950/40"
+                  className="px-4 py-2 rounded-xl bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 active:bg-red-100 dark:active:bg-red-950/40"
                   onPress={handleRemoveAvatar}
                   disabled={uploadingAvatar || savingProfile}
                 >
-                  <Text className="text-[13px] text-red-400 font-bold">
+                  <Text className="text-[13px] text-red-500 dark:text-red-400 font-bold">
                     Xóa ảnh
                   </Text>
                 </Pressable>
               ) : null}
             </View>
-            <Text className="mt-3 text-[11px] text-slate-400 text-center leading-4 font-medium">
+            <Text className="mt-3 text-[11px] text-slate-500 dark:text-slate-400 text-center leading-4 font-medium">
               Khuyên dùng ảnh định dạng JPG, PNG hoặc WEBP.{'\n'}Kích thước tối đa 5MB.
             </Text>
           </View>
 
           {isCustomer ? (
             /* Section: Hạng thành viên & Điểm tin cậy (Premium Loyaty Card) */
-            <View className="rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-5 shadow-2xl mb-6 relative overflow-hidden">
+            <View className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-5 shadow-2xl mb-6 relative overflow-hidden">
               {/* Thanh màu phản quang theo hạng */}
               <View className="absolute top-0 right-0 left-0 h-[3px]" style={{ backgroundColor: tierColor }} />
 
               <View className="flex-row items-center justify-between mb-3.5">
-                <Text className="text-[12px] font-bold text-white uppercase tracking-wider">
+                <Text className="text-[12px] font-bold text-slate-800 dark:text-white uppercase tracking-wider">
                   Hạng thành viên
                 </Text>
                 <View className={`px-2.5 py-0.5 rounded-full border ${tierBg}`}>
@@ -509,7 +560,7 @@ export function ProfileScreen() {
               </View>
 
               <View className="flex-row items-center gap-4 mb-4">
-                <View className="size-12 rounded-xl bg-slate-900 border border-slate-800 justify-center items-center shadow-lg">
+                <View className="size-12 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 justify-center items-center shadow-lg">
                   {memberTier.includes('Gold') ? (
                     <Crown color={tierColor} size={22} />
                   ) : memberTier.includes('Platinum') ? (
@@ -522,14 +573,14 @@ export function ProfileScreen() {
                 </View>
                 <View className="flex-1">
                   <View className="flex-row items-baseline gap-1">
-                    <Text className="text-xl text-white font-extrabold" style={{ color: tierColor }}>
+                    <Text className="text-xl font-extrabold" style={{ color: tierColor }}>
                       {points.toLocaleString('vi-VN')}
                     </Text>
-                    <Text className="text-slate-400 text-xs font-bold">
+                    <Text className="text-slate-500 dark:text-slate-400 text-xs font-bold">
                       điểm
                     </Text>
                   </View>
-                  <Text className="text-[11px] text-slate-400 font-semibold mt-0.5">
+                  <Text className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold mt-0.5">
                     Tích lũy từ {bookingCount} lượt chơi đã đặt
                   </Text>
                 </View>
@@ -539,10 +590,10 @@ export function ProfileScreen() {
               {pointsToNextTier > 0 ? (
                 <View className="space-y-1.5">
                   <View className="flex-row justify-between text-[10.5px] font-bold">
-                    <Text className="text-slate-400">Tiến trình lên {nextTierLabel}</Text>
+                    <Text className="text-slate-500 dark:text-slate-400">Tiến trình lên {nextTierLabel}</Text>
                     <Text style={{ color: tierColor }}>Còn {pointsToNextTier.toLocaleString('vi-VN')} điểm</Text>
                   </View>
-                  <View className="h-2 w-full bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+                  <View className="h-2 w-full bg-slate-100 dark:bg-slate-950 rounded-full overflow-hidden border border-slate-200 dark:border-slate-800">
                     <View
                       className="h-full rounded-full"
                       style={{ width: `${progress}%`, backgroundColor: tierColor }}
@@ -558,11 +609,11 @@ export function ProfileScreen() {
               )}
 
               {/* Điểm uy tín (Trust Score) */}
-              <View className="w-full h-[1px] bg-slate-800/80 my-4" />
+              <View className="w-full h-[1px] bg-slate-200 dark:bg-slate-800/80 my-4" />
               <View className="flex-row items-center justify-between">
                 <View className="flex-1 pr-4">
-                  <Text className="text-[13px] font-bold text-white">Điểm uy tín (Trust Score)</Text>
-                  <Text className="text-[10px] text-slate-400 font-semibold leading-4 mt-0.5">
+                  <Text className="text-[13px] font-bold text-slate-900 dark:text-white">Điểm uy tín (Trust Score)</Text>
+                  <Text className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold leading-4 mt-0.5">
                     Quyết định quyền hạn đặt lịch chơi và hoàn tiền của bạn.
                   </Text>
                 </View>
@@ -570,18 +621,18 @@ export function ProfileScreen() {
                   <Text className="text-lg font-black text-emerald-500">
                     {user?.trustScore ?? 100}
                   </Text>
-                  <Text className="text-slate-400 text-xs font-bold">/100</Text>
+                  <Text className="text-slate-500 dark:text-slate-400 text-xs font-bold">/100</Text>
                 </View>
               </View>
             </View>
           ) : (
-            <View className="rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-5 shadow-2xl mb-6">
+            <View className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-5 shadow-2xl mb-6">
               <View className="mb-4 flex-row items-center justify-between">
                 <View>
-                  <Text className="text-[12px] font-bold text-white uppercase tracking-wider">
+                  <Text className="text-[12px] font-bold text-slate-900 dark:text-white uppercase tracking-wider">
                     Vai trò tài khoản
                   </Text>
-                  <Text className="mt-1 text-[11px] text-slate-400">
+                  <Text className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
                     Hồ sơ vận hành dùng cho ứng dụng staff mobile.
                   </Text>
                 </View>
@@ -593,11 +644,11 @@ export function ProfileScreen() {
               </View>
 
               <View className="gap-3">
-                <View className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
-                  <Text className="text-[11px] uppercase text-slate-500" weight="700">
+                <View className="rounded-xl border border-slate-200 dark:border-slate-850 bg-slate-50 dark:bg-slate-950/60 p-3">
+                  <Text className="text-[11px] uppercase text-slate-450 dark:text-slate-500" weight="700">
                     Chi nhánh được phân công
                   </Text>
-                  <Text className="mt-1 text-[13px] text-white" weight="700">
+                  <Text className="mt-1 text-[13px] text-slate-900 dark:text-white" weight="700">
                     {assignedCafeId
                       ? assignedCafeName ||
                         (loadingAssignedCafe
@@ -611,11 +662,11 @@ export function ProfileScreen() {
                     </Text>
                   ) : null}
                 </View>
-                <View className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
-                  <Text className="text-[11px] uppercase text-slate-500" weight="700">
+                <View className="rounded-xl border border-slate-200 dark:border-slate-850 bg-slate-50 dark:bg-slate-950/60 p-3">
+                  <Text className="text-[11px] uppercase text-slate-450 dark:text-slate-500" weight="700">
                     Quyền thao tác
                   </Text>
-                  <Text className="mt-1 text-[12px] leading-5 text-slate-300">
+                  <Text className="mt-1 text-[12px] leading-5 text-slate-700 dark:text-slate-300">
                     Check-in lịch hôm nay, cập nhật đơn F&B và xem chi tiết phiên chạy.
                   </Text>
                 </View>
@@ -624,10 +675,10 @@ export function ProfileScreen() {
           )}
 
           {/* Section: Thông tin cơ bản */}
-          <View className="rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-5 shadow-2xl mb-6">
-            <View className="flex-row items-center mb-4 gap-2 border-b border-slate-800/80 pb-2">
+          <View className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-5 shadow-2xl mb-6">
+            <View className="flex-row items-center mb-4 gap-2 border-b border-slate-200 dark:border-slate-800/80 pb-2">
               <User color="#f97316" size={18} />
-              <Text className="text-[15px] font-bold text-white uppercase tracking-wider">
+              <Text className="text-[15px] font-bold text-slate-900 dark:text-white uppercase tracking-wider">
                 Thông tin cơ bản
               </Text>
             </View>
@@ -635,16 +686,16 @@ export function ProfileScreen() {
             <View className="gap-4">
               {/* Họ */}
               <View>
-                <Text className="mb-1.5 text-[11px] uppercase text-slate-400 tracking-wider font-bold">
+                <Text className="mb-1.5 text-[11px] uppercase text-slate-550 dark:text-slate-400 tracking-wider font-bold">
                   Họ
                 </Text>
-                <View className="h-11 flex-row items-center rounded-xl border border-slate-800 bg-slate-900/80 px-3.5 focus:border-[#f97316]">
+                <View className="h-11 flex-row items-center rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80 px-3.5 focus:border-[#f97316]">
                   <TextInput
-                    className="flex-1 text-[14px] text-white font-medium"
+                    className="flex-1 text-[14px] text-slate-900 dark:text-white font-medium"
                     editable={!savingProfile}
                     onChangeText={(val) => setForm((prev) => ({ ...prev, firstName: val }))}
                     placeholder="Nguyễn"
-                    placeholderTextColor="#475569"
+                    placeholderTextColor="#94a3b8"
                     value={form.firstName}
                   />
                 </View>
@@ -652,16 +703,16 @@ export function ProfileScreen() {
 
               {/* Tên */}
               <View>
-                <Text className="mb-1.5 text-[11px] uppercase text-slate-400 tracking-wider font-bold">
+                <Text className="mb-1.5 text-[11px] uppercase text-slate-550 dark:text-slate-400 tracking-wider font-bold">
                   Tên
                 </Text>
-                <View className="h-11 flex-row items-center rounded-xl border border-slate-800 bg-slate-900/80 px-3.5 focus:border-[#f97316]">
+                <View className="h-11 flex-row items-center rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80 px-3.5 focus:border-[#f97316]">
                   <TextInput
-                    className="flex-1 text-[14px] text-white font-medium"
+                    className="flex-1 text-[14px] text-slate-900 dark:text-white font-medium"
                     editable={!savingProfile}
                     onChangeText={(val) => setForm((prev) => ({ ...prev, lastName: val }))}
                     placeholder="Văn A"
-                    placeholderTextColor="#475569"
+                    placeholderTextColor="#94a3b8"
                     value={form.lastName}
                   />
                 </View>
@@ -669,13 +720,13 @@ export function ProfileScreen() {
 
               {/* Email */}
               <View>
-                <Text className="mb-1.5 text-[11px] uppercase text-slate-400 tracking-wider font-bold">
+                <Text className="mb-1.5 text-[11px] uppercase text-slate-550 dark:text-slate-400 tracking-wider font-bold">
                   Email Address
                 </Text>
-                <View className="h-11 flex-row items-center rounded-xl border border-slate-800/50 bg-slate-950/80 px-3.5 opacity-60">
-                  <Mail color="#475569" size={16} />
+                <View className="h-11 flex-row items-center rounded-xl border border-slate-150 dark:border-slate-800/50 bg-[#e2e8f0]/40 dark:bg-slate-950/80 px-3.5 opacity-60">
+                  <Mail color="#94a3b8" size={16} />
                   <TextInput
-                    className="ml-2.5 flex-1 text-[14px] text-slate-400 font-medium"
+                    className="ml-2.5 flex-1 text-[14px] text-slate-500 dark:text-slate-400 font-medium"
                     editable={false}
                     value={form.email}
                   />
@@ -684,18 +735,18 @@ export function ProfileScreen() {
 
               {/* Số điện thoại */}
               <View>
-                <Text className="mb-1.5 text-[11px] uppercase text-slate-400 tracking-wider font-bold">
+                <Text className="mb-1.5 text-[11px] uppercase text-slate-550 dark:text-slate-400 tracking-wider font-bold">
                   Số điện thoại
                 </Text>
-                <View className="h-11 flex-row items-center rounded-xl border border-slate-800 bg-slate-900/80 px-3.5 focus:border-[#f97316]">
+                <View className="h-11 flex-row items-center rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80 px-3.5 focus:border-[#f97316]">
                   <Phone color="#94a3b8" size={16} />
                   <TextInput
-                    className="ml-2.5 flex-1 text-[14px] text-white font-medium"
+                    className="ml-2.5 flex-1 text-[14px] text-slate-900 dark:text-white font-medium"
                     editable={!savingProfile}
                     keyboardType="phone-pad"
                     onChangeText={(val) => setForm((prev) => ({ ...prev, phone: val }))}
                     placeholder="0987654321"
-                    placeholderTextColor="#475569"
+                    placeholderTextColor="#94a3b8"
                     value={form.phone}
                   />
                 </View>
@@ -723,10 +774,10 @@ export function ProfileScreen() {
 
           {isCustomer ? (
             /* Section: Cài đặt thông báo */
-            <View className="rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-5 shadow-2xl mb-6">
-              <View className="flex-row items-center mb-4 gap-2 border-b border-slate-800/80 pb-2">
+            <View className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-5 shadow-2xl mb-6">
+              <View className="flex-row items-center mb-4 gap-2 border-b border-slate-200 dark:border-slate-800/80 pb-2">
                 <Bell color="#f97316" size={18} />
-                <Text className="text-[15px] font-bold text-white uppercase tracking-wider">
+                <Text className="text-[15px] font-bold text-slate-900 dark:text-white uppercase tracking-wider">
                   Cài đặt nhận thông báo
                 </Text>
               </View>
@@ -734,36 +785,36 @@ export function ProfileScreen() {
               <View className="gap-4">
                 <View className="flex-row items-center justify-between">
                   <View className="flex-1 pr-4">
-                    <Text className="text-[14px] font-semibold text-white">
+                    <Text className="text-[14px] font-semibold text-slate-900 dark:text-white">
                       Email Marketing
                     </Text>
-                    <Text className="text-[11px] text-slate-400 font-medium leading-4 mt-0.5">
+                    <Text className="text-[11px] text-slate-500 dark:text-slate-400 font-medium leading-4 mt-0.5">
                       Nhận thông tin tin tức khuyến mãi, giải đua và các sự kiện hấp dẫn từ hệ thống.
                     </Text>
                   </View>
                   <Switch
                     value={emailMarketing}
                     onValueChange={setEmailMarketing}
-                    trackColor={{ false: '#1e293b', true: '#ea580c' }}
+                    trackColor={{ false: '#cbd5e1', true: '#ea580c' }}
                     thumbColor="#ffffff"
                   />
                 </View>
 
-                <View className="w-full h-[1px] bg-slate-800/80" />
+                <View className="w-full h-[1px] bg-slate-200 dark:bg-slate-800/80" />
 
                 <View className="flex-row items-center justify-between">
                   <View className="flex-1 pr-4">
-                    <Text className="text-[14px] font-semibold text-white">
+                    <Text className="text-[14px] font-semibold text-slate-900 dark:text-white">
                       SMS Booking Reminders
                     </Text>
-                    <Text className="text-[11px] text-slate-400 font-medium leading-4 mt-0.5">
+                    <Text className="text-[11px] text-slate-500 dark:text-slate-400 font-medium leading-4 mt-0.5">
                       Tự động nhận tin nhắn SMS nhắc nhở lịch đặt sân 1 tiếng trước khi bắt đầu.
                     </Text>
                   </View>
                   <Switch
                     value={smsReminder}
                     onValueChange={setSmsReminder}
-                    trackColor={{ false: '#1e293b', true: '#ea580c' }}
+                    trackColor={{ false: '#cbd5e1', true: '#ea580c' }}
                     thumbColor="#ffffff"
                   />
                 </View>
@@ -771,11 +822,42 @@ export function ProfileScreen() {
             </View>
           ) : null}
 
+          {/* Section: Cài đặt hệ thống (Giao diện) */}
+          <View className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-5 shadow-2xl mb-6">
+            <View className="flex-row items-center mb-4 gap-2 border-b border-slate-200 dark:border-slate-800/80 pb-2">
+              <Bell color="#f97316" size={18} />
+              <Text className="text-[15px] font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                Cài đặt giao diện
+              </Text>
+            </View>
+
+            <View className="flex-row items-center justify-between">
+              <View className="flex-1 pr-4">
+                <Text className="text-[14px] font-semibold text-slate-900 dark:text-white">
+                  Chế độ tối (Dark Mode)
+                </Text>
+                <Text className="text-[11px] text-slate-500 dark:text-slate-400 font-medium leading-4 mt-0.5">
+                  Chuyển đổi giao diện ứng dụng sang tông màu tối để bảo vệ mắt.
+                </Text>
+              </View>
+              <Switch
+                value={colorScheme === 'dark'}
+                onValueChange={async (val) => {
+                  const nextTheme = val ? 'dark' : 'light';
+                  setColorScheme(nextTheme);
+                  await SecureStore.setItemAsync('rcfield_theme', nextTheme);
+                }}
+                trackColor={{ false: '#cbd5e1', true: '#ea580c' }}
+                thumbColor="#ffffff"
+              />
+            </View>
+          </View>
+
           {/* Section: Đổi mật khẩu */}
-          <View className="rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-5 shadow-2xl mb-6">
-            <View className="flex-row items-center mb-4 gap-2 border-b border-slate-800/80 pb-2">
+          <View className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-5 shadow-2xl mb-6">
+            <View className="flex-row items-center mb-4 gap-2 border-b border-slate-200 dark:border-slate-800/80 pb-2">
               <LockKeyhole color="#f97316" size={18} />
-              <Text className="text-[15px] font-bold text-white uppercase tracking-wider">
+              <Text className="text-[15px] font-bold text-slate-900 dark:text-white uppercase tracking-wider">
                 Đổi mật khẩu
               </Text>
             </View>
@@ -783,13 +865,13 @@ export function ProfileScreen() {
             <View className="gap-4">
               {/* Mật khẩu hiện tại */}
               <View>
-                <Text className="mb-1.5 text-[11px] uppercase text-slate-400 tracking-wider font-bold">
+                <Text className="mb-1.5 text-[11px] uppercase text-slate-550 dark:text-slate-400 tracking-wider font-bold">
                   Mật khẩu hiện tại
                 </Text>
-                <View className={`h-11 flex-row items-center rounded-xl border bg-slate-900/80 px-3.5 focus:border-[#f97316] ${passwordErrors.currentPassword ? 'border-red-500' : 'border-slate-800'}`}>
+                <View className={`h-11 flex-row items-center rounded-xl border bg-slate-50 dark:bg-slate-900/80 px-3.5 focus:border-[#f97316] ${passwordErrors.currentPassword ? 'border-red-500' : 'border-slate-200 dark:border-slate-800'}`}>
                   <TextInput
                     autoCapitalize="none"
-                    className="flex-1 text-[14px] text-white font-medium py-0"
+                    className="flex-1 text-[14px] text-slate-900 dark:text-white font-medium py-0"
                     editable={!changingPw}
                     onChangeText={(val) => {
                       setPasswordForm((prev) => ({ ...prev, currentPassword: val }));
@@ -798,7 +880,7 @@ export function ProfileScreen() {
                       }
                     }}
                     placeholder="••••••••"
-                    placeholderTextColor="#475569"
+                    placeholderTextColor="#94a3b8"
                     secureTextEntry={!showCurrentPassword}
                     value={passwordForm.currentPassword}
                   />
@@ -819,13 +901,13 @@ export function ProfileScreen() {
 
               {/* Mật khẩu mới */}
               <View>
-                <Text className="mb-1.5 text-[11px] uppercase text-slate-400 tracking-wider font-bold">
+                <Text className="mb-1.5 text-[11px] uppercase text-slate-550 dark:text-slate-400 tracking-wider font-bold">
                   Mật khẩu mới
                 </Text>
-                <View className={`h-11 flex-row items-center rounded-xl border bg-slate-900/80 px-3.5 focus:border-[#f97316] ${passwordErrors.newPassword ? 'border-red-500' : 'border-slate-800'}`}>
+                <View className={`h-11 flex-row items-center rounded-xl border bg-slate-50 dark:bg-slate-900/80 px-3.5 focus:border-[#f97316] ${passwordErrors.newPassword ? 'border-red-500' : 'border-slate-200 dark:border-slate-800'}`}>
                   <TextInput
                     autoCapitalize="none"
-                    className="flex-1 text-[14px] text-white font-medium py-0"
+                    className="flex-1 text-[14px] text-slate-900 dark:text-white font-medium py-0"
                     editable={!changingPw}
                     onChangeText={(val) => {
                       setPasswordForm((prev) => ({ ...prev, newPassword: val }));
@@ -834,7 +916,7 @@ export function ProfileScreen() {
                       }
                     }}
                     placeholder="••••••••"
-                    placeholderTextColor="#475569"
+                    placeholderTextColor="#94a3b8"
                     secureTextEntry={!showNewPassword}
                     value={passwordForm.newPassword}
                   />
@@ -855,13 +937,13 @@ export function ProfileScreen() {
 
               {/* Nhập lại mật khẩu mới */}
               <View>
-                <Text className="mb-1.5 text-[11px] uppercase text-slate-400 tracking-wider font-bold">
+                <Text className="mb-1.5 text-[11px] uppercase text-slate-550 dark:text-slate-400 tracking-wider font-bold">
                   Nhập lại mật khẩu mới
                 </Text>
-                <View className={`h-11 flex-row items-center rounded-xl border bg-slate-900/80 px-3.5 focus:border-[#f97316] ${passwordErrors.confirmNewPassword ? 'border-red-500' : 'border-slate-800'}`}>
+                <View className={`h-11 flex-row items-center rounded-xl border bg-slate-50 dark:bg-slate-900/80 px-3.5 focus:border-[#f97316] ${passwordErrors.confirmNewPassword ? 'border-red-500' : 'border-slate-200 dark:border-slate-800'}`}>
                   <TextInput
                     autoCapitalize="none"
-                    className="flex-1 text-[14px] text-white font-medium py-0"
+                    className="flex-1 text-[14px] text-slate-900 dark:text-white font-medium py-0"
                     editable={!changingPw}
                     onChangeText={(val) => {
                       setPasswordForm((prev) => ({ ...prev, confirmNewPassword: val }));
@@ -870,7 +952,7 @@ export function ProfileScreen() {
                       }
                     }}
                     placeholder="••••••••"
-                    placeholderTextColor="#475569"
+                    placeholderTextColor="#94a3b8"
                     secureTextEntry={!showConfirmNewPassword}
                     value={passwordForm.confirmNewPassword}
                   />
@@ -891,14 +973,14 @@ export function ProfileScreen() {
 
               {/* Button Submit Change Password */}
               <Pressable
-                className={`h-11 flex-row items-center justify-center rounded-xl bg-slate-950 border border-[#f97316]/20 shadow-md mt-2 active:bg-slate-900 ${changingPw ? 'opacity-70' : ''}`}
+                className={`h-11 flex-row items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-[#f97316]/20 shadow-md mt-2 active:bg-slate-200 dark:active:bg-slate-900 ${changingPw ? 'opacity-70' : ''}`}
                 disabled={changingPw}
                 onPress={handleChangePassword}
               >
                 {changingPw ? (
-                  <ActivityIndicator color="#ffffff" size="small" />
+                  <ActivityIndicator color="#f97316" size="small" />
                 ) : (
-                  <Text className="text-[14px] text-white font-bold">
+                  <Text className="text-[14px] text-slate-800 dark:text-white font-bold">
                     Cập nhật mật khẩu
                   </Text>
                 )}
@@ -909,31 +991,41 @@ export function ProfileScreen() {
           {/* Section: Hành động khác */}
           <View className="gap-3.5">
             <Pressable
-              className="h-12 flex-row items-center justify-center rounded-xl border border-slate-800 bg-[#0f172a]/60 active:bg-slate-900/60 gap-2.5"
+              className="h-12 flex-row items-center justify-center rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 active:bg-slate-100 dark:active:bg-slate-900/60 gap-2.5"
               onPress={() => router.push('/customer/packages' as any)}
             >
               <Gem color="#a855f7" fill="#a855f7" size={18} />
-              <Text className="text-[14px] text-slate-200 font-bold">
+              <Text className="text-[14px] text-slate-800 dark:text-slate-200 font-bold">
                 Gói hội viên của tôi
               </Text>
             </Pressable>
 
             <Pressable
-              className="h-12 flex-row items-center justify-center rounded-xl border border-red-900/20 bg-red-950/10 active:bg-red-950/20 gap-2.5"
+              className="h-12 flex-row items-center justify-center rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 active:bg-slate-100 dark:active:bg-slate-900/60 gap-2.5"
+              onPress={() => router.push('/favorites')}
+            >
+              <Heart color="#ef4444" fill="#ef4444" size={18} />
+              <Text className="text-[14px] text-slate-800 dark:text-slate-200 font-bold">
+                Cơ sở yêu thích (Wishlist)
+              </Text>
+            </Pressable>
+
+            <Pressable
+              className="h-12 flex-row items-center justify-center rounded-xl border border-red-200 dark:border-red-900/20 bg-red-50 dark:bg-red-950/10 active:bg-red-100 dark:active:bg-red-950/20 gap-2.5"
               onPress={handleDeleteAccount}
             >
-              <Trash2 color="#f87171" size={18} />
-              <Text className="text-[14px] text-red-400 font-bold">
+              <Trash2 color="#ef4444" size={18} />
+              <Text className="text-[14px] text-red-500 dark:text-red-400 font-bold">
                 Xóa tài khoản cá nhân
               </Text>
             </Pressable>
 
             <Pressable
-              className="h-12 flex-row items-center justify-center rounded-xl border border-slate-800 bg-[#0f172a]/40 active:bg-[#0f172a]/70 gap-2.5"
+              className="h-12 flex-row items-center justify-center rounded-xl border border-slate-250 dark:border-slate-800 bg-slate-100/50 dark:bg-[#0f172a]/45 active:bg-slate-200 dark:active:bg-[#0f172a]/70 gap-2.5"
               onPress={handleLogout}
             >
               <LogOut color="#94a3b8" size={18} />
-              <Text className="text-[14px] text-slate-300 font-bold">
+              <Text className="text-[14px] text-slate-700 dark:text-slate-300 font-bold">
                 Đăng xuất tài khoản
               </Text>
             </Pressable>

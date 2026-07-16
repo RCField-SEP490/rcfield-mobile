@@ -9,6 +9,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useColorScheme } from 'nativewind';
+import { cn } from '@/shared/lib/utils';
 import {
   Bell,
   CalendarCheck2,
@@ -69,6 +71,7 @@ function getNotificationVisual(type: string) {
 
 export function NotificationsScreen() {
   const router = useRouter();
+  const { colorScheme } = useColorScheme();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -152,29 +155,29 @@ export function NotificationsScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-[#0b0f19]" edges={['top', 'left', 'right']}>
-      <View className="absolute -top-20 -right-20 h-80 w-80 rounded-full bg-[#f97316]/10 blur-3xl pointer-events-none" />
-      <View className="absolute bottom-10 -left-20 h-80 w-80 rounded-full bg-[#0ea5e9]/10 blur-3xl pointer-events-none" />
+    <SafeAreaView className="flex-grow flex-1 bg-[#f8fafc] dark:bg-[#0b0f19]" edges={['top', 'left', 'right']}>
+      <View className="absolute -top-20 -right-20 h-80 w-80 rounded-full bg-[#f97316]/10 blur-3xl pointer-events-none opacity-30 dark:opacity-100" />
+      <View className="absolute bottom-10 -left-20 h-80 w-80 rounded-full bg-[#0ea5e9]/10 blur-3xl pointer-events-none opacity-30 dark:opacity-100" />
 
       <View className="flex-row items-center justify-between px-5 pb-3 pt-3">
         <Pressable
-          className="size-10 items-center justify-center rounded-full border border-slate-800 bg-slate-950/70 active:bg-slate-900"
+          className="size-10 items-center justify-center rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/70 active:bg-slate-100 dark:active:bg-slate-900"
           onPress={() => router.back()}
         >
-          <ChevronLeft color="#e2e8f0" size={20} />
+          <ChevronLeft color={colorScheme === 'dark' ? '#e2e8f0' : '#475569'} size={20} />
         </Pressable>
 
         <View className="flex-1 px-4">
-          <Text className="text-[20px] text-white" variant="title" weight="700">
+          <Text className="text-[20px] text-slate-900 dark:text-white" variant="title" weight="700">
             Thông báo
           </Text>
-          <Text className="mt-0.5 text-[12px] text-slate-400" weight="600">
+          <Text className="mt-0.5 text-[12px] text-slate-500 dark:text-slate-400" weight="600">
             {unreadCount > 0 ? `${unreadCount} thông báo chưa đọc` : 'Tất cả đã đọc'}
           </Text>
         </View>
 
         <Pressable
-          className={`size-10 items-center justify-center rounded-full border border-slate-800 bg-slate-950/70 active:bg-slate-900 ${markingAll || unreadCount === 0 ? 'opacity-50' : ''}`}
+          className={`size-10 items-center justify-center rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/70 active:bg-slate-100 dark:active:bg-slate-900 ${markingAll || unreadCount === 0 ? 'opacity-50' : ''}`}
           disabled={markingAll || unreadCount === 0}
           onPress={handleMarkAllRead}
         >
@@ -189,7 +192,7 @@ export function NotificationsScreen() {
       {loading ? (
         <View className="flex-1 items-center justify-center px-5">
           <ActivityIndicator color="#f97316" size="large" />
-          <Text className="mt-3 text-[13px] text-slate-400" weight="600">
+          <Text className="mt-3 text-[13px] text-slate-500 dark:text-slate-400" weight="600">
             {emptyTitle}
           </Text>
         </View>
@@ -207,14 +210,14 @@ export function NotificationsScreen() {
           showsVerticalScrollIndicator={false}
         >
           {notifications.length === 0 ? (
-            <View className="mt-10 items-center rounded-2xl border border-dashed border-slate-800 bg-slate-950/40 px-5 py-10">
-              <View className="size-12 items-center justify-center rounded-2xl bg-slate-900">
+            <View className="mt-10 items-center rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/40 px-5 py-10">
+              <View className="size-12 items-center justify-center rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
                 <Bell color="#64748b" size={24} />
               </View>
-              <Text className="mt-4 text-center text-[16px] text-white" weight="700">
+              <Text className="mt-4 text-center text-[16px] text-slate-900 dark:text-white" weight="700">
                 {emptyTitle}
               </Text>
-              <Text className="mt-2 text-center text-[12px] leading-5 text-slate-400" weight="500">
+              <Text className="mt-2 text-center text-[12px] leading-5 text-slate-500 dark:text-slate-400" weight="500">
                 Các cập nhật booking, kiểm tra xe, thanh toán và đánh giá sẽ xuất hiện ở đây.
               </Text>
               <Pressable
@@ -263,11 +266,12 @@ function NotificationItem({
 
   return (
     <Pressable
-      className={`rounded-2xl border p-4 active:bg-slate-900/80 ${
+      className={cn(
+        'rounded-2xl border p-4 active:bg-slate-100 dark:active:bg-slate-900/80',
         unread
-          ? 'border-[#f97316]/30 bg-[#0f172a]/90'
-          : 'border-slate-800 bg-[#0f172a]/55'
-      }`}
+          ? 'border-[#f97316]/30 bg-orange-50/20 dark:bg-[#0f172a]/90'
+          : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/55'
+      )}
       disabled={opening}
       onPress={onPress}
     >
@@ -281,13 +285,13 @@ function NotificationItem({
 
         <View className="flex-1">
           <View className="flex-row items-start gap-2">
-            <Text className="flex-1 text-[14px] leading-5 text-white" weight="700">
+            <Text className="flex-1 text-[14px] leading-5 text-slate-900 dark:text-white" weight="700">
               {notification.title}
             </Text>
             {unread ? <View className="mt-1.5 size-2 rounded-full bg-[#f97316]" /> : null}
           </View>
 
-          <Text className="mt-1 text-[12px] leading-5 text-slate-400" weight="500">
+          <Text className="mt-1 text-[12px] leading-5 text-slate-550 dark:text-slate-400" weight="500">
             {notification.message}
           </Text>
 

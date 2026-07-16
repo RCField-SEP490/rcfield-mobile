@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Pressable, Image, ActivityIndicator } from 'react-native';
 import { Plus, Minus, Coffee } from 'lucide-react-native';
 import { Text } from '@/shared/ui/Text';
+import { useColorScheme } from 'nativewind';
 import { bookingWizardApi, type MenuItem } from '../api/booking-wizard.api';
 
 interface FnbStepProps {
@@ -11,6 +12,7 @@ interface FnbStepProps {
 }
 
 export function FnbStep({ cafeId, fnbQuantities, setFnbQuantities }: FnbStepProps) {
+  const { colorScheme } = useColorScheme();
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -43,11 +45,11 @@ export function FnbStep({ cafeId, fnbQuantities, setFnbQuantities }: FnbStepProp
       <View className="flex-row items-center justify-between mb-3">
         <View className="flex-row items-center gap-1.5">
           <Coffee color="#f97316" size={15} />
-          <Text className="text-[13px] text-slate-400 uppercase tracking-wider font-bold">
+          <Text className="text-[13px] text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold">
             Đặt trước dịch vụ ăn uống (F&B)
           </Text>
         </View>
-        <Text className="text-[10px] text-slate-400 font-semibold">
+        <Text className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">
           Không bắt buộc
         </Text>
       </View>
@@ -61,21 +63,21 @@ export function FnbStep({ cafeId, fnbQuantities, setFnbQuantities }: FnbStepProp
             return (
               <View
                 key={item.id}
-                className="bg-[#0f172a]/50 border border-slate-800 rounded-xl p-3 flex-row gap-3 items-center justify-between"
+                className="bg-white dark:bg-[#0f172a]/50 border border-slate-200 dark:border-slate-800 rounded-xl p-3 flex-row gap-3 items-center justify-between shadow-sm"
               >
                 <View className="flex-row gap-3 items-center flex-1 pr-2">
                   {item.image ? (
                     <Image
                       source={{ uri: item.image }}
-                      className="h-14 w-14 rounded-lg bg-slate-900 object-cover"
+                      className="h-14 w-14 rounded-lg bg-slate-100 dark:bg-slate-900 object-cover"
                     />
                   ) : (
-                    <View className="h-14 w-14 rounded-lg bg-slate-900 border border-slate-800 items-center justify-center">
+                    <View className="h-14 w-14 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 items-center justify-center">
                       <Coffee color="#475569" size={20} />
                     </View>
                   )}
                   <View className="flex-1">
-                    <Text className="text-[13px] text-white" weight="700" numberOfLines={1}>
+                    <Text className="text-[13px] text-slate-900 dark:text-white" weight="700" numberOfLines={1}>
                       {item.name}
                     </Text>
                     <Text className="text-[12px] text-[#f97316] mt-1 font-bold">
@@ -90,11 +92,11 @@ export function FnbStep({ cafeId, fnbQuantities, setFnbQuantities }: FnbStepProp
                     <>
                       <Pressable
                         onPress={() => handleQuantityChange(item.id, -1)}
-                        className="h-7 w-7 rounded-full bg-slate-800 items-center justify-center active:bg-slate-700"
+                        className="h-7 w-7 rounded-full bg-slate-100 dark:bg-slate-800 items-center justify-center active:bg-slate-200 dark:active:bg-slate-700"
                       >
-                        <Minus color="#ffffff" size={14} />
+                        <Minus color={colorScheme === 'dark' ? '#ffffff' : '#475569'} size={14} />
                       </Pressable>
-                      <Text className="text-[13px] text-white font-bold w-5 text-center">
+                      <Text className="text-[13px] text-slate-900 dark:text-white font-bold w-5 text-center">
                         {qty}
                       </Text>
                     </>
@@ -111,8 +113,8 @@ export function FnbStep({ cafeId, fnbQuantities, setFnbQuantities }: FnbStepProp
           })}
         </View>
       ) : (
-        <View className="bg-slate-900/30 rounded-xl p-6 border border-dashed border-slate-800 items-center justify-center">
-          <Text className="text-[12px] text-slate-400 font-semibold">
+        <View className="bg-slate-100 dark:bg-slate-900/30 rounded-xl p-6 border border-dashed border-slate-200 dark:border-slate-800 items-center justify-center">
+          <Text className="text-[12px] text-slate-500 dark:text-slate-400 font-semibold">
             Không có món F&B khả dụng tại cơ sở này.
           </Text>
         </View>

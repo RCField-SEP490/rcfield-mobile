@@ -2,6 +2,7 @@ import React from 'react';
 import { View, StyleSheet, type DimensionValue } from 'react-native';
 import { Check, Compass, Users, Coffee, CreditCard } from 'lucide-react-native';
 import { Text } from '@/shared/ui/Text';
+import { useColorScheme } from 'nativewind';
 
 interface StepperBarProps {
   currentStep: number; // 1 | 2 | 3 | 4
@@ -15,17 +16,18 @@ const STEPS = [
 ];
 
 export function StepperBar({ currentStep }: StepperBarProps) {
+  const { colorScheme } = useColorScheme();
   // Tính toán chiều rộng của đường màu cam active nối từ tâm vòng tròn 1 đến tâm vòng tròn 4
   const activeLineWidth = `${((currentStep - 1) / (STEPS.length - 1)) * 100}%` as DimensionValue;
 
   return (
-    <View className="w-full bg-[#0f172a]/40 border border-slate-800/80 rounded-2xl p-5 mb-5">
+    <View className="w-full bg-white dark:bg-[#0f172a]/40 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-5 mb-5 shadow-sm">
       {/* Title */}
       <View className="mb-5">
         <Text className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">
           RCField Checkout
         </Text>
-        <Text className="text-[17px] text-white mt-0.5" weight="700">
+        <Text className="text-[17px] text-slate-900 dark:text-white mt-0.5" weight="700">
           Hoàn tất đặt lịch chạy RC
         </Text>
       </View>
@@ -33,7 +35,7 @@ export function StepperBar({ currentStep }: StepperBarProps) {
       {/* Stepper progress */}
       <View className="w-full relative">
         {/* Đường nối ngang chạy nền phía sau các vòng tròn */}
-        <View style={styles.lineBackground}>
+        <View style={[styles.lineBackground, { backgroundColor: colorScheme === 'dark' ? '#1e293b' : '#e2e8f0' }]}>
           <View style={[styles.lineActive, { width: activeLineWidth }]} />
         </View>
 
@@ -55,8 +57,8 @@ export function StepperBar({ currentStep }: StepperBarProps) {
                     alignItems: 'center',
                     justifyContent: 'center',
                     borderWidth: 1.5,
-                    backgroundColor: isCompleted ? '#ea580c' : '#0b0f19',
-                    borderColor: isCompleted ? '#ea580c' : isActive ? '#f97316' : '#334155',
+                    backgroundColor: isCompleted ? '#ea580c' : (colorScheme === 'dark' ? '#0b0f19' : '#ffffff'),
+                    borderColor: isCompleted ? '#ea580c' : isActive ? '#f97316' : (colorScheme === 'dark' ? '#334155' : '#cbd5e1'),
                     zIndex: 10,
                   }}
                   className="mb-2"
@@ -65,7 +67,7 @@ export function StepperBar({ currentStep }: StepperBarProps) {
                     <Check color="#ffffff" size={14} strokeWidth={3} />
                   ) : (
                     <IconComponent
-                      color={isActive ? '#f97316' : '#475569'}
+                      color={isActive ? '#f97316' : (colorScheme === 'dark' ? '#475569' : '#94a3b8')}
                       size={15}
                       strokeWidth={isActive ? 2.5 : 2}
                     />
@@ -75,7 +77,7 @@ export function StepperBar({ currentStep }: StepperBarProps) {
                 {/* Nhãn chữ nằm chính giữa cột dọc của vòng tròn */}
                 <Text
                   className={`text-[10px] text-center font-bold leading-4 ${
-                    isActive ? 'text-[#f97316]' : 'text-slate-400'
+                    isActive ? 'text-[#f97316]' : 'text-slate-500 dark:text-slate-400'
                   }`}
                   numberOfLines={1}
                 >
@@ -100,7 +102,6 @@ const styles = StyleSheet.create({
     left: '11.5%', // Bắt đầu tại tâm của cột thứ nhất (23% / 2)
     right: '11.5%', // Kết thúc tại tâm của cột thứ tư (23% / 2)
     height: 2,
-    backgroundColor: '#1e293b',
     zIndex: 1,
   },
   lineActive: {

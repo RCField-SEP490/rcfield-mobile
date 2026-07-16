@@ -25,7 +25,7 @@ import { subscribeMainTabRequests } from '@/shared/ui/main-tab-events';
 
 const ACTIVE_COLOR = '#10b981';
 const INACTIVE_COLOR = '#64748b';
-const BORDER_COLOR = '#1f2937';
+
 const TAB_BAR_HEIGHT = 56;
 
 type MainTab = {
@@ -217,7 +217,7 @@ export function SwipeTabPager() {
   }, [markTabLoaded]);
 
   return (
-    <View style={styles.container}>
+    <View className="flex-1 bg-[#f8fafc] dark:bg-[#0b0f19]">
       <PagerView
         ref={pagerRef}
         style={styles.pager}
@@ -231,7 +231,10 @@ export function SwipeTabPager() {
         ))}
       </PagerView>
 
-      <View style={[styles.tabBar, { height: TAB_BAR_HEIGHT + insets.bottom, paddingBottom: insets.bottom }]}>
+      <View
+        className="flex-row items-center border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0b0f19]"
+        style={{ height: TAB_BAR_HEIGHT + insets.bottom, paddingBottom: insets.bottom }}
+      >
         {tabs.map(({ key, title, Icon }, index) => (
           <TabBarItem
             key={key}
@@ -248,22 +251,11 @@ export function SwipeTabPager() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0b0b0b',
-  },
   pager: {
     flex: 1,
   },
   page: {
     flex: 1,
-  },
-  tabBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderTopColor: BORDER_COLOR,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    backgroundColor: '#0b0b0b',
   },
   tabButton: {
     flex: 1,

@@ -193,9 +193,9 @@ export function ExploreScreen() {
     return (
       <Pressable
         onPress={() => handleSelectCafe(item.id)}
-        className="mx-5 mb-4 overflow-hidden rounded-2xl border border-slate-800 bg-[#0f172a]/60 shadow-md active:bg-slate-900/60"
+        className="mx-5 mb-4 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 shadow-md active:bg-slate-100 dark:active:bg-slate-900/60"
       >
-        <View className="relative h-44 w-full bg-slate-900">
+        <View className="relative h-44 w-full bg-slate-950">
           <Image source={{ uri: item.image }} className="h-full w-full object-cover" />
           <Pressable
             onPress={(e) => {
@@ -215,10 +215,10 @@ export function ExploreScreen() {
         <View className="p-4">
           <View className="flex-row justify-between items-start">
             <View className="flex-1 pr-2">
-              <Text className="text-[16px] text-white" weight="700">
+              <Text className="text-[16px] text-slate-900 dark:text-white" weight="700">
                 {item.name}
               </Text>
-              <Text className="mt-0.5 text-[12px] text-slate-400">
+              <Text className="mt-0.5 text-[12px] text-slate-500 dark:text-slate-400">
                 {item.address}, {item.district}, {item.city}
               </Text>
             </View>
@@ -245,7 +245,7 @@ export function ExploreScreen() {
           </View>
 
           {/* Divider */}
-          <View className="h-[1px] bg-slate-800/80 my-3.5" />
+          <View className="h-[1px] bg-slate-200 dark:bg-slate-800/80 my-3.5" />
 
           <View className="flex-row justify-between items-center">
             {distance !== null ? (
@@ -258,7 +258,7 @@ export function ExploreScreen() {
             ) : (
               <View className="flex-row items-center gap-1">
                 <MapPin color="#64748b" size={13} />
-                <Text className="text-[12px] text-slate-400">Không rõ khoảng cách</Text>
+                <Text className="text-[12px] text-slate-500 dark:text-slate-400">Không rõ khoảng cách</Text>
               </View>
             )}
 
@@ -266,7 +266,7 @@ export function ExploreScreen() {
               <Text className="text-[15px] text-[#f97316]" weight="700">
                 {item.priceRange.split(' ')[0]}
               </Text>
-              <Text className="text-[10px] text-slate-400 font-medium">/slot</Text>
+              <Text className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">/slot</Text>
             </View>
           </View>
         </View>
@@ -275,24 +275,24 @@ export function ExploreScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-[#0b0f19]" edges={['top', 'left', 'right']}>
+    <SafeAreaView className="flex-grow flex-1 bg-[#f8fafc] dark:bg-[#0b0f19]" edges={['top', 'left', 'right']}>
       {/* Background Glow */}
-      <View className="absolute -top-40 -left-40 w-96 h-96 rounded-full bg-[#f97316]/5 blur-3xl pointer-events-none" />
+      <View className="absolute -top-40 -left-40 w-96 h-96 rounded-full bg-[#f97316]/5 blur-3xl pointer-events-none opacity-30 dark:opacity-100" />
 
       {/* Header Title */}
       <View className="px-5 pt-4 pb-2">
         <View className="flex-row items-start justify-between gap-3">
           <View className="flex-1">
-            <Text className="text-[22px] text-white" weight="700">
+            <Text className="text-[22px] text-slate-900 dark:text-white" weight="700">
               Khám phá chi nhánh
             </Text>
-            <Text className="text-[12px] text-slate-400 mt-0.5 font-semibold">
+            <Text className="text-[12px] text-slate-500 dark:text-slate-400 mt-0.5 font-semibold">
               Tìm kiếm và đặt lịch sân chạy RC của bạn
             </Text>
           </View>
 
           <Pressable
-            className="relative size-11 items-center justify-center rounded-2xl border border-slate-800 bg-[#0f172a]/80 active:bg-slate-900"
+            className="relative size-11 items-center justify-center rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/80 active:bg-slate-100 dark:active:bg-slate-900"
             onPress={() => router.push('/favorites' as any)}
           >
             <Heart
@@ -312,12 +312,12 @@ export function ExploreScreen() {
       </View>
 
       {/* Tìm kiếm */}
-      <View className="mx-5 my-3 flex-row h-11 items-center rounded-xl border border-slate-800 bg-[#0f172a]/60 px-3.5 shadow-sm">
+      <View className="mx-5 my-3 flex-row h-11 items-center rounded-xl border border-slate-250 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 px-3.5 shadow-sm">
         <Search color="#94a3b8" size={18} />
         <TextInput
           placeholder="Tìm tên chi nhánh..."
-          placeholderTextColor="#475569"
-          className="ml-2.5 flex-1 text-[13px] text-white font-medium py-0"
+          placeholderTextColor="#94a3b8"
+          className="ml-2.5 flex-1 text-[13px] text-slate-900 dark:text-white font-medium py-0"
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
@@ -346,11 +346,11 @@ export function ExploreScreen() {
                 className={`rounded-xl border px-3.5 py-1.5 ${
                   isSelected
                     ? 'border-[#ea580c] bg-[#ea580c]'
-                    : 'border-slate-800 bg-[#0f172a]/40'
+                    : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/40'
                 }`}
               >
                 <Text
-                  className={`text-[11px] font-bold ${isSelected ? 'text-white' : 'text-slate-400'}`}
+                  className={`text-[11px] font-bold ${isSelected ? 'text-white' : 'text-slate-500 dark:text-slate-400'}`}
                 >
                   {city}
                 </Text>
@@ -372,12 +372,12 @@ export function ExploreScreen() {
             className={`rounded-xl border px-3.5 py-1.5 flex-row items-center gap-1 ${
               filterFavorites
                 ? 'border-[#ef4444] bg-[#ef4444]/20'
-                : 'border-slate-800 bg-[#0f172a]/40'
+                : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/40'
             }`}
           >
             <Heart color={filterFavorites ? '#ef4444' : '#94a3b8'} fill={filterFavorites ? '#ef4444' : 'transparent'} size={11} />
             <Text
-              className={`text-[11px] font-bold ${filterFavorites ? 'text-[#ef4444]' : 'text-slate-400'}`}
+              className={`text-[11px] font-bold ${filterFavorites ? 'text-[#ef4444]' : 'text-slate-550 dark:text-slate-400'}`}
             >
               Cơ sở đã thích
             </Text>
@@ -392,11 +392,11 @@ export function ExploreScreen() {
                 className={`rounded-xl border px-3.5 py-1.5 ${
                   isSelected
                     ? 'border-[#ea580c] bg-[#ea580c]'
-                    : 'border-slate-800 bg-[#0f172a]/40'
+                    : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/40'
                 }`}
               >
                 <Text
-                  className={`text-[11px] font-bold ${isSelected ? 'text-white' : 'text-slate-400'}`}
+                  className={`text-[11px] font-bold ${isSelected ? 'text-white' : 'text-slate-500 dark:text-slate-400'}`}
                 >
                   {type}
                 </Text>
@@ -413,11 +413,11 @@ export function ExploreScreen() {
         </View>
       ) : filteredCafes.length === 0 ? (
         <View className="flex-1 items-center justify-center px-8">
-          <View className="size-16 items-center justify-center rounded-2xl bg-slate-900 border border-slate-800 mb-4">
-            <Compass color="#64748b" size={28} />
+          <View className="size-16 items-center justify-center rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 mb-4">
+            <Compass color="#94a3b8" size={28} />
           </View>
-          <Text className="text-[15px] text-slate-300 font-bold">Không tìm thấy chi nhánh nào</Text>
-          <Text className="text-[11px] text-slate-500 text-center mt-1 leading-4 font-semibold">
+          <Text className="text-[15px] text-slate-800 dark:text-slate-300 font-bold">Không tìm thấy chi nhánh nào</Text>
+          <Text className="text-[11px] text-slate-500 dark:text-slate-400 text-center mt-1 leading-4 font-semibold">
             Thử thay đổi từ khoá tìm kiếm hoặc đặt lại các bộ lọc xem sao nhé.
           </Text>
         </View>

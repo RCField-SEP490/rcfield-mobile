@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { View, ScrollView, Pressable, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, DeviceEventEmitter, BackHandler } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useColorScheme } from 'nativewind';
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 
@@ -29,6 +30,7 @@ export function BookingWizardScreen({
   preselectedFnb,
 }: BookingWizardScreenProps) {
   const router = useRouter();
+  const { colorScheme } = useColorScheme();
   const insets = useSafeAreaInsets();
 
   // Wizard state
@@ -350,17 +352,17 @@ export function BookingWizardScreen({
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-[#0b0f19]" edges={['top', 'left', 'right']}>
+    <SafeAreaView className="flex-grow flex-1 bg-[#f8fafc] dark:bg-[#0b0f19]" edges={['top', 'left', 'right']}>
       {/* Header Back Button */}
-      <View className="flex-row items-center px-4 py-3 border-b border-slate-900 bg-[#0f172a]/50">
-        <Pressable onPress={handleBack} className="p-1 rounded-full active:bg-slate-800 flex-row items-center gap-1">
-          <ChevronLeft color="#f97316" size={20} />
+      <View className="flex-row items-center px-4 py-3 border-b border-slate-200 dark:border-slate-900 bg-white dark:bg-[#0f172a]/50">
+        <Pressable onPress={handleBack} className="p-1 rounded-full active:bg-slate-100 dark:active:bg-slate-800 flex-row items-center gap-1">
+          <ChevronLeft color={colorScheme === 'dark' ? '#f97316' : '#ea580c'} size={20} />
           <Text className="text-[12px] text-[#f97316] font-bold">
             Quay lại
           </Text>
         </Pressable>
         {cafe && (
-          <Text className="text-[13px] text-white flex-1 text-center font-bold mr-10" numberOfLines={1}>
+          <Text className="text-[13px] text-slate-900 dark:text-white flex-1 text-center font-bold mr-10" numberOfLines={1}>
             Đặt sân {cafe.name}
           </Text>
         )}
@@ -459,10 +461,10 @@ export function BookingWizardScreen({
             {/* Action Bottom Bar */}
             <View
               style={{ paddingBottom: Math.max(insets.bottom, 16), paddingTop: 14 }}
-              className="border-t border-slate-900 bg-[#0f172a]/95 px-5 flex-row justify-between items-center shadow-lg"
+              className="border-t border-slate-200 dark:border-slate-900 bg-white/95 dark:bg-[#0f172a]/95 px-5 flex-row justify-between items-center shadow-lg"
             >
               <View>
-                <Text className="text-[10px] text-slate-400 font-semibold">Tạm tính</Text>
+                <Text className="text-[10px] text-slate-550 dark:text-slate-400 font-semibold">Tạm tính</Text>
                 <Text className="text-[16px] text-[#f97316]" weight="700">
                   {finalTotalAmount.toLocaleString('vi-VN')}đ
                 </Text>
@@ -489,13 +491,16 @@ export function BookingWizardScreen({
                 <Pressable
                   disabled={isNextDisabled}
                   onPress={handleNext}
-                  className={`flex-row items-center justify-center py-2.5 px-6 rounded-xl gap-1 ${isNextDisabled ? 'bg-slate-800 opacity-50' : 'bg-[#ea580c] active:bg-[#f97316]'
-                    }`}
+                  className={`flex-row items-center justify-center py-2.5 px-6 rounded-xl gap-1 ${
+                    isNextDisabled
+                      ? 'bg-slate-200 dark:bg-slate-800 opacity-50'
+                      : 'bg-[#ea580c] active:bg-[#f97316]'
+                  }`}
                 >
-                  <Text className="text-[12px] text-white font-bold">
+                  <Text className={`text-[12px] font-bold ${isNextDisabled ? 'text-slate-400 dark:text-slate-500' : 'text-white'}`}>
                     Tiếp theo
                   </Text>
-                  <ChevronRight color="#ffffff" size={14} strokeWidth={2.5} />
+                  <ChevronRight color={isNextDisabled ? (colorScheme === 'dark' ? '#64748b' : '#94a3b8') : '#ffffff'} size={14} strokeWidth={2.5} />
                 </Pressable>
               )}
             </View>

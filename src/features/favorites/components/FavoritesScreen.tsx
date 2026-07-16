@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useColorScheme } from 'nativewind';
 import {
   CalendarPlus,
   ChevronLeft,
@@ -28,6 +29,7 @@ import { useAuthStore } from '@/shared/store/auth-store';
 import { Text } from '@/shared/ui/Text';
 
 export function FavoritesScreen() {
+  const { colorScheme } = useColorScheme();
   const router = useRouter();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
@@ -118,11 +120,11 @@ export function FavoritesScreen() {
 
     return (
       <Pressable
-        className="mb-3.5 overflow-hidden rounded-2xl border border-slate-800 bg-[#0f172a]/70 active:bg-slate-900"
+        className="mb-3.5 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/70 active:bg-slate-55 dark:active:bg-slate-900 shadow-sm"
         onPress={() => router.push(`/cafe-detail/${item.id}` as any)}
       >
         <View className="flex-row p-3">
-          <View className="relative h-28 w-28 overflow-hidden rounded-2xl bg-slate-900">
+          <View className="relative h-28 w-28 overflow-hidden rounded-2xl bg-slate-100 dark:bg-slate-900">
             <Image source={{ uri: item.image }} className="h-full w-full object-cover" />
             <View className="absolute bottom-2 left-2 flex-row items-center gap-1 rounded-lg bg-black/65 px-2 py-1">
               <Star color="#f59e0b" fill="#f59e0b" size={10} />
@@ -133,12 +135,12 @@ export function FavoritesScreen() {
           <View className="ml-3 flex-1">
             <View className="flex-row items-start gap-2">
               <View className="flex-1">
-                <Text className="text-[15px] leading-5 text-white" numberOfLines={2} weight="700">
+                <Text className="text-[15px] leading-5 text-slate-900 dark:text-white" numberOfLines={2} weight="700">
                   {item.name}
                 </Text>
                 <View className="mt-1.5 flex-row items-center gap-1">
                   <MapPin color="#94a3b8" size={12} />
-                  <Text className="flex-1 text-[11px] text-slate-400" numberOfLines={1} weight="600">
+                  <Text className="flex-1 text-[11px] text-slate-500 dark:text-slate-400" numberOfLines={1} weight="600">
                     {item.district}, {item.city}
                   </Text>
                 </View>
@@ -170,7 +172,7 @@ export function FavoritesScreen() {
 
             <View className="mt-auto flex-row items-end justify-between pt-3">
               <View>
-                <Text className="text-[9px] font-black uppercase text-slate-500">Giá slot</Text>
+                <Text className="text-[9px] font-black uppercase text-slate-400 dark:text-slate-500">Giá slot</Text>
                 <Text className="text-[13px] font-black text-[#f97316]">{priceLabel}</Text>
               </View>
               <Pressable
@@ -194,29 +196,29 @@ export function FavoritesScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-[#0b0f19]" edges={['top', 'left', 'right']}>
+    <SafeAreaView className="flex-1 bg-[#f8fafc] dark:bg-[#0b0f19]" edges={['top', 'left', 'right']}>
       <View className="absolute -top-32 -right-32 h-80 w-80 rounded-full bg-red-500/10 blur-3xl pointer-events-none" />
       <View className="absolute bottom-16 -left-24 h-72 w-72 rounded-full bg-orange-500/10 blur-3xl pointer-events-none" />
 
       <View className="flex-row items-center px-5 pb-3 pt-3">
         <Pressable
-          className="size-10 items-center justify-center rounded-full border border-slate-800 bg-slate-950/70 active:bg-slate-900"
+          className="size-10 items-center justify-center rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/70 active:bg-slate-50 dark:active:bg-slate-900 shadow-sm"
           onPress={() => router.back()}
         >
-          <ChevronLeft color="#e2e8f0" size={20} />
+          <ChevronLeft color={colorScheme === 'dark' ? '#e2e8f0' : '#475569'} size={20} />
         </Pressable>
 
         <View className="ml-3 flex-1">
-          <Text className="text-[22px] text-white" variant="title" weight="700">
+          <Text className="text-[22px] text-slate-900 dark:text-white" variant="title" weight="700">
             Wishlist
           </Text>
-          <Text className="mt-0.5 text-[12px] text-slate-400" weight="600">
+          <Text className="mt-0.5 text-[12px] text-slate-500 dark:text-slate-400" weight="600">
             Những chi nhánh bạn muốn quay lại
           </Text>
         </View>
 
         <Pressable
-          className="size-10 items-center justify-center rounded-full border border-slate-800 bg-slate-950/70 active:bg-slate-900"
+          className="size-10 items-center justify-center rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/70 active:bg-slate-55 dark:active:bg-slate-900 shadow-sm"
           onPress={() => fetchFavorites(true)}
         >
           {refreshing ? (
@@ -230,7 +232,7 @@ export function FavoritesScreen() {
       {loading ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#f97316" />
-          <Text className="mt-3 text-[13px] text-slate-400" weight="600">
+          <Text className="mt-3 text-[13px] text-slate-500 dark:text-slate-400" weight="600">
             Đang tải wishlist...
           </Text>
         </View>
@@ -241,34 +243,34 @@ export function FavoritesScreen() {
           renderItem={renderFavoriteItem}
           contentContainerClassName="px-5 pb-28 pt-2"
           ListHeaderComponent={
-            <View className="mb-5 overflow-hidden rounded-3xl border border-slate-800 bg-[#0f172a]/75 p-5">
+            <View className="mb-5 overflow-hidden rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/75 p-5 shadow-sm">
               <View className="absolute -right-12 -top-14 h-40 w-40 rounded-full bg-red-500/15" />
               <View className="flex-row items-start gap-4">
                 <View className="size-14 items-center justify-center rounded-2xl bg-red-500/15">
                   <Heart color="#ef4444" fill="#ef4444" size={28} />
                 </View>
                 <View className="flex-1">
-                  <Text className="text-[18px] leading-6 text-white" weight="700">
+                  <Text className="text-[18px] leading-6 text-slate-900 dark:text-white" weight="700">
                     Bộ sưu tập sân đua của bạn
                   </Text>
-                  <Text className="mt-1.5 text-[12px] leading-5 text-slate-400" weight="600">
+                  <Text className="mt-1.5 text-[12px] leading-5 text-slate-500 dark:text-slate-400" weight="600">
                     Lưu nhanh các chi nhánh đáng chú ý để so sánh, quay lại xem lịch trống và đặt sân nhanh hơn.
                   </Text>
                 </View>
               </View>
 
               <View className="mt-5 flex-row gap-2">
-                <View className="flex-1 rounded-2xl border border-slate-800 bg-slate-950/50 p-3">
-                  <Text className="text-[9px] font-black uppercase text-slate-500">Đã lưu</Text>
-                  <Text className="mt-1 text-xl font-black text-white">{favoriteCount}</Text>
+                <View className="flex-1 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/50 p-3">
+                  <Text className="text-[9px] font-black uppercase text-slate-400 dark:text-slate-500">Đã lưu</Text>
+                  <Text className="mt-1 text-xl font-black text-slate-900 dark:text-white">{favoriteCount}</Text>
                 </View>
-                <View className="flex-1 rounded-2xl border border-slate-800 bg-slate-950/50 p-3">
-                  <Text className="text-[9px] font-black uppercase text-slate-500">Thành phố</Text>
-                  <Text className="mt-1 text-xl font-black text-white">{cityCount}</Text>
+                <View className="flex-1 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/50 p-3">
+                  <Text className="text-[9px] font-black uppercase text-slate-400 dark:text-slate-500">Thành phố</Text>
+                  <Text className="mt-1 text-xl font-black text-slate-900 dark:text-white">{cityCount}</Text>
                 </View>
-                <View className="flex-1 rounded-2xl border border-slate-800 bg-slate-950/50 p-3">
-                  <Text className="text-[9px] font-black uppercase text-slate-500">Đánh giá</Text>
-                  <Text className="mt-1 text-xl font-black text-white">
+                <View className="flex-1 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/50 p-3">
+                  <Text className="text-[9px] font-black uppercase text-slate-400 dark:text-slate-500">Đánh giá</Text>
+                  <Text className="mt-1 text-xl font-black text-slate-900 dark:text-white">
                     {averageRating > 0 ? averageRating.toFixed(1) : '--'}
                   </Text>
                 </View>
@@ -276,14 +278,14 @@ export function FavoritesScreen() {
             </View>
           }
           ListEmptyComponent={
-            <View className="mt-14 items-center rounded-3xl border border-dashed border-slate-800 bg-slate-950/45 px-6 py-10">
-              <View className="size-16 items-center justify-center rounded-2xl bg-slate-900">
-                <Compass color="#64748b" size={30} />
+            <View className="mt-14 items-center rounded-3xl border border-dashed border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/45 px-6 py-10 shadow-sm">
+              <View className="size-16 items-center justify-center rounded-2xl bg-slate-100 dark:bg-slate-900">
+                <Compass color={colorScheme === 'dark' ? '#64748b' : '#94a3b8'} size={30} />
               </View>
-              <Text className="mt-4 text-center text-[17px] text-white" weight="700">
+              <Text className="mt-4 text-center text-[17px] text-slate-900 dark:text-white" weight="700">
                 Wishlist đang trống
               </Text>
-              <Text className="mt-2 text-center text-[12px] leading-5 text-slate-400" weight="600">
+              <Text className="mt-2 text-center text-[12px] leading-5 text-slate-550 dark:text-slate-400" weight="600">
                 Mở Khám phá và bấm trái tim trên chi nhánh bạn muốn lưu lại.
               </Text>
               <Pressable

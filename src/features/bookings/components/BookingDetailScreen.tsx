@@ -30,6 +30,7 @@ import {
   AppStateStatus,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useColorScheme } from 'nativewind';
 
 import { bookingWizardApi } from '@/features/bookings/api/booking-wizard.api';
 import { wsClient } from '@/shared/lib/websocket';
@@ -44,6 +45,7 @@ interface BookingDetailScreenProps {
 
 export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
   const router = useRouter();
+  const { colorScheme } = useColorScheme();
 
   const [booking, setBooking] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -294,23 +296,23 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 bg-[#0b0f19] justify-center items-center">
+      <SafeAreaView className="flex-grow flex-1 bg-[#f8fafc] dark:bg-[#0b0f19] justify-center items-center">
         <ActivityIndicator color="#ea580c" size="large" />
-        <Text className="mt-3 text-slate-400 text-xs font-semibold">Đang tải chi tiết đặt sân...</Text>
+        <Text className="mt-3 text-slate-500 dark:text-slate-400 text-xs font-semibold">Đang tải chi tiết đặt sân...</Text>
       </SafeAreaView>
     );
   }
 
   if (!booking) {
     return (
-      <SafeAreaView className="flex-1 bg-[#0b0f19] px-5 justify-center items-center">
+      <SafeAreaView className="flex-grow flex-1 bg-[#f8fafc] dark:bg-[#0b0f19] px-5 justify-center items-center">
         <AlertCircle color="#ef4444" size={48} />
-        <Text className="text-white text-lg font-bold mt-4">Không tìm thấy đơn đặt sân</Text>
+        <Text className="text-slate-900 dark:text-white text-lg font-bold mt-4">Không tìm thấy đơn đặt sân</Text>
         <Pressable
-          className="mt-6 px-6 py-2.5 rounded-xl bg-slate-800 border border-slate-700 active:bg-slate-700"
+          className="mt-6 px-6 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 active:bg-slate-200 dark:active:bg-slate-700"
           onPress={() => router.back()}
         >
-          <Text className="text-white text-xs font-bold">Quay lại</Text>
+          <Text className="text-slate-900 dark:text-white text-xs font-bold">Quay lại</Text>
         </Pressable>
       </SafeAreaView>
     );
@@ -416,20 +418,20 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
     : undefined;
 
   return (
-    <SafeAreaView className="flex-1 bg-[#0b0f19]" edges={['top', 'left', 'right']}>
+    <SafeAreaView className="flex-grow flex-1 bg-[#f8fafc] dark:bg-[#0b0f19]" edges={['top', 'left', 'right']}>
       {/* Background lights */}
-      <View className="absolute -top-20 -right-20 w-80 h-80 rounded-full bg-[#f97316]/5 blur-3xl pointer-events-none" />
-      <View className="absolute bottom-10 -left-20 w-80 h-80 rounded-full bg-[#6366f1]/5 blur-3xl pointer-events-none" />
+      <View className="absolute -top-20 -right-20 w-80 h-80 rounded-full bg-[#f97316]/5 blur-3xl pointer-events-none opacity-30 dark:opacity-100" />
+      <View className="absolute bottom-10 -left-20 w-80 h-80 rounded-full bg-[#6366f1]/5 blur-3xl pointer-events-none opacity-30 dark:opacity-100" />
 
       {/* Header */}
-      <View className="px-5 pt-3 pb-4 flex-row items-center justify-between border-b border-slate-800/80">
+      <View className="px-5 pt-3 pb-4 flex-row items-center justify-between border-b border-slate-200 dark:border-slate-800/80 bg-white dark:bg-[#0b0f19]">
         <Pressable
-          className="size-9 rounded-xl bg-slate-900 border border-slate-800 justify-center items-center active:bg-slate-800"
+          className="size-9 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 justify-center items-center active:bg-slate-100 dark:active:bg-slate-800"
           onPress={() => router.back()}
         >
-          <ArrowLeft color="#ffffff" size={18} />
+          <ArrowLeft color={colorScheme === 'dark' ? '#ffffff' : '#475569'} size={18} />
         </Pressable>
-        <Text className="text-white text-base" weight="700">Chi tiết đặt sân</Text>
+        <Text className="text-slate-900 dark:text-white text-base" weight="700">Chi tiết đặt sân</Text>
         <View className="size-9" />
       </View>
 
@@ -437,7 +439,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
 
         {/* Mã QR Code Check-in — dùng endpoint BE /bookings/:id/qr (Ẩn nếu đã checkout hoặc bị hủy) */}
         {booking.status !== 'CANCELLED' && booking.status !== 'NO_SHOW' && (!session || session.status !== 'COMPLETED') && (
-          <View className="items-center mb-6 rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-6 shadow-2xl">
+          <View className="items-center mb-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-6 shadow-xl">
             <View className="bg-white p-3 rounded-2xl shadow-lg mb-4">
               <Image
                 source={{
@@ -448,11 +450,11 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                 onError={() => console.warn('[BookingQR] QR image load failed for', bookingId)}
               />
             </View>
-            <Text className="text-slate-400 text-xs font-bold tracking-widest uppercase">Mã check-in của bạn</Text>
-            <Text className="text-white text-xl font-mono mt-1" weight="700">
+            <Text className="text-slate-500 dark:text-slate-400 text-xs font-bold tracking-widest uppercase">Mã check-in của bạn</Text>
+            <Text className="text-slate-900 dark:text-white text-xl font-mono mt-1" weight="700">
               {bookingId.slice(0, 8).toUpperCase()}
             </Text>
-            <Text className="text-slate-400 text-[11px] text-center font-medium mt-2 leading-4">
+            <Text className="text-slate-500 dark:text-slate-400 text-[11px] text-center font-medium mt-2 leading-4">
               Đưa mã QR này cho nhân viên tại quầy để check-in nhận làn đua và nhận xe thuê của bạn.
             </Text>
           </View>
@@ -464,7 +466,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
             <AlertTriangle color="#f59e0b" size={20} style={{ marginTop: 2 }} />
             <View className="flex-1">
               <Text className="text-amber-500 text-[14px]" weight="700">Đơn đặt sân chưa thanh toán</Text>
-              <Text className="text-slate-400 text-xs leading-4 mt-1 font-semibold">
+              <Text className="text-slate-500 dark:text-slate-400 text-xs leading-4 mt-1 font-semibold">
                 Lượt đặt của bạn sẽ bị hủy nếu không thanh toán trước thời hạn. Vui lòng hoàn tất thanh toán VNPay ngay.
               </Text>
               <Pressable
@@ -493,7 +495,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                 <Text className="text-orange-400 text-[14px]" weight="700">
                   Cần xác nhận biên bản trả xe
                 </Text>
-                <Text className="mt-1 text-xs leading-4 text-slate-300 font-semibold">
+                <Text className="mt-1 text-xs leading-4 text-slate-700 dark:text-slate-300 font-semibold">
                   Nhân viên đã gửi biên bản checkout. Bạn cần xem và đồng ý để phiên chơi hoàn tất.
                 </Text>
               </View>
@@ -518,7 +520,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                 <Text className="text-emerald-300 text-[14px]" weight="700">
                   Staff đề xuất gia hạn +{pendingExtension.extraMinutes} phút
                 </Text>
-                <Text className="mt-1 text-xs leading-4 text-slate-300 font-semibold">
+                <Text className="mt-1 text-xs leading-4 text-slate-700 dark:text-slate-300 font-semibold">
                   Phí phát sinh {Number(pendingExtension.additionalFee || 0).toLocaleString('vi-VN')}đ. Bạn cần phản hồi để staff cập nhật giờ chơi.
                 </Text>
               </View>
@@ -543,7 +545,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                 <Text className="text-amber-300 text-[14px]" weight="700">
                   Đánh giá trải nghiệm sau phiên
                 </Text>
-                <Text className="mt-1 text-xs leading-4 text-slate-300 font-semibold">
+                <Text className="mt-1 text-xs leading-4 text-slate-700 dark:text-slate-300 font-semibold">
                   Gửi đánh giá về sân, xe và nhân viên sau khi checkout hoàn tất.
                 </Text>
               </View>
@@ -561,8 +563,8 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
         ) : null}
 
         {/* Timeline đứng tiến trình (Booking Lifecycle) */}
-        <View className="rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-5 shadow-2xl mb-6">
-          <Text className="text-[12px] font-bold text-white uppercase tracking-wider mb-4">
+        <View className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-5 shadow-xl mb-6">
+          <Text className="text-[12px] font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-4">
             Tiến trình lượt chơi
           </Text>
 
@@ -576,26 +578,26 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                 <View className="w-[1.5px] h-8 bg-emerald-500/50 mt-1" />
               </View>
               <View className="flex-1 pt-0.5">
-                <Text className="text-white text-sm" weight="600">Khởi tạo & Đặt sân thành công</Text>
-                <Text className="text-slate-400 text-xs mt-0.5 font-semibold">Đã tạo đơn đặt lịch chơi lúc {new Date(booking.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} ngày {new Date(booking.createdAt).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}</Text>
+                <Text className="text-slate-900 dark:text-white text-sm" weight="600">Khởi tạo & Đặt sân thành công</Text>
+                <Text className="text-slate-500 dark:text-slate-400 text-xs mt-0.5 font-semibold">Đã tạo đơn đặt lịch chơi lúc {new Date(booking.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} ngày {new Date(booking.createdAt).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}</Text>
               </View>
             </View>
 
             {/* Step 2 */}
             <View className="flex-row gap-3">
               <View className="items-center">
-                <View className={cn("size-6 rounded-full justify-center items-center border", booking.status !== 'PENDING' ? 'bg-emerald-500 border-emerald-400' : 'bg-slate-900 border-slate-800')}>
+                <View className={cn("size-6 rounded-full justify-center items-center border", booking.status !== 'PENDING' ? 'bg-emerald-500 border-emerald-400' : 'bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800')}>
                   {booking.status !== 'PENDING' ? (
                     <CheckCircle2 color="#ffffff" size={13} />
                   ) : (
-                    <Text className="text-slate-400 text-[10px] font-black font-mono">2</Text>
+                    <Text className="text-slate-500 dark:text-slate-400 text-[10px] font-black font-mono">2</Text>
                   )}
                 </View>
-                <View className={cn("w-[1.5px] h-8 mt-1", booking.status !== 'PENDING' ? 'bg-emerald-500/50' : 'bg-slate-800')} />
+                <View className={cn("w-[1.5px] h-8 mt-1", booking.status !== 'PENDING' ? 'bg-emerald-500/50' : 'bg-slate-200 dark:bg-slate-800')} />
               </View>
               <View className="flex-1 pt-0.5">
-                <Text className="text-white text-sm" weight="600">Thanh toán hóa đơn</Text>
-                <Text className="text-slate-400 text-xs mt-0.5 font-semibold">
+                <Text className="text-slate-900 dark:text-white text-sm" weight="600">Thanh toán hóa đơn</Text>
+                <Text className="text-slate-500 dark:text-slate-400 text-xs mt-0.5 font-semibold">
                   {booking.status === 'PENDING' ? 'Đang chờ xử lý thanh toán...' : 'Đã thanh toán thành công qua cổng VNPay'}
                 </Text>
               </View>
@@ -604,18 +606,18 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
             {/* Step 3 */}
             <View className="flex-row gap-3">
               <View className="items-center">
-                <View className={cn("size-6 rounded-full justify-center items-center border", session ? 'bg-emerald-500 border-emerald-400' : 'bg-slate-900 border-slate-800')}>
+                <View className={cn("size-6 rounded-full justify-center items-center border", session ? 'bg-emerald-500 border-emerald-400' : 'bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800')}>
                   {session ? (
                     <CheckCircle2 color="#ffffff" size={13} />
                   ) : (
-                    <Text className="text-slate-400 text-[10px] font-black font-mono">3</Text>
+                    <Text className="text-slate-500 dark:text-slate-400 text-[10px] font-black font-mono">3</Text>
                   )}
                 </View>
-                <View className={cn("w-[1.5px] h-8 mt-1", session ? 'bg-emerald-500/50' : 'bg-slate-800')} />
+                <View className={cn("w-[1.5px] h-8 mt-1", session ? 'bg-emerald-500/50' : 'bg-slate-200 dark:bg-slate-800')} />
               </View>
               <View className="flex-1 pt-0.5">
-                <Text className="text-white text-sm" weight="600">Bàn giao & Check-in tại sân</Text>
-                <Text className="text-slate-400 text-xs mt-0.5 font-semibold">
+                <Text className="text-slate-900 dark:text-white text-sm" weight="600">Bàn giao & Check-in tại sân</Text>
+                <Text className="text-slate-500 dark:text-slate-400 text-xs mt-0.5 font-semibold">
                   {session?.actualStartAt
                     ? `Nhân viên check-in đã bàn giao xe lúc ${new Date(session.actualStartAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`
                     : 'Đưa mã check-in cho nhân viên tại quầy\nđể bàn giao xe và check-in'}
@@ -626,17 +628,17 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
             {/* Step 4 */}
             <View className="flex-row gap-3">
               <View className="items-center">
-                <View className={cn("size-6 rounded-full justify-center items-center border", isSessionActive ? 'bg-orange-500 border-orange-400' : session?.status === 'COMPLETED' ? 'bg-emerald-500 border-emerald-400' : 'bg-slate-900 border-slate-800')}>
+                <View className={cn("size-6 rounded-full justify-center items-center border", isSessionActive ? 'bg-orange-500 border-orange-400' : session?.status === 'COMPLETED' ? 'bg-emerald-500 border-emerald-400' : 'bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800')}>
                   {session?.status === 'COMPLETED' ? (
                     <CheckCircle2 color="#ffffff" size={13} />
                   ) : (
-                    <Text className={cn("text-[10px] font-black font-mono", isSessionActive ? 'text-white' : 'text-slate-400')}>4</Text>
+                    <Text className={cn("text-[10px] font-black font-mono", isSessionActive ? 'text-white' : 'text-slate-500 dark:text-slate-400')}>4</Text>
                   )}
                 </View>
               </View>
               <View className="flex-1 pt-0.5">
-                <Text className="text-white text-sm" weight="600">Trạng thái chơi & Kết thúc</Text>
-                <Text className="text-slate-400 text-xs mt-0.5 font-semibold">
+                <Text className="text-slate-900 dark:text-white text-sm" weight="600">Trạng thái chơi & Kết thúc</Text>
+                <Text className="text-slate-500 dark:text-slate-400 text-xs mt-0.5 font-semibold">
                   {session?.status === 'COMPLETED'
                     ? 'Đã hoàn thành phiên chơi và checkout xe đua.'
                     : isSessionActive
@@ -649,53 +651,53 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
         </View>
 
         {/* Thông tin Chi nhánh */}
-        <View className="rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-5 shadow-2xl mb-6">
-          <View className="flex-row items-center gap-2 mb-3.5 border-b border-slate-800/80 pb-2">
+        <View className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-5 shadow-xl mb-6">
+          <View className="flex-row items-center gap-2 mb-3.5 border-b border-slate-200 dark:border-slate-800/80 pb-2">
             <MapPin color="#f97316" size={16} />
-            <Text className="text-[12px] font-bold text-white uppercase tracking-wider">
+            <Text className="text-[12px] font-bold text-slate-900 dark:text-white uppercase tracking-wider">
               Chi nhánh & Làn đua
             </Text>
           </View>
-          <Text className="text-white text-[15px]" weight="600">{booking.cafe?.name ?? 'RCField Platform Branch'}</Text>
-          <Text className="text-slate-400 text-xs leading-4 font-semibold mt-1">{booking.cafe?.address ?? 'Địa chỉ chi nhánh chưa được cấu hình.'}</Text>
+          <Text className="text-slate-900 dark:text-white text-[15px]" weight="600">{booking.cafe?.name ?? 'RCField Branch'}</Text>
+          <Text className="text-slate-500 dark:text-slate-400 text-xs leading-4 font-semibold mt-1">{booking.cafe?.address ?? 'Địa chỉ chi nhánh chưa được cấu hình.'}</Text>
         </View>
 
         {/* Thông tin Lượt đua */}
-        <View className="rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-5 shadow-2xl mb-6">
-          <View className="flex-row items-center gap-2 mb-3.5 border-b border-slate-800/80 pb-2">
+        <View className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-5 shadow-xl mb-6">
+          <View className="flex-row items-center gap-2 mb-3.5 border-b border-slate-200 dark:border-slate-800/80 pb-2">
             <Calendar color="#f97316" size={16} />
-            <Text className="text-[12px] font-bold text-white uppercase tracking-wider">
+            <Text className="text-[12px] font-bold text-slate-900 dark:text-white uppercase tracking-wider">
               Thông tin chi tiết lịch chạy
             </Text>
           </View>
           <View className="space-y-2.5">
             <View className="flex-row justify-between">
-              <Text className="text-slate-400 text-xs font-semibold">Ngày chơi</Text>
-              <Text className="text-white text-xs font-bold">{dateLabel}</Text>
+              <Text className="text-slate-500 dark:text-slate-400 text-xs font-semibold">Ngày chơi</Text>
+              <Text className="text-slate-900 dark:text-white text-xs font-bold">{dateLabel}</Text>
             </View>
             <View className="flex-row justify-between">
-              <Text className="text-slate-400 text-xs font-semibold">Khung giờ</Text>
-              <Text className="text-white text-xs font-bold">{timeLabel}</Text>
+              <Text className="text-slate-500 dark:text-slate-400 text-xs font-semibold">Khung giờ</Text>
+              <Text className="text-slate-900 dark:text-white text-xs font-bold">{timeLabel}</Text>
             </View>
             <View className="flex-row justify-between">
-              <Text className="text-slate-400 text-xs font-semibold">Chế độ chơi</Text>
-              <Text className="text-white text-xs font-bold">
+              <Text className="text-slate-500 dark:text-slate-400 text-xs font-semibold">Chế độ chơi</Text>
+              <Text className="text-slate-900 dark:text-white text-xs font-bold">
                 {booking.playMode === 'RENTAL' ? 'Thuê xe của chi nhánh' : 'Mang xe riêng (BYOC)'}
               </Text>
             </View>
             <View className="flex-row justify-between">
-              <Text className="text-slate-400 text-xs font-semibold">Số lượng người chơi</Text>
-              <Text className="text-white text-xs font-bold">{booking.participants?.length || 1} người</Text>
+              <Text className="text-slate-500 dark:text-slate-400 text-xs font-semibold">Số lượng người chơi</Text>
+              <Text className="text-slate-900 dark:text-white text-xs font-bold">{booking.participants?.length || 1} người</Text>
             </View>
           </View>
         </View>
 
         {/* Danh sách người tham gia (Companions) */}
         {booking.participants && booking.participants.length > 0 && (
-          <View className="rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-5 shadow-2xl mb-6">
-            <View className="flex-row items-center gap-2 mb-3.5 border-b border-slate-800/80 pb-2">
+          <View className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-5 shadow-xl mb-6">
+            <View className="flex-row items-center gap-2 mb-3.5 border-b border-slate-200 dark:border-slate-800/80 pb-2">
               <User color="#f97316" size={16} />
-              <Text className="text-[12px] font-bold text-white uppercase tracking-wider">
+              <Text className="text-[12px] font-bold text-slate-900 dark:text-white uppercase tracking-wider">
                 Danh sách người chơi
               </Text>
             </View>
@@ -703,20 +705,20 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
               {booking.participants.map((p: any, idx: number) => (
                 <View key={p.id || idx} className="flex-row items-center justify-between">
                   <View className="flex-row items-center gap-2.5">
-                    <View className="size-7 rounded-full bg-slate-900 border border-slate-800 justify-center items-center">
-                      <Text className="text-slate-400 text-[10px] font-bold">{idx + 1}</Text>
+                    <View className="size-7 rounded-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 justify-center items-center">
+                      <Text className="text-slate-500 dark:text-slate-400 text-[10px] font-bold">{idx + 1}</Text>
                     </View>
                     <View>
-                      <Text className="text-white text-xs font-bold">
+                      <Text className="text-slate-900 dark:text-white text-xs font-bold">
                         {p.resolvedName ?? p.guestName ?? 'Người chơi phụ'}
                       </Text>
-                      <Text className="text-slate-400 text-[10px] font-medium">
+                      <Text className="text-slate-500 dark:text-slate-400 text-[10px] font-medium">
                         {p.resolvedPhone ?? p.guestPhone ?? 'Chưa cập nhật SĐT'}
                       </Text>
                     </View>
                   </View>
-                  <View className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800">
-                    <Text className="text-slate-400 text-[9px] font-bold uppercase">
+                  <View className="px-2 py-0.5 rounded bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                    <Text className="text-slate-500 dark:text-slate-400 text-[9px] font-bold uppercase">
                       {p.userId === booking.customerId ? 'Người đặt' : 'Người đi cùng'}
                     </Text>
                   </View>
@@ -728,33 +730,33 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
 
         {/* Danh sách xe thuê (Rental Vehicles) */}
         {booking.vehicles && booking.vehicles.length > 0 && (
-          <View className="rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-5 shadow-2xl mb-6">
-            <View className="flex-row items-center gap-2 mb-3.5 border-b border-slate-800/80 pb-2">
+          <View className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-5 shadow-xl mb-6">
+            <View className="flex-row items-center gap-2 mb-3.5 border-b border-slate-200 dark:border-slate-800/80 pb-2">
               <Car color="#f97316" size={16} />
-              <Text className="text-[12px] font-bold text-white uppercase tracking-wider">
+              <Text className="text-[12px] font-bold text-slate-900 dark:text-white uppercase tracking-wider">
                 Danh sách xe thuê
               </Text>
             </View>
             <View className="space-y-3">
               {booking.vehicles.map((v: any, idx: number) => (
-                <View key={v.id || idx} className="flex-row items-center gap-3 bg-slate-950/40 p-2.5 rounded-xl border border-slate-900">
+                <View key={v.id || idx} className="flex-row items-center gap-3 bg-slate-50 dark:bg-slate-950/40 p-2.5 rounded-xl border border-slate-200 dark:border-slate-900">
                   {v.coverImageUrl ? (
-                    <Image source={{ uri: v.coverImageUrl }} className="size-11 rounded-lg bg-slate-900" />
+                    <Image source={{ uri: v.coverImageUrl }} className="size-11 rounded-lg bg-slate-100 dark:bg-slate-900" />
                   ) : (
-                    <View className="size-11 rounded-lg bg-slate-900 border border-slate-800 justify-center items-center">
+                    <View className="size-11 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 justify-center items-center">
                       <Car color="#475569" size={18} />
                     </View>
                   )}
                   <View className="flex-1">
-                    <Text className="text-white text-xs font-bold">{v.catalogName ?? 'Xe đua RC'}</Text>
+                    <Text className="text-slate-900 dark:text-white text-xs font-bold">{v.catalogName ?? 'Xe đua RC'}</Text>
                     <View className="flex-row items-center gap-2 mt-0.5">
-                      <Text className="text-[10px] text-slate-400 font-semibold font-mono">Bảng số: {v.identifier ?? 'N/A'}</Text>
-                      <View className="w-[1px] h-2 bg-slate-800" />
-                      <Text className="text-[10px] text-slate-400 font-semibold">Màu: {v.color ?? 'N/A'}</Text>
+                      <Text className="text-[10px] text-slate-550 dark:text-slate-400 font-semibold font-mono">Bảng số: {v.identifier ?? 'N/A'}</Text>
+                      <View className="w-[1px] h-2 bg-slate-200 dark:bg-slate-800" />
+                      <Text className="text-[10px] text-slate-550 dark:text-slate-400 font-semibold">Màu: {v.color ?? 'N/A'}</Text>
                     </View>
                   </View>
-                  <View className={cn("px-2 py-0.5 rounded border", v.tier === 'PREMIUM' ? 'bg-yellow-500/5 border-yellow-500/10' : 'bg-slate-900 border-slate-800')}>
-                    <Text className={cn("text-[9px] font-bold uppercase", v.tier === 'PREMIUM' ? 'text-yellow-500' : 'text-slate-400')}>
+                  <View className={cn("px-2 py-0.5 rounded border", v.tier === 'PREMIUM' ? 'bg-yellow-500/5 border-yellow-500/10' : 'bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800')}>
+                    <Text className={cn("text-[9px] font-bold uppercase", v.tier === 'PREMIUM' ? 'text-yellow-500' : 'text-slate-500 dark:text-slate-400')}>
                       {v.tier ?? 'STANDARD'}
                     </Text>
                   </View>
@@ -766,10 +768,10 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
 
         {/* Trình đối chiếu hình ảnh Check-in/Check-out (Handover Photos) */}
         {session && (session.status === 'ACTIVE' || session.status === 'COMPLETED' || session.status === 'CHECKING_OUT') && (
-          <View className="rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-5 shadow-2xl mb-6">
-            <View className="flex-row items-center gap-2 mb-3.5 border-b border-slate-800/80 pb-2">
+          <View className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-5 shadow-xl mb-6">
+            <View className="flex-row items-center gap-2 mb-3.5 border-b border-slate-200 dark:border-slate-800/80 pb-2">
               <Camera color="#f97316" size={16} />
-              <Text className="text-[12px] font-bold text-white uppercase tracking-wider">
+              <Text className="text-[12px] font-bold text-slate-900 dark:text-white uppercase tracking-wider">
                 Đối chiếu bàn giao xe (Side-by-Side)
               </Text>
             </View>
@@ -785,7 +787,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
               {sessionDetail?.damageNotes && (
                 <View className="rounded-lg bg-red-500/5 border border-red-500/10 p-2.5">
                   <Text className="text-red-400 text-[10px] font-bold uppercase tracking-wide">Ghi chú hư hại từ nhân viên:</Text>
-                  <Text className="text-slate-300 text-xs font-semibold leading-4 mt-0.5">{sessionDetail.damageNotes}</Text>
+                  <Text className="text-slate-700 dark:text-slate-300 text-xs font-semibold leading-4 mt-0.5">{sessionDetail.damageNotes}</Text>
                 </View>
               )}
             </View>
@@ -793,10 +795,10 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
         )}
 
         {/* Section: Thanh toán & Quyết toán (Billing & Settlement) */}
-        <View className="rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-5 shadow-2xl mb-6">
-          <View className="flex-row items-center gap-2 mb-4 border-b border-slate-800/80 pb-2.5">
+        <View className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-5 shadow-xl mb-6">
+          <View className="flex-row items-center gap-2 mb-4 border-b border-slate-200 dark:border-slate-800/80 pb-2.5">
             <CreditCard color="#f97316" size={16} />
-            <Text className="text-[12px] font-bold text-white uppercase tracking-wider">
+            <Text className="text-[12px] font-bold text-slate-900 dark:text-white uppercase tracking-wider">
               Thanh toán & Quyết toán
             </Text>
           </View>
@@ -817,50 +819,50 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
             <View className="pl-5 space-y-2">
               {slotFee > 0 && (
                 <View className="flex-row justify-between">
-                  <Text className="text-slate-400 text-xs font-semibold">Phí lịch sân</Text>
-                  <Text className="text-white text-xs font-bold">{slotFee.toLocaleString('vi-VN')}đ</Text>
+                  <Text className="text-slate-500 dark:text-slate-400 text-xs font-semibold">Phí lịch sân</Text>
+                  <Text className="text-slate-900 dark:text-white text-xs font-bold">{slotFee.toLocaleString('vi-VN')}đ</Text>
                 </View>
               )}
               {rentalFee > 0 && (
                 <View className="flex-row justify-between">
-                  <Text className="text-slate-400 text-xs font-semibold">Phí thuê xe</Text>
-                  <Text className="text-white text-xs font-bold">{rentalFee.toLocaleString('vi-VN')}đ</Text>
+                  <Text className="text-slate-500 dark:text-slate-400 text-xs font-semibold">Phí thuê xe</Text>
+                  <Text className="text-slate-900 dark:text-white text-xs font-bold">{rentalFee.toLocaleString('vi-VN')}đ</Text>
                 </View>
               )}
               {fnbPreorderFee > 0 && (
                 <View className="flex-row justify-between">
-                  <Text className="text-slate-400 text-xs font-semibold">F&B đặt trước</Text>
-                  <Text className="text-white text-xs font-bold">{fnbPreorderFee.toLocaleString('vi-VN')}đ</Text>
+                  <Text className="text-slate-500 dark:text-slate-400 text-xs font-semibold">F&B đặt trước</Text>
+                  <Text className="text-slate-900 dark:text-white text-xs font-bold">{fnbPreorderFee.toLocaleString('vi-VN')}đ</Text>
                 </View>
               )}
               {depositAmount > 0 && (
                 <View className="flex-row justify-between">
-                  <Text className="text-slate-400 text-xs font-semibold">Tiền cọc xe giữ</Text>
-                  <Text className="text-white text-xs font-bold">{depositAmount.toLocaleString('vi-VN')}đ</Text>
+                  <Text className="text-slate-500 dark:text-slate-400 text-xs font-semibold">Tiền cọc xe giữ</Text>
+                  <Text className="text-slate-900 dark:text-white text-xs font-bold">{depositAmount.toLocaleString('vi-VN')}đ</Text>
                 </View>
               )}
               {discountAmount > 0 && (
                 <View className="flex-row justify-between">
-                  <Text className="text-slate-400 text-xs font-semibold">Mã giảm giá</Text>
-                  <Text className="text-emerald-400 text-xs font-bold">-{discountAmount.toLocaleString('vi-VN')}đ</Text>
+                  <Text className="text-slate-500 dark:text-slate-400 text-xs font-semibold">Mã giảm giá</Text>
+                  <Text className="text-emerald-500 text-xs font-bold">-{discountAmount.toLocaleString('vi-VN')}đ</Text>
                 </View>
               )}
 
               {/* Dòng gạch chân mờ và Tổng đã trả */}
-              <View className="w-full h-[1px] bg-slate-800/60 my-1" />
+              <View className="w-full h-[1px] bg-slate-200 dark:bg-slate-800/60 my-1" />
               <View className="flex-row justify-between">
-                <Text className="text-slate-200 text-xs font-bold">Tổng đã trả</Text>
-                <Text className="text-white text-xs font-bold">{totalPrepaid.toLocaleString('vi-VN')}đ</Text>
+                <Text className="text-slate-700 dark:text-slate-200 text-xs font-bold">Tổng đã trả</Text>
+                <Text className="text-slate-900 dark:text-white text-xs font-bold">{totalPrepaid.toLocaleString('vi-VN')}đ</Text>
               </View>
             </View>
           </View>
 
           {/* Block 2: Quyết toán cuối phiên chơi (Active hoặc Completed) */}
           {(isSessionActive || booking.status === 'COMPLETED') && (depositAmount > 0 || totalCounterBill > 0) && (
-            <View className="mt-5 pt-4 border-t border-slate-800/80 space-y-3">
+            <View className="mt-5 pt-4 border-t border-slate-200 dark:border-slate-800/80 space-y-3">
               <View className="flex-row items-center gap-2">
                 <Clock color="#94a3b8" size={15} />
-                <Text className="text-slate-400 text-xs font-bold uppercase tracking-wide">
+                <Text className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wide">
                   {isSessionActive ? 'Khi kết thúc phiên (ước tính)' : 'Quyết toán tại quầy'}
                 </Text>
               </View>
@@ -868,13 +870,13 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
               <View className="pl-5 space-y-2">
                 {depositRefundAmount > 0 && (
                   <View className="flex-row justify-between">
-                    <Text className="text-slate-400 text-xs font-semibold">Hoàn cọc xe</Text>
+                    <Text className="text-slate-500 dark:text-slate-400 text-xs font-semibold">Hoàn cọc xe</Text>
                     <Text className="text-emerald-400 text-xs font-bold">+{depositRefundAmount.toLocaleString('vi-VN')}đ</Text>
                   </View>
                 )}
                 {depositConsumedByDamage > 0 && (
                   <View className="flex-row justify-between">
-                    <Text className="text-slate-400 text-xs font-semibold">Khấu trừ cọc hư hỏng</Text>
+                    <Text className="text-slate-500 dark:text-slate-400 text-xs font-semibold">Khấu trừ cọc hư hỏng</Text>
                     <Text className="text-rose-400 text-xs font-bold">-{depositConsumedByDamage.toLocaleString('vi-VN')}đ</Text>
                   </View>
                 )}
@@ -884,14 +886,14 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                   if (c.type === 'FB_PREORDER' || c.type === 'FNB_PREORDER') label = 'F&B gọi thêm tại quầy';
                   return (
                     <View key={c.id || idx} className="flex-row justify-between">
-                      <Text className="text-slate-400 text-xs font-semibold">{label}</Text>
+                      <Text className="text-slate-500 dark:text-slate-400 text-xs font-semibold">{label}</Text>
                       <Text className="text-rose-400 text-xs font-bold">+{Number(c.amount).toLocaleString('vi-VN')}đ</Text>
                     </View>
                   );
                 })}
                 {damageExceedingDeposit > 0 && (
                   <View className="flex-row justify-between">
-                    <Text className="text-slate-400 text-xs font-semibold">Hư hỏng vượt cọc</Text>
+                    <Text className="text-slate-500 dark:text-slate-400 text-xs font-semibold">Hư hỏng vượt cọc</Text>
                     <Text className="text-rose-400 text-xs font-bold">+{damageExceedingDeposit.toLocaleString('vi-VN')}đ</Text>
                   </View>
                 )}
@@ -901,7 +903,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
 
           {/* Block 3: Trạng thái quyết toán nợ phát sinh */}
           {totalCounterBill > 0 && (
-            <View className="mt-5 pt-4 border-t border-slate-800/80">
+            <View className="mt-5 pt-4 border-t border-slate-200 dark:border-slate-800/80">
               {!isPaid ? (
                 <View className="space-y-3">
                   <View className="rounded-xl bg-amber-500/5 border border-amber-500/10 p-3 flex-row items-center gap-2">
@@ -945,11 +947,11 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
         {/* Nút hủy đặt lịch */}
         {(booking.status === 'CONFIRMED' || booking.status === 'PENDING') && (
           <Pressable
-            className="w-full h-11 flex-row items-center justify-center rounded-xl border border-red-900/20 bg-red-950/15 active:bg-red-950/30 gap-2 shadow-sm"
+            className="w-full h-11 flex-row items-center justify-center rounded-xl border border-red-200 dark:border-red-900/20 bg-red-50 dark:bg-red-950/15 active:bg-red-100 dark:active:bg-red-950/30 gap-2 shadow-sm"
             onPress={() => setCancelModalVisible(true)}
           >
             <RotateCcw color="#ef4444" size={16} />
-            <Text className="text-red-400 text-xs font-bold">Hủy đặt lịch chơi</Text>
+            <Text className="text-red-500 dark:text-red-400 text-xs font-bold">Hủy đặt lịch chơi</Text>
           </Pressable>
         )}
       </ScrollView>
@@ -965,11 +967,11 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
           >
-            <View className="bg-[#0f172a] rounded-t-3xl border-t border-slate-800 p-6 pb-10 space-y-4">
-              <View className="flex-row justify-between items-center border-b border-slate-800 pb-3">
-                <Text className="text-white text-base" weight="700">Xác nhận hủy đặt lịch</Text>
+            <View className="bg-white dark:bg-[#0f172a] rounded-t-3xl border-t border-slate-200 dark:border-slate-800 p-6 pb-10 space-y-4">
+              <View className="flex-row justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-3">
+                <Text className="text-slate-900 dark:text-white text-base" weight="700">Xác nhận hủy đặt lịch</Text>
                 <Pressable onPress={() => setCancelModalVisible(false)}>
-                  <Text className="text-slate-400 text-xs font-bold">Đóng</Text>
+                  <Text className="text-slate-500 dark:text-slate-400 text-xs font-bold">Đóng</Text>
                 </Pressable>
               </View>
 
@@ -978,13 +980,13 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                   <Text className="text-amber-500 text-xs font-bold uppercase tracking-wider">
                     ⚠️ Chính sách hoàn phí chi tiết:
                   </Text>
-                  <Text className="text-slate-300 text-xs leading-4 font-semibold">
+                  <Text className="text-slate-700 dark:text-slate-300 text-xs leading-4 font-semibold">
                     • {refundEstimation.policyText}{'\n'}
                     • Phí thuê xe & dịch vụ F&B: Hoàn 100%
                   </Text>
-                  <View className="w-full h-[1px] bg-slate-800/80 my-1" />
+                  <View className="w-full h-[1px] bg-slate-200 dark:bg-slate-800/80 my-1" />
                   <View className="flex-row justify-between items-center">
-                    <Text className="text-slate-400 text-xs font-bold">Tổng tiền hoàn dự kiến:</Text>
+                    <Text className="text-slate-500 dark:text-slate-400 text-xs font-bold">Tổng tiền hoàn dự kiến:</Text>
                     <Text className="text-emerald-400 text-sm font-black">
                       {refundEstimation.totalRefund.toLocaleString('vi-VN')}đ
                     </Text>
@@ -993,12 +995,12 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
               )}
 
               <View className="space-y-1.5 mt-4">
-                <Text className="text-slate-400 text-xs font-bold uppercase tracking-wider">Nhập lý do hủy đặt lịch</Text>
+                <Text className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">Nhập lý do hủy đặt lịch</Text>
                 <TextInput
-                  className="w-full min-h-[70px] rounded-xl border border-slate-800 bg-slate-950 p-3 text-white text-xs font-medium leading-4 mt-3"
+                  className="w-full min-h-[70px] rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-3 text-slate-900 dark:text-white text-xs font-medium leading-4 mt-3"
                   multiline={true}
                   placeholder="Nhập lý do hủy lịch chơi của bạn..."
-                  placeholderTextColor="#475569"
+                  placeholderTextColor="#94a3b8"
                   value={cancelReason}
                   onChangeText={setCancelReason}
                 />

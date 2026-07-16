@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+
 import {
   ChevronLeft,
   Calendar,
@@ -139,28 +140,26 @@ export function MyPackagesScreen() {
             <Text className="text-[9px] text-red-400 font-bold">Hết hạn dùng</Text>
           </View>
         );
-      default:
-        return null;
     }
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-[#0b0f19]" edges={['top', 'left', 'right']}>
+    <SafeAreaView className="flex-grow flex-1 bg-[#f8fafc] dark:bg-[#0b0f19]" edges={['top', 'left', 'right']}>
       {/* Header */}
-      <View className="flex-row items-center px-4 py-3 border-b border-slate-900 bg-[#0f172a]/50">
-        <Pressable onPress={() => router.back()} className="p-1 rounded-full active:bg-slate-800 flex-row items-center gap-1">
+      <View className="flex-row items-center px-4 py-3 border-b border-slate-200 dark:border-slate-900 bg-white dark:bg-[#0f172a]/50">
+        <Pressable onPress={() => router.back()} className="p-1 rounded-full active:bg-slate-100 dark:active:bg-slate-800 flex-row items-center gap-1">
           <ChevronLeft color="#f97316" size={20} />
           <Text className="text-[12px] text-[#f97316] font-bold">
             Quay lại
           </Text>
         </Pressable>
-        <Text className="text-[14px] text-white flex-1 text-center font-bold mr-10">
+        <Text className="text-[14px] text-slate-900 dark:text-white flex-1 text-center font-bold mr-10">
           Gói hội viên của tôi
         </Text>
       </View>
 
       {/* Tabs Selector */}
-      <View className="flex-row border-b border-slate-900/60 bg-[#0f172a]/20">
+      <View className="flex-row border-b border-slate-200 dark:border-slate-900/60 bg-white dark:bg-[#0f172a]/20">
         <Pressable
           onPress={() => setActiveTab('ACTIVE')}
           className={`flex-1 py-3 items-center border-b-2 ${
@@ -168,7 +167,7 @@ export function MyPackagesScreen() {
           }`}
         >
           <Text
-            className={`text-xs ${activeTab === 'ACTIVE' ? 'text-[#f97316] font-bold' : 'text-slate-400'}`}
+            className={`text-xs ${activeTab === 'ACTIVE' ? 'text-[#f97316] font-bold' : 'text-slate-500 dark:text-slate-400'}`}
           >
             Đang hoạt động ({packages.filter((p) => p.status === 'ACTIVE' || p.status === 'PENDING_PAYMENT').length})
           </Text>
@@ -180,7 +179,7 @@ export function MyPackagesScreen() {
           }`}
         >
           <Text
-            className={`text-xs ${activeTab === 'INACTIVE' ? 'text-[#f97316] font-bold' : 'text-slate-400'}`}
+            className={`text-xs ${activeTab === 'INACTIVE' ? 'text-[#f97316] font-bold' : 'text-slate-500 dark:text-slate-400'}`}
           >
             Đã hết / Hết hạn ({packages.filter((p) => p.status === 'EXHAUSTED' || p.status === 'EXPIRED').length})
           </Text>
@@ -212,15 +211,15 @@ export function MyPackagesScreen() {
                 <Pressable
                   key={pkg.id}
                   onPress={() => handleOpenHistory(pkg)}
-                  className="mb-4 rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-5 shadow-sm active:bg-slate-900/60"
+                  className="mb-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-5 shadow-sm active:bg-slate-100 dark:active:bg-slate-900/60"
                 >
                   {/* Tên và Trạng thái */}
                   <View className="flex-row justify-between items-start mb-3">
                     <View className="flex-1 pr-2">
-                      <Text className="text-[14px] text-white" weight="700">
+                      <Text className="text-[14px] text-slate-900 dark:text-white" weight="700">
                         {pkg.package_name}
                       </Text>
-                      <Text className="text-[10px] text-slate-400 mt-1 font-semibold">
+                      <Text className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 font-semibold">
                         Sân: {pkg.cafe_name}
                       </Text>
                     </View>
@@ -230,12 +229,12 @@ export function MyPackagesScreen() {
                   {/* Thanh tiến trình Slot */}
                   <View className="mb-4">
                     <View className="flex-row justify-between items-baseline mb-1.5">
-                      <Text className="text-[10px] text-slate-400 font-semibold">Tình trạng sử dụng</Text>
-                      <Text className="text-[12px] text-white" weight="700">
+                      <Text className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">Tình trạng sử dụng</Text>
+                      <Text className="text-[12px] text-slate-900 dark:text-white" weight="700">
                         Còn {pkg.slots_remaining} / {pkg.slots_total} slots
                       </Text>
                     </View>
-                    <View className="h-2 w-full rounded-full bg-slate-800 overflow-hidden">
+                    <View className="h-2 w-full rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
                       <View
                         className="h-full rounded-full bg-[#f97316]"
                         style={{ width: `${100 - usedPercent}%` }}
@@ -244,26 +243,26 @@ export function MyPackagesScreen() {
                   </View>
 
                   {/* Divider */}
-                  <View className="h-[1px] bg-slate-800/80 my-3" />
+                  <View className="h-[1px] bg-slate-200 dark:bg-slate-800/80 my-3" />
 
                   {/* Thông tin phụ */}
                   <View className="flex-row justify-between items-center text-[10px]">
                     <View className="flex-row items-center gap-1">
                       <Tag color="#94a3b8" size={11} />
-                      <Text className="text-[10px] text-slate-400 font-semibold">
+                      <Text className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">
                         Giá: {formatPrice(pkg.purchased_price)}
                       </Text>
                     </View>
                     <View className="flex-row items-center gap-1">
                       <Clock color="#94a3b8" size={11} />
-                      <Text className="text-[10px] text-slate-400 font-semibold">
+                      <Text className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">
                         Hạn dùng: {formatDate(pkg.expires_at)}
                       </Text>
                     </View>
                   </View>
 
                   {/* Play Mode & Click view history hint */}
-                  <View className="flex-row justify-between items-center mt-3 pt-3 border-t border-slate-900/60">
+                  <View className="flex-row justify-between items-center mt-3 pt-3 border-t border-slate-200 dark:border-slate-900/60">
                     <Text className="text-[9px] text-[#f97316] font-bold uppercase tracking-wider">
                       {getPlayModeLabel(pkg.applicable_play_modes)}
                     </Text>
@@ -276,12 +275,12 @@ export function MyPackagesScreen() {
               );
             })
           ) : (
-            <View className="rounded-2xl border border-dashed border-slate-800 bg-[#0f172a]/30 p-8 items-center mt-10">
+            <View className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/30 p-8 items-center mt-10">
               <Compass color="#64748b" size={32} className="mb-2" />
-              <Text className="text-[13px] text-slate-300 font-bold">
+              <Text className="text-[13px] text-slate-700 dark:text-slate-300 font-bold">
                 {activeTab === 'ACTIVE' ? 'Không có gói đang hoạt động' : 'Không tìm thấy gói đã hết/hết hạn'}
               </Text>
-              <Text className="mt-1 text-[11px] text-slate-400 text-center leading-4 font-semibold">
+              <Text className="mt-1 text-[11px] text-slate-500 dark:text-slate-400 text-center leading-4 font-semibold">
                 {activeTab === 'ACTIVE'
                   ? 'Hãy đăng ký mua các gói lượt chơi hội viên tại mục Khám phá để nhận nhiều ưu đãi slots hơn nhé!'
                   : 'Danh sách lịch sử gói hội viên cũ của bạn sẽ hiển thị tại đây.'}
@@ -310,28 +309,28 @@ export function MyPackagesScreen() {
         onRequestClose={handleCloseHistory}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent} className="bg-[#0f172a] border border-slate-850">
+          <View style={styles.modalContent} className="bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-slate-850">
             {/* Modal Header */}
-            <View className="flex-row justify-between items-center p-4 border-b border-slate-800">
+            <View className="flex-row justify-between items-center p-4 border-b border-slate-200 dark:border-slate-800">
               <View className="flex-1 pr-3">
-                <Text className="text-white text-[13px] font-bold" numberOfLines={1}>
+                <Text className="text-slate-900 dark:text-white text-[13px] font-bold" numberOfLines={1}>
                   {selectedPackage?.package_name}
                 </Text>
-                <Text className="text-slate-400 text-[9px] mt-0.5" numberOfLines={1}>
+                <Text className="text-slate-500 dark:text-slate-400 text-[9px] mt-0.5" numberOfLines={1}>
                   Chi nhánh: {selectedPackage?.cafe_name}
                 </Text>
               </View>
               <Pressable
                 onPress={handleCloseHistory}
-                className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 active:bg-slate-800"
+                className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 active:bg-slate-200 dark:active:bg-slate-800"
               >
-                <Text className="text-white text-xs font-bold">Đóng</Text>
+                <Text className="text-slate-900 dark:text-white text-xs font-bold">Đóng</Text>
               </Pressable>
             </View>
 
             {/* Modal Body */}
             <View className="flex-1 p-4">
-              <Text className="text-slate-400 text-[10px] uppercase font-bold tracking-wider mb-3">
+              <Text className="text-slate-500 dark:text-slate-400 text-[10px] uppercase font-bold tracking-wider mb-3">
                 Lịch sử sử dụng slots ({usageHistory.length} lần)
               </Text>
 
@@ -356,12 +355,12 @@ export function MyPackagesScreen() {
                     return (
                       <View
                         key={index}
-                        className="mb-3 p-3.5 rounded-xl bg-slate-900/60 border border-slate-800/80"
+                        className="mb-3 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/80"
                       >
                         <View className="flex-row justify-between items-start">
                           <View className="flex-row items-center gap-1.5">
                             <Calendar color="#f97316" size={12} />
-                            <Text className="text-white text-[11px] font-bold">
+                            <Text className="text-slate-900 dark:text-white text-[11px] font-bold">
                               {dateStr} • {timeStr}
                             </Text>
                           </View>
@@ -372,7 +371,7 @@ export function MyPackagesScreen() {
                           </View>
                         </View>
                         <View className="mt-2 flex-row justify-between items-center text-[10px]">
-                          <Text className="text-slate-400 text-[10px] font-semibold">
+                          <Text className="text-slate-500 dark:text-slate-400 text-[10px] font-semibold">
                             Booking ID: {item.booking_id.substring(0, 8).toUpperCase()}
                           </Text>
                           <Text
@@ -398,7 +397,7 @@ export function MyPackagesScreen() {
               ) : (
                 <View className="flex-1 items-center justify-center py-12">
                   <HelpCircle color="#475569" size={24} />
-                  <Text className="text-slate-400 text-[11px] font-bold mt-2">
+                  <Text className="text-slate-600 dark:text-slate-400 text-[11px] font-bold mt-2">
                     Chưa có lịch sử trừ slots
                   </Text>
                   <Text className="text-slate-500 text-[9px] text-center mt-1 leading-4 font-semibold">

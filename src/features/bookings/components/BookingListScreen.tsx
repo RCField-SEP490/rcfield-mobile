@@ -17,6 +17,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useColorScheme } from 'nativewind';
 
 import { getMyBookings, type BookingListItem, type BookingStatus } from '@/features/bookings/api/booking.api';
 import { NotificationBellButton } from '@/features/notifications/components/NotificationBellButton';
@@ -77,14 +78,18 @@ function resolveIconColor(textClass: string): string {
 
 export function BookingListScreen() {
   const router = useRouter();
+  const { colorScheme } = useColorScheme();
   const role = useAuthStore((state) => state.role);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const [activeTab, setActiveTab] = useState<FilterKey>('ALL');
   const [bookings, setBookings] = useState<BookingListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Hooks được gọi không điều kiện ở đây
+
   const fetchBookings = useCallback(async (isRefresh = false) => {
-    if (role !== 'customer') {
+    if (!isAuthenticated || role !== 'customer') {
       setBookings([]);
       setLoading(false);
       setRefreshing(false);
@@ -135,7 +140,7 @@ export function BookingListScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [role]);
+  }, [role, isAuthenticated]);
 
   useEffect(() => {
     fetchBookings();
@@ -197,7 +202,7 @@ export function BookingListScreen() {
 
     return (
       <Pressable
-        className="mb-4 overflow-hidden rounded-2xl border border-slate-800 bg-[#0f172a]/60 active:bg-[#0f172a]/90 shadow-xl"
+        className="mb-4 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 active:bg-slate-100 dark:active:bg-[#0f172a]/90 shadow-xl"
         onPress={() => handleCardPress(item.id)}
       >
         {/* Thanh màu cam nếu session đang active */}
@@ -209,7 +214,7 @@ export function BookingListScreen() {
           {/* Row 1: Mã booking + badge trạng thái + số tiền */}
           <View className="flex-row items-center justify-between">
             <View className="flex-row items-center gap-1.5">
-              <Text className="text-slate-400 text-xs font-bold font-mono">#{shortId}</Text>
+              <Text className="text-slate-500 dark:text-slate-400 text-xs font-bold font-mono">#{shortId}</Text>
               <View className={cn('px-2 py-0.5 rounded-full border flex-row items-center gap-1', status.bg)}>
                 <StatusIcon color={resolveIconColor(status.text)} size={10} />
                 <Text className={cn('text-[9px] font-black uppercase tracking-wide', status.text)}>
@@ -217,24 +222,24 @@ export function BookingListScreen() {
                 </Text>
               </View>
             </View>
-            <Text className="text-white text-sm" weight="700">
+            <Text className="text-slate-900 dark:text-white text-sm" weight="700">
               {formattedAmount}
             </Text>
           </View>
 
           {/* Row 2: Tên chi nhánh + ngày giờ + mode */}
           <View className="space-y-2">
-            <Text className="text-white text-[15px]" weight="600">
+            <Text className="text-slate-900 dark:text-white text-[15px]" weight="600">
               {item.cafe?.name ?? 'RCField Platform Branch'}
             </Text>
             <View className="flex-row flex-wrap items-center gap-y-1 gap-x-3.5">
               <View className="flex-row items-center gap-1">
                 <Calendar color="#94a3b8" size={13} />
-                <Text className="text-slate-400 text-xs font-semibold">{dateLabel}</Text>
+                <Text className="text-slate-500 dark:text-slate-400 text-xs font-semibold">{dateLabel}</Text>
               </View>
               <View className="flex-row items-center gap-1">
                 <Clock color="#94a3b8" size={13} />
-                <Text className="text-slate-400 text-xs font-semibold">{timeLabel}</Text>
+                <Text className="text-slate-500 dark:text-slate-400 text-xs font-semibold">{timeLabel}</Text>
               </View>
               <View
                 className={cn(
@@ -279,20 +284,46 @@ export function BookingListScreen() {
     );
   };
 
+  if (!isAuthenticated) {
+    return (
+      <SafeAreaView className="flex-grow flex-1 bg-[#f8fafc] dark:bg-[#0b0f19] justify-center items-center px-8" edges={['top', 'left', 'right']}>
+        {/* Background Glows */}
+        <View className="absolute -top-20 -right-20 w-80 h-80 rounded-full bg-[#f97316]/5 blur-3xl pointer-events-none" />
+        <View className="absolute bottom-10 -left-20 w-80 h-80 rounded-full bg-[#6366f1]/5 blur-3xl pointer-events-none" />
+
+        <View className="size-16 rounded-full bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 justify-center items-center mb-4">
+          <Calendar color="#f97316" size={28} />
+        </View>
+        <Text className="text-slate-900 dark:text-white text-lg font-bold text-center">
+          Yêu cầu đăng nhập
+        </Text>
+        <Text className="mt-2 text-slate-500 dark:text-slate-400 text-sm text-center leading-5 font-semibold max-w-xs mb-6">
+          Vui lòng đăng nhập để xem lịch sử và quản lý danh sách đặt lịch sân chơi của bạn.
+        </Text>
+        <Pressable
+          className="w-full h-11 items-center justify-center rounded-xl bg-[#ea580c] active:bg-[#f97316] shadow-md"
+          onPress={() => router.push('/(auth)/login')}
+        >
+          <Text className="text-white text-sm font-bold">Đăng nhập ngay</Text>
+        </Pressable>
+      </SafeAreaView>
+    );
+  }
+
   return (
-    <SafeAreaView className="flex-1 bg-[#0b0f19]" edges={['top', 'left', 'right']}>
+    <SafeAreaView className="flex-grow flex-1 bg-[#f8fafc] dark:bg-[#0b0f19]" edges={['top', 'left', 'right']}>
       {/* Background Lights */}
-      <View className="absolute -top-20 -right-20 w-80 h-80 rounded-full bg-[#f97316]/5 blur-3xl pointer-events-none" />
-      <View className="absolute bottom-10 -left-20 w-80 h-80 rounded-full bg-[#6366f1]/5 blur-3xl pointer-events-none" />
+      <View className="absolute -top-20 -right-20 w-80 h-80 rounded-full bg-[#f97316]/5 blur-3xl pointer-events-none opacity-30 dark:opacity-100" />
+      <View className="absolute bottom-10 -left-20 w-80 h-80 rounded-full bg-[#6366f1]/5 blur-3xl pointer-events-none opacity-30 dark:opacity-100" />
 
       {/* Header */}
       <View className="px-5 pt-3 pb-4">
         <View className="flex-row items-start justify-between gap-3">
           <View className="flex-1">
-            <Text className="text-white text-3xl" variant="title" weight="700">
+            <Text className="text-slate-900 dark:text-white text-3xl" variant="title" weight="700">
               Lịch sử đặt sân
             </Text>
-            <Text className="mt-1 text-[13px] text-slate-400 font-semibold">
+            <Text className="mt-1 text-[13px] text-slate-500 dark:text-slate-400 font-semibold">
               Quản lý và xem tiến trình các lượt chơi của bạn.
             </Text>
           </View>
@@ -302,7 +333,6 @@ export function BookingListScreen() {
 
 
       {/* Tab Filter — ScrollView ngang chứa đủ 6 category */}
-      {/* flexShrink:0 quan trọng: ngăn FlatList phía dưới đẩy co tab bar khi có nhiều item */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -337,14 +367,14 @@ export function BookingListScreen() {
                 },
                 isActive
                   ? { backgroundColor: tab.activeBg, borderColor: tab.activeBorderColor }
-                  : { backgroundColor: 'rgba(15,23,42,0.6)', borderColor: '#1e293b' },
+                  : { backgroundColor: colorScheme === 'dark' ? 'rgba(15,23,42,0.6)' : '#ffffff', borderColor: colorScheme === 'dark' ? '#1e293b' : '#cbd5e1' },
               ]}
             >
               <Text
                 style={{
                   fontSize: 12,
                   fontWeight: '700',
-                  color: isActive ? tab.activeTextColor : '#94a3b8',
+                  color: isActive ? tab.activeTextColor : (colorScheme === 'dark' ? '#94a3b8' : '#64748b'),
                 }}
                 numberOfLines={1}
               >
@@ -360,14 +390,14 @@ export function BookingListScreen() {
                     alignItems: 'center',
                     justifyContent: 'center',
                     paddingHorizontal: 4,
-                    backgroundColor: isActive ? tab.activeBadgeBg : '#1e293b',
+                    backgroundColor: isActive ? tab.activeBadgeBg : (colorScheme === 'dark' ? '#1e293b' : '#cbd5e1'),
                   }}
                 >
                   <Text
                     style={{
                       fontSize: 10,
                       fontWeight: '900',
-                      color: isActive ? tab.activeTextColor : '#94a3b8',
+                      color: isActive ? tab.activeTextColor : (colorScheme === 'dark' ? '#94a3b8' : '#64748b'),
                     }}
                   >
                     {count}
@@ -384,7 +414,7 @@ export function BookingListScreen() {
       {loading ? (
         <View className="flex-1 justify-center items-center">
           <ActivityIndicator color="#ea580c" size="large" />
-          <Text className="mt-3 text-slate-400 text-xs font-semibold">
+          <Text className="mt-3 text-slate-555 dark:text-slate-400 text-xs font-semibold">
             Đang tải lịch sử đặt sân...
           </Text>
         </View>
@@ -405,13 +435,13 @@ export function BookingListScreen() {
           }
           ListEmptyComponent={
             <View className="flex-1 justify-center items-center px-8 py-20 mt-10">
-              <View className="size-16 rounded-full bg-slate-900 border border-slate-800 justify-center items-center mb-4">
-                <HelpCircle color="#475569" size={28} />
+              <View className="size-16 rounded-full bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 justify-center items-center mb-4">
+                <HelpCircle color="#94a3b8" size={28} />
               </View>
-              <Text className="text-white text-base font-bold text-center">
+              <Text className="text-slate-900 dark:text-white text-base font-bold text-center">
                 Không tìm thấy lịch đặt nào
               </Text>
-              <Text className="mt-1.5 text-slate-400 text-xs text-center leading-4 font-semibold max-w-xs">
+              <Text className="mt-1.5 text-slate-500 dark:text-slate-400 text-xs text-center leading-4 font-semibold max-w-xs">
                 {activeTab === 'ALL'
                   ? 'Bạn chưa có đơn đặt sân nào. Hãy đặt lịch chơi ngay!'
                   : `Bạn không có đơn đặt nào ở trạng thái "${TAB_CONFIG.find((t) => t.key === activeTab)?.label}".`}

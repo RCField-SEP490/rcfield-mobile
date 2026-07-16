@@ -58,7 +58,7 @@ export function NotificationBellButton({
   return (
     <Pressable
       className={cn(
-        'relative items-center justify-center border border-slate-800 bg-[#0f172a]/80 active:bg-slate-900',
+        'relative items-center justify-center border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/80 active:bg-slate-50 dark:active:bg-slate-900',
         sizeClassName[size],
         className,
       )}
