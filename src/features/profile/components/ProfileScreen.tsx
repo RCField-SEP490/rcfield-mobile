@@ -53,6 +53,11 @@ export function ProfileScreen() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   // Hooks được gọi không điều kiện ở đây
+  const [isDarkMode, setIsDarkMode] = useState(colorScheme === 'dark');
+
+  useEffect(() => {
+    setIsDarkMode(colorScheme === 'dark');
+  }, [colorScheme]);
 
   const displayName = user?.fullName ?? user?.email ?? 'RCField User';
   const email = user?.email ?? 'user@rcfield.vn';
@@ -841,11 +846,14 @@ export function ProfileScreen() {
                 </Text>
               </View>
               <Switch
-                value={colorScheme === 'dark'}
-                onValueChange={async (val) => {
-                  const nextTheme = val ? 'dark' : 'light';
-                  setColorScheme(nextTheme);
-                  await SecureStore.setItemAsync('rcfield_theme', nextTheme);
+                value={isDarkMode}
+                onValueChange={(val) => {
+                  setIsDarkMode(val);
+                  setTimeout(async () => {
+                    const nextTheme = val ? 'dark' : 'light';
+                    setColorScheme(nextTheme);
+                    await SecureStore.setItemAsync('rcfield_theme', nextTheme);
+                  }, 100);
                 }}
                 trackColor={{ false: '#cbd5e1', true: '#ea580c' }}
                 thumbColor="#ffffff"
