@@ -6,6 +6,7 @@ import {
   Gamepad2,
   AlertTriangle,
   RotateCcw,
+  Heart,
 } from 'lucide-react-native';
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import {
@@ -327,7 +328,15 @@ export function BookingListScreen() {
               Quản lý và xem tiến trình các lượt chơi của bạn.
             </Text>
           </View>
-          <NotificationBellButton size="md" />
+          <View className="flex-row items-center gap-2">
+            <Pressable
+              className="relative items-center justify-center border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/80 active:bg-slate-50 dark:active:bg-slate-900 size-11 rounded-2xl"
+              onPress={() => router.push('/favorites')}
+            >
+              <Heart color="#ef4444" fill="#ef4444" size={20} />
+            </Pressable>
+            <NotificationBellButton size="md" />
+          </View>
         </View>
       </View>
 

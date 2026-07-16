@@ -18,6 +18,7 @@ import { favoriteApi, favoriteLocal } from '../api/favorite.api';
 import type { Cafe } from '../types/explore.types';
 import { useLocation } from '@/shared/hooks/useLocation';
 import { useAuthStore } from '@/shared/store/auth-store';
+import { NotificationBellButton } from '@/features/notifications/components/NotificationBellButton';
 import { Text } from '@/shared/ui/Text';
 
 // Hàm tính khoảng cách Haversine (km)
@@ -291,23 +292,26 @@ export function ExploreScreen() {
             </Text>
           </View>
 
-          <Pressable
-            className="relative size-11 items-center justify-center rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/80 active:bg-slate-100 dark:active:bg-slate-900"
-            onPress={() => router.push('/favorites' as any)}
-          >
-            <Heart
-              color={favoriteCount > 0 ? '#ef4444' : '#94a3b8'}
-              fill={favoriteCount > 0 ? '#ef4444' : 'transparent'}
-              size={20}
-            />
-            {favoriteCount > 0 ? (
-              <View className="absolute -right-1 -top-1 min-w-5 rounded-full border-2 border-[#0b0f19] bg-red-500 px-1.5 py-0.5">
-                <Text className="text-center text-[9px] font-black text-white">
-                  {favoriteCount > 9 ? '9+' : favoriteCount}
-                </Text>
-              </View>
-            ) : null}
-          </Pressable>
+          <View className="flex-row items-center gap-2">
+            <Pressable
+              className="relative size-11 items-center justify-center rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/80 active:bg-slate-100 dark:active:bg-slate-900"
+              onPress={() => router.push('/favorites' as any)}
+            >
+              <Heart
+                color={favoriteCount > 0 ? '#ef4444' : '#94a3b8'}
+                fill={favoriteCount > 0 ? '#ef4444' : 'transparent'}
+                size={20}
+              />
+              {favoriteCount > 0 ? (
+                <View className="absolute -right-1 -top-1 min-w-5 rounded-full border-2 border-[#0b0f19] bg-red-500 px-1.5 py-0.5">
+                  <Text className="text-center text-[9px] font-black text-white">
+                    {favoriteCount > 9 ? '9+' : favoriteCount}
+                  </Text>
+                </View>
+              ) : null}
+            </Pressable>
+            {isAuthenticated && <NotificationBellButton size="md" />}
+          </View>
         </View>
       </View>
 

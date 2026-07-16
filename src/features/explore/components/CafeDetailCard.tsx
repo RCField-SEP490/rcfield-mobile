@@ -1,6 +1,7 @@
 import { Alert, Image, Linking, Pressable, View } from 'react-native';
 import { MapPin, Star, Route, X, Calendar } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { useColorScheme } from 'nativewind';
 import type { Cafe, UserLocation } from '../types/explore.types';
 import { Text } from '@/shared/ui/Text';
 
@@ -27,6 +28,7 @@ function getHaversineDistance(lat1: number, lon1: number, lat2: number, lon2: nu
 
 export function CafeDetailCard({ cafe, userLocation, onClose }: CafeDetailCardProps) {
   const router = useRouter();
+  const { colorScheme } = useColorScheme();
 
   const distance =
     userLocation && cafe.latitude && cafe.longitude

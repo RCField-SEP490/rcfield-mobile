@@ -389,6 +389,15 @@ export function LoginScreen() {
                   </Text>
                 </Pressable>
               </View>
+
+              {/* Link to Guest Mode */}
+              <View className="flex-row justify-center mt-2">
+                <Pressable onPress={() => router.replace('/(tabs)')} className="py-1.5 px-4 rounded-xl border border-dashed border-[#f97316]/30 active:bg-[#f97316]/5">
+                  <Text className="text-[12.5px] text-[#f97316] font-bold">
+                    Hoặc tiếp tục với tư cách khách
+                  </Text>
+                </Pressable>
+              </View>
             </View>
           </View>
         </ScrollView>
