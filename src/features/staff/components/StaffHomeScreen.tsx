@@ -150,15 +150,15 @@ export function StaffHomeScreen() {
 
   if (!assignedCafeId) {
     return (
-      <SafeAreaView className="flex-1 bg-[#0b0f19] px-5" edges={['top', 'left', 'right']}>
+      <SafeAreaView className="flex-1 bg-[#f8fafc] dark:bg-[#0b0f19] px-5" edges={['top', 'left', 'right']}>
         <View className="flex-1 items-center justify-center">
           <View className="mb-4 h-14 w-14 items-center justify-center rounded-2xl border border-amber-500/20 bg-amber-500/10">
             <QrCode color="#f59e0b" size={28} />
           </View>
-          <Text className="text-center text-[17px] text-white" weight="700">
+          <Text className="text-center text-[17px] text-slate-900 dark:text-white" weight="700">
             Chưa được gán chi nhánh
           </Text>
-          <Text className="mt-2 text-center text-[12px] leading-5 text-slate-400">
+          <Text className="mt-2 text-center text-[12px] leading-5 text-slate-500 dark:text-slate-400">
             Tài khoản staff cần được provider phân công vào một RC Cafe trước khi trực ca.
           </Text>
         </View>
@@ -167,7 +167,7 @@ export function StaffHomeScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-[#0b0f19]" edges={['top', 'left', 'right']}>
+    <SafeAreaView className="flex-1 bg-[#f8fafc] dark:bg-[#0b0f19]" edges={['top', 'left', 'right']}>
       {loading ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#f97316" />
@@ -187,16 +187,16 @@ export function StaffHomeScreen() {
         >
           <View className="mb-5 flex-row items-center justify-between">
             <View>
-              <Text className="text-[12px] uppercase tracking-wider text-slate-500" weight="700">
+              <Text className="text-[12px] uppercase tracking-wider text-slate-500 dark:text-slate-400" weight="700">
                 Trực ca mobile
               </Text>
-              <Text className="mt-1 text-[22px] text-white" weight="700">
+              <Text className="mt-1 text-[22px] text-slate-900 dark:text-white" weight="700">
                 {user?.fullName ?? 'Nhân viên'}
               </Text>
             </View>
             <Pressable
               onPress={() => loadData(true)}
-              className="h-10 w-10 items-center justify-center rounded-xl border border-slate-800 bg-[#0f172a]"
+              className="h-10 w-10 items-center justify-center rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a] active:bg-slate-100 dark:active:bg-slate-900"
             >
               <RotateCcw color="#f97316" size={18} />
             </Pressable>
@@ -209,10 +209,10 @@ export function StaffHomeScreen() {
             <StatCard label="F&B chờ" value={stats.pendingFnb} Icon={Coffee} />
           </View>
 
-          <View className="mb-6 rounded-2xl border border-slate-800 bg-[#0f172a]/70 p-4">
+          <View className="mb-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/70 p-4 shadow-sm">
             <View className="mb-3 flex-row items-center gap-2">
               <QrCode color="#f97316" size={18} />
-              <Text className="text-[14px] text-white" weight="700">
+              <Text className="text-[14px] text-slate-900 dark:text-white" weight="700">
                 Check-in bằng mã đặt lịch
               </Text>
             </View>
@@ -222,8 +222,8 @@ export function StaffHomeScreen() {
                 onChangeText={setScanCode}
                 autoCapitalize="characters"
                 placeholder="Nhập shortcode hoặc booking ID"
-                placeholderTextColor="#64748b"
-                className="h-11 flex-1 rounded-xl border border-slate-800 bg-[#0b0f19] px-3 text-[13px] text-white"
+                placeholderTextColor="#94a3b8"
+                className="h-11 flex-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0b0f19] px-3 text-[13px] text-slate-900 dark:text-white"
               />
               <Pressable
                 onPress={handleScanSubmit}
@@ -237,11 +237,11 @@ export function StaffHomeScreen() {
           </View>
 
           <View className="mb-3 flex-row items-center justify-between">
-            <Text className="text-[13px] uppercase tracking-wider text-slate-400" weight="700">
+            <Text className="text-[13px] uppercase tracking-wider text-slate-500 dark:text-slate-400" weight="700">
               Lịch gần nhất
             </Text>
             <Pressable onPress={() => requestMainTab(1)}>
-              <Text className="text-[12px] text-[#f97316]" weight="700">
+              <Text className="text-[12px] text-[#f97316] font-bold">
                 Xem tất cả
               </Text>
             </Pressable>
@@ -257,11 +257,11 @@ export function StaffHomeScreen() {
               />
             ))}
             {bookings.length === 0 && (
-              <View className="rounded-2xl border border-dashed border-slate-800 bg-[#0f172a]/40 p-5">
-                <Text className="text-center text-[13px] text-slate-300" weight="700">
+              <View className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/40 p-5">
+                <Text className="text-center text-[13px] text-slate-800 dark:text-slate-300" weight="700">
                   Hôm nay chưa có lịch
                 </Text>
-                <Text className="mt-1 text-center text-[11px] text-slate-500">
+                <Text className="mt-1 text-center text-[11px] text-slate-500 dark:text-slate-400">
                   Khi có khách đặt sân hoặc walk-in, lịch sẽ hiển thị tại đây.
                 </Text>
               </View>
@@ -283,14 +283,14 @@ function StatCard({
   value: number;
 }) {
   return (
-    <View className="w-[47%] rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-4">
+    <View className="w-[47%] rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-4 shadow-sm">
       <View className="mb-3 h-9 w-9 items-center justify-center rounded-xl border border-orange-500/20 bg-orange-500/10">
         <Icon color="#f97316" size={18} />
       </View>
-      <Text className="text-[20px] text-white" weight="700">
+      <Text className="text-[20px] text-slate-900 dark:text-white" weight="700">
         {value}
       </Text>
-      <Text className="mt-1 text-[11px] text-slate-400">{label}</Text>
+      <Text className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{label}</Text>
     </View>
   );
 }
@@ -310,23 +310,23 @@ function BookingRow({
   return (
     <Pressable
       onPress={onPress}
-      className="rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-4 active:bg-slate-900"
+      className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-4 active:bg-slate-50 dark:active:bg-slate-900 shadow-sm"
     >
       <View className="flex-row items-start justify-between gap-3">
         <View className="flex-1">
-          <Text className="text-[14px] text-white" weight="700" numberOfLines={1}>
+          <Text className="text-[14px] text-slate-900 dark:text-white" weight="700" numberOfLines={1}>
             {customer}
           </Text>
-          <Text className="mt-1 text-[11px] text-slate-400" numberOfLines={1}>
+          <Text className="mt-1 text-[11px] text-slate-500 dark:text-slate-400" numberOfLines={1}>
             #{booking.shortCode || shortId(booking.bookingId)} • {booking.trackName || booking.trackType}
           </Text>
-          <Text className="mt-1 text-[11px] text-slate-500">
+          <Text className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
             {formatTime(booking.slotStart)} - {formatTime(booking.slotEnd)} • {booking.playMode}
           </Text>
         </View>
         <View className="items-end">
           <View className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-2 py-1">
-            <Text className="text-[9px] uppercase text-emerald-400" weight="700">
+            <Text className="text-[9px] uppercase text-emerald-600 dark:text-emerald-400" weight="700">
               {sessionId ? 'Đã check-in' : booking.status}
             </Text>
           </View>
@@ -345,3 +345,5 @@ function BookingRow({
     </Pressable>
   );
 }
+
+

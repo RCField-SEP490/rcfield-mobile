@@ -280,7 +280,7 @@ export function StaffSessionTools({
                   className={`min-w-[31%] flex-1 rounded-xl border p-3 ${
                     option.available && canProposeExtension
                       ? 'border-orange-500/30 bg-orange-500/10'
-                      : 'border-slate-800 bg-slate-950 opacity-60'
+                      : 'border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-950 opacity-60'
                   }`}
                 >
                   <Text className="text-center text-[13px] text-[#fb923c]" weight="700">
@@ -289,7 +289,7 @@ export function StaffSessionTools({
                   <Text className="mt-1 text-center text-[10px] text-slate-500">
                     {option.available ? `→ ${formatTime(option.newPlannedEnd)}` : 'Không khả dụng'}
                   </Text>
-                  <Text className="mt-1 text-center text-[10px] text-white" weight="700">
+                  <Text className="mt-1 text-center text-[10px] text-slate-900 dark:text-white" weight="700">
                     {option.blockedReason || formatCurrency(option.additionalFee)}
                   </Text>
                 </Pressable>
@@ -325,10 +325,10 @@ export function StaffSessionTools({
                       key={item.id}
                       onPress={() => setSelectedMenuItemId(item.id)}
                       className={`w-36 overflow-hidden rounded-xl border ${
-                        active ? 'border-orange-500 bg-orange-500/10' : 'border-slate-800 bg-slate-950'
+                        active ? 'border-orange-500 bg-orange-500/10' : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950'
                       }`}
                     >
-                      <View className="h-20 bg-[#0b0f19]">
+                      <View className="h-20 bg-slate-100 dark:bg-[#0b0f19]">
                         {imageUrl ? (
                           <Image source={{ uri: imageUrl }} className="h-full w-full" resizeMode="cover" />
                         ) : (
@@ -338,7 +338,7 @@ export function StaffSessionTools({
                         )}
                       </View>
                       <View className="p-2">
-                        <Text className="text-[11px] text-white" weight="700" numberOfLines={1}>
+                        <Text className="text-[11px] text-slate-900 dark:text-white" weight="700" numberOfLines={1}>
                           {item.name}
                         </Text>
                         <Text className="mt-1 text-[10px] text-[#fb923c]" weight="700">
@@ -355,7 +355,7 @@ export function StaffSessionTools({
                 value={qtyText}
                 onChangeText={(value) => setQtyText(value.replace(/[^\d]/g, ''))}
                 keyboardType="number-pad"
-                className="h-11 w-20 rounded-xl border border-slate-800 bg-slate-950 px-3 text-center text-[13px] text-white"
+                className="h-11 w-20 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-3 text-center text-[13px] text-slate-900 dark:text-white"
               />
               <Pressable
                 disabled={submitting === 'fnb'}
@@ -397,12 +397,12 @@ export function StaffSessionTools({
                       key={vehicle.vehicleId}
                       onPress={() => setSelectedOldVehicleId(vehicle.vehicleId)}
                       className={`flex-row items-center gap-3 rounded-xl border p-3 ${
-                        active ? 'border-orange-500 bg-orange-500/10' : 'border-slate-800 bg-slate-950'
+                        active ? 'border-orange-500 bg-orange-500/10' : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950'
                       }`}
                     >
                       <Car color={active ? '#fb923c' : '#64748b'} size={16} />
                       <View className="flex-1">
-                        <Text className="text-[12px] text-white" weight="700" numberOfLines={1}>
+                        <Text className="text-[12px] text-slate-900 dark:text-white" weight="700" numberOfLines={1}>
                           {vehicle.name}
                         </Text>
                         <Text className="mt-0.5 text-[10px] text-slate-500">ID {shortId(vehicle.vehicleId)}</Text>
@@ -414,10 +414,10 @@ export function StaffSessionTools({
               </View>
             </View>
 
-            <View className="rounded-xl border border-slate-800 bg-slate-950 p-3">
+            <View className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-3">
               <View className="flex-row items-center justify-between gap-3">
                 <View className="flex-1">
-                  <Text className="text-[12px] text-white" weight="700">
+                  <Text className="text-[12px] text-slate-900 dark:text-white" weight="700">
                     Xe cũ cần bảo trì
                   </Text>
                   <Text className="mt-1 text-[10px] text-slate-500">
@@ -451,10 +451,10 @@ export function StaffSessionTools({
                           key={vehicle.id}
                           onPress={() => setSelectedReplacementId(vehicle.id)}
                           className={`w-40 rounded-xl border p-3 ${
-                            active ? 'border-orange-500 bg-orange-500/10' : 'border-slate-800 bg-slate-950'
+                            active ? 'border-orange-500 bg-orange-500/10' : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950'
                           }`}
                         >
-                          <Text className="text-[12px] text-white" weight="700" numberOfLines={1}>
+                          <Text className="text-[12px] text-slate-900 dark:text-white" weight="700" numberOfLines={1}>
                             {getUnitName(vehicle)}
                           </Text>
                           <Text className="mt-1 text-[10px] text-slate-500" numberOfLines={1}>
@@ -504,14 +504,14 @@ function ToolCard({
   children: ReactNode;
 }) {
   return (
-    <View className="rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-4">
+    <View className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-4 shadow-sm">
       <View className="mb-3 flex-row items-center justify-between gap-3">
         <View className="flex-row items-center gap-2">
           <View className="h-9 w-9 items-center justify-center rounded-xl border border-orange-500/20 bg-orange-500/10">
             {icon}
           </View>
           <View>
-            <Text className="text-[13px] text-white" weight="700">
+            <Text className="text-[13px] text-slate-900 dark:text-white" weight="700">
               {title}
             </Text>
             <Text className="mt-1 text-[10px] text-slate-500">{subtitle}</Text>
@@ -526,7 +526,7 @@ function ToolCard({
 
 function EmptyInline({ text }: { text: string }) {
   return (
-    <View className="rounded-xl border border-dashed border-slate-800 bg-slate-950 p-3">
+    <View className="rounded-xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-3">
       <Text className="text-center text-[11px] text-slate-500">{text}</Text>
     </View>
   );

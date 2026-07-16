@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
   Pressable,
   ScrollView,
@@ -14,7 +13,6 @@ import {
   MapPin,
   CalendarDays,
   Package as PackageIcon,
-  Car,
   ArrowRight,
   Star,
   Clock,
@@ -275,66 +273,6 @@ export function HomeScreen() {
             )}
           </View>
 
-          {/* Hero Promo Banner */}
-          <Pressable
-            onPress={handleNavigateToExplore}
-            className="mb-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/70 p-5 shadow-lg overflow-hidden"
-          >
-            {/* Background overlay glow */}
-            <View className="absolute -top-12 -right-12 w-28 h-28 rounded-full bg-[#f97316]/5 blur-xl pointer-events-none" />
-
-            <View className="flex-row gap-4">
-              {/* Cột trái: Nội dung chữ */}
-              <View className="flex-1 pr-1">
-                <View className="rounded-lg bg-[#ea580c]/10 border border-[#ea580c]/20 px-2 py-0.5 self-start mb-2.5">
-                  <Text className="text-[8px] text-[#f97316] font-bold uppercase tracking-wider">
-                    Nền tảng đặt lịch RC tại Việt Nam
-                  </Text>
-                </View>
-
-                <Text className="text-[17px] text-slate-900 dark:text-white leading-6.5" weight="700">
-                  Chạy RC <Text className="text-[#f97316]">đúng sân</Text>,{'\n'}đúng giờ, không lo cọc.
-                </Text>
-                
-                <Text className="text-[10px] text-slate-600 dark:text-slate-400 mt-2 leading-4 font-semibold">
-                  Tìm RC Cafe gần bạn, thuê xe và thanh toán cọc online trong vài phút.
-                </Text>
-
-                <View className="flex-row items-center gap-1.5 mt-3.5">
-                  <Text className="text-[11px] text-[#f97316]" weight="700">
-                    Khám phá ngay
-                  </Text>
-                  <ArrowRight color="#f97316" size={12} />
-                </View>
-              </View>
-
-              {/* Cột phải: Hình ảnh minh hoạ xe RC đỏ */}
-              <View className="justify-center items-center">
-                <Image
-                  source={{ uri: 'https://images.unsplash.com/photo-1594787318286-3d835c1d207f?q=80&w=250&auto=format&fit=crop' }}
-                  className="h-24 w-24 rounded-2xl border border-slate-200 dark:border-slate-800"
-                  style={{ transform: [{ rotate: '-6deg' }] }}
-                />
-              </View>
-            </View>
-
-            {/* Stats chân banner */}
-            <View className="h-[1px] bg-slate-200 dark:bg-slate-800/80 my-4" />
-            <View className="flex-row justify-between items-center px-1">
-              <View className="items-center">
-                <Text className="text-[13px] text-slate-900 dark:text-white" weight="700">50+</Text>
-                <Text className="text-[9px] text-slate-500 dark:text-slate-400 font-semibold mt-0.5">RC Cafe</Text>
-              </View>
-              <View className="items-center">
-                <Text className="text-[13px] text-slate-900 dark:text-white" weight="700">12k+</Text>
-                <Text className="text-[9px] text-slate-500 dark:text-slate-400 font-semibold mt-0.5">Phiên chơi</Text>
-              </View>
-              <View className="items-center">
-                <Text className="text-[13px] text-slate-900 dark:text-white" weight="700">4.8★</Text>
-                <Text className="text-[9px] text-slate-500 dark:text-slate-400 font-semibold mt-0.5">Đánh giá TB</Text>
-              </View>
-            </View>
-          </Pressable>
 
           {/* Quick Actions Grid */}
           <View className="flex-row gap-3 mb-6">
@@ -371,22 +309,6 @@ export function HomeScreen() {
               </View>
               <Text className="text-[12px] text-slate-800 dark:text-slate-200" weight="700">
                 Gói chơi
-              </Text>
-            </Pressable>
-
-            <Pressable
-              onPress={() =>
-                handleActionWithAuth(() => {
-                  Alert.alert('Đội xe', 'Tính năng Xe của tôi (BYOC) đang được nâng cấp.');
-                }, 'Đội xe')
-              }
-              className="flex-1 flex-col items-center gap-2 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/50 py-3.5 shadow-sm active:bg-slate-100 dark:active:bg-slate-900/50"
-            >
-              <View className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-600/10 border border-sky-500/20">
-                <Car color="#0ea5e9" size={20} />
-              </View>
-              <Text className="text-[12px] text-slate-800 dark:text-slate-200" weight="700">
-                Đội xe
               </Text>
             </Pressable>
           </View>

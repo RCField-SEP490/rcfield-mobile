@@ -70,34 +70,34 @@ export function CafeDetailCard({ cafe, userLocation, onClose }: CafeDetailCardPr
   return (
     <View
       style={{ zIndex: 99, elevation: 5 }}
-      className="absolute bottom-6 left-4 right-4 rounded-2xl border border-slate-800 bg-[#0f172a]/95 p-4 shadow-2xl backdrop-blur-md"
+      className="absolute bottom-6 left-4 right-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/95 p-4 shadow-2xl backdrop-blur-md"
     >
       {/* Nút đóng card */}
       <Pressable
         onPress={onClose}
-        className="absolute right-3 top-3 z-10 h-7 w-7 items-center justify-center rounded-full bg-slate-800/80 active:bg-slate-700"
+        className="absolute right-3 top-3 z-10 h-7 w-7 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800/80 active:bg-slate-200 dark:active:bg-slate-700"
       >
-        <X color="#94a3b8" size={16} />
+        <X color={colorScheme === 'dark' ? '#94a3b8' : '#64748b'} size={16} />
       </Pressable>
-
+ 
       <Pressable onPress={handleGoToDetail} className="flex-row gap-3.5">
         {/* Ảnh cơ sở */}
         <Image
           source={{ uri: cafe.image }}
-          className="h-20 w-20 rounded-xl object-cover bg-slate-900"
+          className="h-20 w-20 rounded-xl object-cover bg-slate-100 dark:bg-slate-900"
         />
-
+ 
         {/* Thông tin cơ sở */}
         <View className="flex-1 justify-between pr-4">
           <View>
-            <Text className="text-[15px] text-white" weight="700" numberOfLines={1}>
+            <Text className="text-[15px] text-slate-900 dark:text-white" weight="700" numberOfLines={1}>
               {cafe.name}
             </Text>
-            <Text className="mt-0.5 text-[12px] text-slate-400" numberOfLines={1}>
+            <Text className="mt-0.5 text-[12px] text-slate-500 dark:text-slate-400" numberOfLines={1}>
               {cafe.district}, {cafe.city}
             </Text>
           </View>
-
+ 
           <View className="flex-row items-center gap-3">
             {/* Đánh giá */}
             <View className="flex-row items-center gap-1">
@@ -106,7 +106,7 @@ export function CafeDetailCard({ cafe, userLocation, onClose }: CafeDetailCardPr
                 {cafe.rating > 0 ? cafe.rating.toFixed(1) : '5.0'}
               </Text>
             </View>
-
+ 
             {/* Khoảng cách */}
             {distance !== null ? (
               <View className="flex-row items-center gap-1">
@@ -117,26 +117,26 @@ export function CafeDetailCard({ cafe, userLocation, onClose }: CafeDetailCardPr
               </View>
             ) : null}
           </View>
-
+ 
           {/* Giá slot */}
           <Text className="text-[13px] text-[#f97316]" weight="700">
             {cafe.priceRange}
           </Text>
         </View>
       </Pressable>
-
+ 
       {/* Nút hành động */}
       <View className="mt-4 flex-row gap-2.5">
         <Pressable
           onPress={handleOpenGoogleMaps}
-          className="flex-1 flex-row h-10 items-center justify-center rounded-xl border border-blue-900/30 bg-blue-950/20 active:bg-blue-950/40 gap-1.5"
+          className="flex-1 flex-row h-10 items-center justify-center rounded-xl border border-blue-200 dark:border-blue-900/30 bg-blue-50 dark:bg-blue-950/20 active:bg-blue-100 dark:active:bg-blue-950/40 gap-1.5"
         >
-          <Route color="#3b82f6" size={16} />
-          <Text className="text-[13px] text-blue-400" weight="700">
+          <Route color={colorScheme === 'dark' ? '#3b82f6' : '#2563eb'} size={16} />
+          <Text className="text-[13px] text-blue-600 dark:text-blue-400" weight="700">
             Chỉ đường
           </Text>
         </Pressable>
-
+ 
         <Pressable
           onPress={handleBookNow}
           className="flex-1 flex-row h-10 items-center justify-center rounded-xl bg-[#ea580c] active:bg-[#f97316] gap-1.5"

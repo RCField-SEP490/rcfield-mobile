@@ -492,7 +492,7 @@ export function StaffInspectionFormScreen({
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-[#0b0f19]">
+      <SafeAreaView className="flex-1 items-center justify-center bg-[#f8fafc] dark:bg-[#0b0f19]">
         <ActivityIndicator size="large" color="#f97316" />
         <Text className="mt-3 text-[12px] text-slate-500">Đang tải thông tin kiểm xe...</Text>
       </SafeAreaView>
@@ -502,33 +502,33 @@ export function StaffInspectionFormScreen({
   const title = isCheckIn ? 'Biên bản nhận xe' : 'Biên bản trả xe';
 
   return (
-    <SafeAreaView className="flex-1 bg-[#0b0f19]" edges={['top', 'left', 'right']}>
+    <SafeAreaView className="flex-1 bg-[#f8fafc] dark:bg-[#0b0f19]" edges={['top', 'left', 'right']}>
       <KeyboardAvoidingView
         className="flex-1"
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View className="flex-row items-center gap-3 border-b border-slate-900 px-5 py-4">
+        <View className="flex-row items-center gap-3 border-b border-slate-200 dark:border-slate-900 px-5 py-4">
           <Pressable
             onPress={() => router.back()}
-            className="h-10 w-10 items-center justify-center rounded-xl border border-slate-800 bg-[#0f172a]"
+            className="h-10 w-10 items-center justify-center rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]"
           >
             <ArrowLeft color="#e2e8f0" size={19} />
           </Pressable>
           <View className="flex-1">
-            <Text className="text-[12px] uppercase tracking-wider text-slate-500" weight="700">
+            <Text className="text-[12px] uppercase tracking-wider text-slate-500 dark:text-slate-400" weight="700">
               Staff inspection
             </Text>
-            <Text className="mt-1 text-[19px] text-white" weight="700" numberOfLines={1}>
+            <Text className="mt-1 text-[19px] text-slate-900 dark:text-white" weight="700" numberOfLines={1}>
               {title}
             </Text>
           </View>
         </View>
 
         <ScrollView contentContainerClassName="px-5 py-5 pb-28" showsVerticalScrollIndicator={false}>
-          <View className="mb-5 rounded-2xl border border-slate-800 bg-[#0f172a]/70 p-4">
+          <View className="mb-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/70 p-4 shadow-sm">
             <View className="flex-row items-start justify-between gap-3">
               <View className="flex-1">
-                <Text className="text-[16px] text-white" weight="700">
+                <Text className="text-[16px] text-slate-900 dark:text-white" weight="700">
                   Phiên #{shortId(sessionId)}
                 </Text>
                 <Text className="mt-1 text-[11px] text-slate-500">
@@ -561,22 +561,22 @@ export function StaffInspectionFormScreen({
               <View className="gap-3">
                 {session.vehicles.map((vehicle) => (
                   <View
-                    key={vehicle.vehicleId}
-                    className="flex-row items-center gap-3 rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-3"
-                  >
-                    <View className="h-14 w-14 overflow-hidden rounded-xl border border-slate-800 bg-slate-950">
-                      {vehicle.imageUrl ? (
-                        <Image source={{ uri: vehicle.imageUrl }} className="h-full w-full" resizeMode="cover" />
-                      ) : (
-                        <View className="h-full w-full items-center justify-center">
-                          <Car color="#64748b" size={22} />
-                        </View>
-                      )}
-                    </View>
-                    <View className="flex-1">
-                      <Text className="text-[13px] text-white" weight="700" numberOfLines={1}>
-                        {vehicle.name || 'Xe trong phiên'}
-                      </Text>
+                  key={vehicle.vehicleId}
+                  className="flex-row items-center gap-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-3 shadow-sm"
+                >
+                  <View className="h-14 w-14 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-950">
+                    {vehicle.imageUrl ? (
+                      <Image source={{ uri: vehicle.imageUrl }} className="h-full w-full" resizeMode="cover" />
+                    ) : (
+                      <View className="h-full w-full items-center justify-center">
+                        <Car color="#64748b" size={22} />
+                      </View>
+                    )}
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-[13px] text-slate-900 dark:text-white" weight="700" numberOfLines={1}>
+                      {vehicle.name || 'Xe trong phiên'}
+                    </Text>
                       <Text className="mt-1 text-[11px] text-slate-500">{vehicle.type}</Text>
                     </View>
                   </View>
@@ -632,10 +632,10 @@ export function StaffInspectionFormScreen({
           </View>
 
           {type === 'CHECK_OUT' && !isByoc ? (
-            <View className="mb-5 rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-4">
+            <View className="mb-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-4 shadow-sm">
               <View className="mb-3 flex-row items-center justify-between gap-3">
                 <View className="flex-1">
-                  <Text className="text-[13px] text-white" weight="700">
+                  <Text className="text-[13px] text-slate-900 dark:text-white" weight="700">
                     Ghi nhận hư hỏng/phí phát sinh
                   </Text>
                   <Text className="mt-1 text-[11px] leading-4 text-slate-500">
@@ -652,27 +652,27 @@ export function StaffInspectionFormScreen({
 
               {damageFlagged ? (
                 <View className="gap-3">
-                  <TextInput
-                    value={damageDescription}
-                    onChangeText={setDamageDescription}
-                    multiline
-                    placeholder="Mô tả hư hỏng, vị trí, mức độ..."
-                    placeholderTextColor="#64748b"
-                    className="min-h-[92px] rounded-xl border border-slate-800 bg-slate-950 px-3 py-3 text-[12px] text-white"
-                    style={{ textAlignVertical: 'top' }}
-                  />
-                  <View className="rounded-xl border border-slate-800 bg-slate-950 p-3">
+                    <TextInput
+                      value={damageDescription}
+                      onChangeText={setDamageDescription}
+                      multiline
+                      placeholder="Mô tả hư hỏng, vị trí, mức độ..."
+                      placeholderTextColor="#64748b"
+                      className="min-h-[92px] rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 py-3 text-[12px] text-slate-900 dark:text-white"
+                      style={{ textAlignVertical: 'top' }}
+                    />
+                    <View className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-3">
                     <Text className="text-[10px] uppercase tracking-wider text-slate-500" weight="700">
                       Chi phí dự kiến
                     </Text>
-                    <TextInput
-                      value={estimatedCostText}
-                      onChangeText={(value) => setEstimatedCostText(value.replace(/[^\d]/g, ''))}
-                      keyboardType="number-pad"
-                      placeholder="0"
-                      placeholderTextColor="#475569"
-                      className="mt-2 h-11 rounded-lg border border-slate-800 bg-[#0b0f19] px-3 text-[15px] text-white"
-                    />
+                      <TextInput
+                        value={estimatedCostText}
+                        onChangeText={(value) => setEstimatedCostText(value.replace(/[^\d]/g, ''))}
+                        keyboardType="number-pad"
+                        placeholder="0"
+                        placeholderTextColor="#475569"
+                        className="mt-2 h-11 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0b0f19] px-3 text-[15px] text-slate-900 dark:text-white"
+                      />
                     <View className="mt-3 flex-row items-center justify-between gap-3">
                       <Text className="text-[11px] text-slate-500">Hệ số xe</Text>
                       <Text className="text-[12px] text-slate-200" weight="700">
@@ -698,7 +698,7 @@ export function StaffInspectionFormScreen({
             multiline
             placeholder="Ghi chú bổ sung cho biên bản..."
             placeholderTextColor="#64748b"
-            className="mb-5 min-h-[96px] rounded-2xl border border-slate-800 bg-[#0f172a]/60 px-4 py-3 text-[12px] text-white"
+            className="mb-5 min-h-[96px] rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 px-4 py-3 text-[12px] text-slate-900 dark:text-white"
             style={{ textAlignVertical: 'top' }}
           />
 
@@ -714,7 +714,7 @@ export function StaffInspectionFormScreen({
         </ScrollView>
 
         {!(isByoc && type === 'CHECK_OUT') ? (
-          <View className="border-t border-slate-900 bg-[#0b0f19] px-5 py-4">
+          <View className="border-t border-slate-200 dark:border-slate-900 bg-[#f8fafc] dark:bg-[#0b0f19] px-5 py-4">
             <Pressable
               disabled={submitting}
               onPress={handleSubmit}
@@ -760,10 +760,10 @@ function PhotoSlotCard({
   const hasPhoto = !!slot.uri || !!slot.url;
 
   return (
-    <View className="rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-4">
+    <View className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-4 shadow-sm">
       <View className="mb-3 flex-row items-center justify-between gap-3">
         <View>
-          <Text className="text-[13px] text-white" weight="700">
+          <Text className="text-[13px] text-slate-900 dark:text-white" weight="700">
             {slot.label}
           </Text>
           <Text className="mt-1 text-[10px] uppercase tracking-wider text-slate-500">{slot.angle}</Text>
@@ -778,7 +778,7 @@ function PhotoSlotCard({
         ) : null}
       </View>
 
-      <View className="aspect-[4/3] overflow-hidden rounded-xl border border-slate-800 bg-slate-950">
+      <View className="aspect-[4/3] overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-950">
         {hasPhoto ? (
           <View className="h-full w-full">
             <Image source={{ uri: slot.uri || slot.url }} className="h-full w-full" resizeMode="cover" />
