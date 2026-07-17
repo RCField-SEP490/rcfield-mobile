@@ -107,12 +107,12 @@ export function StaffFnbOrdersScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-[#0b0f19]" edges={['top', 'left', 'right']}>
-      <View className="border-b border-slate-900 px-5 py-4">
-        <Text className="text-[12px] uppercase tracking-wider text-slate-500" weight="700">
+    <SafeAreaView className="flex-1 bg-[#f8fafc] dark:bg-[#0b0f19]" edges={['top', 'left', 'right']}>
+      <View className="border-b border-slate-200 dark:border-slate-900 px-5 py-4">
+        <Text className="text-[12px] uppercase tracking-wider text-slate-500 dark:text-slate-400" weight="700">
           Staff
         </Text>
-        <Text className="mt-1 text-[22px] text-white" weight="700">
+        <Text className="mt-1 text-[22px] text-slate-900 dark:text-white" weight="700">
           Đơn F&B hôm nay
         </Text>
       </View>
@@ -130,10 +130,12 @@ export function StaffFnbOrdersScreen() {
                 key={filter.key}
                 onPress={() => setActiveFilter(filter.key)}
                 className={`rounded-xl border px-3 py-2 ${
-                  active ? 'border-orange-500 bg-orange-500/10' : 'border-slate-800 bg-[#0f172a]/60'
+                  active
+                    ? 'border-orange-500 bg-orange-500/10'
+                    : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60'
                 }`}
               >
-                <Text className={`text-[11px] ${active ? 'text-[#f97316]' : 'text-slate-400'}`} weight="700">
+                <Text className={`text-[11px] ${active ? 'text-[#f97316]' : 'text-slate-500 dark:text-slate-400'}`} weight="700">
                   {filter.label}
                 </Text>
               </Pressable>
@@ -167,8 +169,8 @@ export function StaffFnbOrdersScreen() {
             />
           )}
           ListEmptyComponent={
-            <View className="mt-10 rounded-2xl border border-dashed border-slate-800 bg-[#0f172a]/40 p-6">
-              <Text className="text-center text-[14px] text-slate-300" weight="700">
+            <View className="mt-10 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/40 p-6">
+              <Text className="text-center text-[14px] text-slate-800 dark:text-slate-300" weight="700">
                 Không có đơn F&B phù hợp
               </Text>
               <Text className="mt-1 text-center text-[11px] text-slate-500">
@@ -195,17 +197,17 @@ function FnbOrderCard({
   const StatusIcon = meta.Icon;
 
   return (
-    <View className="mb-4 rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-4">
+    <View className="mb-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-4 shadow-sm">
       <View className="mb-3 flex-row items-start justify-between gap-3">
         <View className="flex-1">
-          <Text className="text-[15px] text-white" weight="700" numberOfLines={1}>
+          <Text className="text-[15px] text-slate-900 dark:text-white" weight="700" numberOfLines={1}>
             {order.customerName || 'Khách hàng'}
           </Text>
           <Text className="mt-1 text-[11px] text-slate-500">
             #{shortId(order.bookingId)} • {formatTime(order.slotStart)}
           </Text>
         </View>
-        <View className="flex-row items-center gap-1 rounded-lg border border-slate-700 bg-slate-900 px-2 py-1">
+        <View className="flex-row items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-900 px-2 py-1">
           <StatusIcon color={meta.color} size={12} />
           <Text className="text-[9px] uppercase" weight="700" style={{ color: meta.color }}>
             {meta.label}
@@ -213,14 +215,14 @@ function FnbOrderCard({
         </View>
       </View>
 
-      <View className="rounded-xl border border-slate-800 bg-[#0b0f19] p-3">
+      <View className="rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-[#0b0f19] p-3">
         {order.items.map((item, index) => (
           <View
             key={`${order.id}-${item.name}-${index}`}
             className="mb-2 flex-row items-start justify-between gap-3 last:mb-0"
           >
             <View className="flex-1">
-              <Text className="text-[12px] text-slate-200" weight="700" numberOfLines={1}>
+              <Text className="text-[12px] text-slate-800 dark:text-slate-200" weight="700" numberOfLines={1}>
                 {item.quantity}x {item.name}
               </Text>
               {item.notes ? (
@@ -229,7 +231,7 @@ function FnbOrderCard({
                 </Text>
               ) : null}
             </View>
-            <Text className="text-[11px] text-slate-400" weight="700">
+            <Text className="text-[11px] text-slate-500 dark:text-slate-400" weight="700">
               {formatCurrency(item.subtotal)}
             </Text>
           </View>
@@ -239,7 +241,7 @@ function FnbOrderCard({
         ) : null}
       </View>
 
-      <View className="mt-4 flex-row items-center justify-between border-t border-slate-800 pt-3">
+      <View className="mt-4 flex-row items-center justify-between border-t border-slate-200 dark:border-slate-800 pt-3">
         <View className="flex-row items-center gap-2">
           <ReceiptText color="#f97316" size={15} />
           <Text className="text-[12px] text-[#f97316]" weight="700">
@@ -270,9 +272,9 @@ function OrderActions({
       <View className="flex-row items-center gap-2">
         <Pressable
           onPress={() => onUpdateStatus(order.id, 'CANCELLED')}
-          className="h-9 w-9 items-center justify-center rounded-xl border border-red-900/30 bg-red-950/20"
+          className="h-9 w-9 items-center justify-center rounded-xl border border-red-200 dark:border-red-900/30 bg-red-50 dark:bg-red-950/20"
         >
-          <XCircle color="#f87171" size={16} />
+          <XCircle color="#ef4444" size={16} />
         </Pressable>
         <Pressable
           onPress={() => onUpdateStatus(order.id, 'CONFIRMED')}

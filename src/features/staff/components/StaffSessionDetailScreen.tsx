@@ -164,19 +164,19 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-[#0b0f19]" edges={['top', 'left', 'right']}>
-      <View className="flex-row items-center gap-3 border-b border-slate-900 px-5 py-4">
+    <SafeAreaView className="flex-1 bg-[#f8fafc] dark:bg-[#0b0f19]" edges={['top', 'left', 'right']}>
+      <View className="flex-row items-center gap-3 border-b border-slate-200 dark:border-slate-900 px-5 py-4">
         <Pressable
           onPress={() => router.back()}
-          className="h-10 w-10 items-center justify-center rounded-xl border border-slate-800 bg-[#0f172a]"
+          className="h-10 w-10 items-center justify-center rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]"
         >
           <ArrowLeft color="#e2e8f0" size={19} />
         </Pressable>
         <View className="flex-1">
-          <Text className="text-[12px] uppercase tracking-wider text-slate-500" weight="700">
+          <Text className="text-[12px] uppercase tracking-wider text-slate-500 dark:text-slate-400" weight="700">
             Phiên chạy
           </Text>
-          <Text className="mt-1 text-[19px] text-white" weight="700" numberOfLines={1}>
+          <Text className="mt-1 text-[19px] text-slate-900 dark:text-white" weight="700" numberOfLines={1}>
             #{shortId(sessionId)}
           </Text>
         </View>
@@ -188,7 +188,7 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
         </View>
       ) : !session ? (
         <View className="flex-1 items-center justify-center px-5">
-          <Text className="text-center text-[15px] text-white" weight="700">
+          <Text className="text-center text-[15px] text-slate-900 dark:text-white" weight="700">
             Không tìm thấy phiên
           </Text>
           <Text className="mt-1 text-center text-[12px] text-slate-500">
@@ -208,17 +208,17 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
           }
           showsVerticalScrollIndicator={false}
         >
-          <View className="mb-5 rounded-2xl border border-slate-800 bg-[#0f172a]/70 p-4">
+          <View className="mb-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/70 p-4 shadow-sm">
             <View className="mb-4 flex-row items-start justify-between gap-3">
               <View className="flex-1">
-                <Text className="text-[16px] text-white" weight="700">
+                <Text className="text-[16px] text-slate-900 dark:text-white" weight="700">
                   Booking #{shortId(session.bookingId)}
                 </Text>
                 <Text className="mt-1 text-[11px] text-slate-500">
                   Staff: {session.staffName || 'Nhân viên trực ca'}
                 </Text>
               </View>
-              <View className="rounded-lg border border-slate-700 bg-slate-900 px-2 py-1">
+              <View className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-900 px-2 py-1">
                 <Text
                   className="text-[9px] uppercase"
                   weight="700"
@@ -237,7 +237,7 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
               ) : null}
             </View>
 
-            <View className="mt-4 flex-row flex-wrap gap-3 border-t border-slate-800 pt-4">
+            <View className="mt-4 flex-row flex-wrap gap-3 border-t border-slate-200 dark:border-slate-800 pt-4">
               <Metric label="Người chơi" value={session.participants?.length || 0} Icon={UserRound} />
               <Metric label="Xe" value={session.vehicles?.length || 0} Icon={Car} />
               <Metric label="Kiểm tra" value={session.inspections?.length || 0} Icon={ShieldCheck} />
@@ -274,9 +274,9 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
             {session.vehicles?.map((vehicle) => (
               <View
                 key={vehicle.vehicleId}
-                className="flex-row items-center gap-3 rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-3"
+                className="flex-row items-center gap-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-3 shadow-sm"
               >
-                <View className="h-14 w-14 overflow-hidden rounded-xl border border-slate-800 bg-slate-950">
+                <View className="h-14 w-14 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-950">
                   {vehicle.imageUrl ? (
                     <Image source={{ uri: vehicle.imageUrl }} className="h-full w-full" resizeMode="cover" />
                   ) : (
@@ -286,7 +286,7 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
                   )}
                 </View>
                 <View className="flex-1">
-                  <Text className="text-[13px] text-white" weight="700" numberOfLines={1}>
+                  <Text className="text-[13px] text-slate-900 dark:text-white" weight="700" numberOfLines={1}>
                     {vehicle.name}
                   </Text>
                   <Text className="mt-1 text-[11px] text-slate-500">{vehicle.type}</Text>
@@ -301,12 +301,12 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
             {session.inspections?.map((inspection) => (
               <View
                 key={inspection.inspectionId}
-                className="rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-4"
+                className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-4 shadow-sm"
               >
                 <View className="flex-row items-center justify-between gap-3">
                   <View className="flex-row items-center gap-2">
                     <ShieldCheck color="#f97316" size={16} />
-                    <Text className="text-[13px] text-white" weight="700">
+                    <Text className="text-[13px] text-slate-900 dark:text-white" weight="700">
                       {inspection.type === 'CHECK_IN' ? 'Check-in' : 'Check-out'}
                     </Text>
                   </View>
@@ -377,7 +377,7 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
                       {inspection.photos.map((photo, index) => (
                         <View
                           key={`${inspection.inspectionId}-${photo.url}-${index}`}
-                          className="h-20 w-20 overflow-hidden rounded-xl border border-slate-800 bg-slate-950"
+                          className="h-20 w-20 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-950"
                         >
                           <Image source={{ uri: photo.url }} className="h-full w-full" resizeMode="cover" />
                           <View className="absolute bottom-1 left-1 rounded bg-black/70 px-1 py-0.5">
@@ -432,10 +432,10 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
           <SectionTitle title="F&B của phiên" />
           <View className="mb-5 gap-3">
             {session.fnbOrders?.map((order) => (
-              <View key={order.orderId} className="rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-4">
+              <View key={order.orderId} className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-4 shadow-sm">
                 <View className="mb-3 flex-row items-center justify-between gap-3">
                   <View>
-                    <Text className="text-[13px] text-white" weight="700">
+                    <Text className="text-[13px] text-slate-900 dark:text-white" weight="700">
                       {order.orderType}
                     </Text>
                     <Text className="mt-1 text-[10px] text-slate-500">{order.status}</Text>
@@ -457,10 +457,10 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
             {session.fnbOrders?.length === 0 ? <EmptyText text="Phiên chưa có đơn F&B." /> : null}
           </View>
 
-          <View className="rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-4">
+          <View className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-4 shadow-sm">
             <View className="mb-3 flex-row items-center justify-between gap-3">
               <View className="flex-1">
-                <Text className="text-[13px] text-white" weight="700">
+                <Text className="text-[13px] text-slate-900 dark:text-white" weight="700">
                   Thanh toán tồn đọng
                 </Text>
                 <Text className="mt-1 text-[11px] text-slate-500">
@@ -506,9 +506,9 @@ function InfoRow({ Icon, label, value }: { Icon: LucideIcon; label: string; valu
 
 function Metric({ Icon, label, value }: { Icon: LucideIcon; label: string; value: number }) {
   return (
-    <View className="min-w-[47%] flex-1 rounded-xl border border-slate-800 bg-[#0b0f19] p-3">
+    <View className="min-w-[47%] flex-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-[#0b0f19] p-3">
       <Icon color="#f97316" size={16} />
-      <Text className="mt-2 text-[18px] text-white" weight="700">
+      <Text className="mt-2 text-[18px] text-slate-900 dark:text-white" weight="700">
         {value}
       </Text>
       <Text className="mt-0.5 text-[10px] text-slate-500">{label}</Text>
@@ -535,10 +535,10 @@ function SessionOperations({
   const canSubmitCheckOut = ['ACTIVE', 'EXTENDING'].includes(status) && !hasCheckOutInspection;
 
   return (
-    <View className="mb-5 rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-4">
+    <View className="mb-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-4 shadow-sm">
       <View className="mb-3 flex-row items-center justify-between gap-3">
         <View className="flex-1">
-          <Text className="text-[13px] text-white" weight="700">
+          <Text className="text-[13px] text-slate-900 dark:text-white" weight="700">
             Thao tác phiên
           </Text>
           <Text className="mt-1 text-[11px] leading-4 text-slate-500">
@@ -612,12 +612,12 @@ function SimpleRow({
   subtitle: string;
 }) {
   return (
-    <View className="flex-row items-center gap-3 rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-4">
+    <View className="flex-row items-center gap-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-4 shadow-sm">
       <View className="h-10 w-10 items-center justify-center rounded-xl border border-orange-500/20 bg-orange-500/10">
         <Icon color="#f97316" size={18} />
       </View>
       <View className="flex-1">
-        <Text className="text-[13px] text-white" weight="700" numberOfLines={1}>
+        <Text className="text-[13px] text-slate-900 dark:text-white" weight="700" numberOfLines={1}>
           {title}
         </Text>
         <Text className="mt-1 text-[11px] text-slate-500">{subtitle}</Text>
@@ -628,7 +628,7 @@ function SimpleRow({
 
 function EmptyText({ text }: { text: string }) {
   return (
-    <View className="rounded-2xl border border-dashed border-slate-800 bg-[#0f172a]/40 p-4">
+    <View className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/40 p-4">
       <Text className="text-center text-[11px] text-slate-500">{text}</Text>
     </View>
   );

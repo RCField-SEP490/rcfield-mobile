@@ -21,7 +21,7 @@ export async function getNotifications(params?: {
   limit?: number;
   unreadOnly?: boolean;
 }): Promise<NotificationListResponse> {
-  const response = await api.get<NotificationListResponse>('/notifications', {
+  const response = await api.get<NotificationListResponse>('/provider/notifications', {
     params: {
       page: params?.page ?? 1,
       limit: params?.limit ?? 50,
@@ -33,9 +33,9 @@ export async function getNotifications(params?: {
 }
 
 export async function markNotificationRead(id: string): Promise<void> {
-  await api.put(`/notifications/${id}/read`);
+  await api.put(`/provider/notifications/${id}/read`);
 }
 
 export async function markAllNotificationsRead(): Promise<void> {
-  await api.put('/notifications/read-all');
+  await api.put('/provider/notifications/read-all');
 }

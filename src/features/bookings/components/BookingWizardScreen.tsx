@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { View, ScrollView, Pressable, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, DeviceEventEmitter, BackHandler } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useColorScheme } from 'nativewind';
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 
@@ -29,6 +30,7 @@ export function BookingWizardScreen({
   preselectedFnb,
 }: BookingWizardScreenProps) {
   const router = useRouter();
+  const { colorScheme } = useColorScheme();
   const insets = useSafeAreaInsets();
 
   // Wizard state
@@ -123,9 +125,10 @@ export function BookingWizardScreen({
     return selectedVehicleIds.reduce((sum, id) => {
       const match = catalogs.find((c) => c.id === id);
       const rate = match ? Number(match.hourlyRate) : 0;
-      return sum + rate * durationHours;
+      const durationHoursActual = (durationHours * (cafe?.slotDurationMinutes || 60)) / 60;
+      return sum + rate * durationHoursActual;
     }, 0);
-  }, [selectedVehicleIds, catalogs, durationHours]);
+  }, [selectedVehicleIds, catalogs, durationHours, cafe?.slotDurationMinutes]);
 
   // Fnb preorder price total
   const fnbPriceTotal = useMemo(() => {
@@ -178,11 +181,25 @@ export function BookingWizardScreen({
   const slotEndIso = useMemo(() => {
     if (sortedSlots.length === 0) return '';
     const lastSlot = sortedSlots[sortedSlots.length - 1];
+    const duration = cafe?.slotDurationMinutes || 60;
     const [lastH, lastM] = lastSlot.split(':').map(Number);
-    const endH = String(lastH + 1).padStart(2, '0');
-    const endM = String(lastM || 0).padStart(2, '0');
-    return `${selectedDate}T${endH}:${endM}:00+07:00`;
-  }, [selectedDate, sortedSlots]);
+    const endMinutes = lastH * 60 + lastM + duration;
+
+    const endH = String(Math.floor(endMinutes / 60) % 24).padStart(2, '0');
+    const endM = String(endMinutes % 60).padStart(2, '0');
+
+    let endDateStr = selectedDate;
+    if (endMinutes >= 24 * 60) {
+      const d = new Date(selectedDate);
+      d.setDate(d.getDate() + 1);
+      const y = d.getFullYear();
+      const mo = String(d.getMonth() + 1).padStart(2, '0');
+      const da = String(d.getDate()).padStart(2, '0');
+      endDateStr = `${y}-${mo}-${da}`;
+    }
+
+    return `${endDateStr}T${endH}:${endM}:00+07:00`;
+  }, [selectedDate, sortedSlots, cafe?.slotDurationMinutes]);
 
   const isNextDisabled = useMemo(() => {
     if (currentStep === 1) {
@@ -211,11 +228,19 @@ export function BookingWizardScreen({
 
     // Step 1 Validation: Ensure sequential selected slots
     if (currentStep === 1) {
+      const duration = cafe?.slotDurationMinutes || 60;
       let isSequential = true;
+
+      const timeToMinutes = (timeStr: string): number => {
+        const [h, m] = timeStr.split(':').map(Number);
+        return h * 60 + m;
+      };
+
       for (let i = 0; i < sortedSlots.length - 1; i++) {
-        const [h1] = sortedSlots[i].split(':').map(Number);
-        const [h2] = sortedSlots[i + 1].split(':').map(Number);
-        if (h2 - h1 !== 1) {
+        const currentMin = timeToMinutes(sortedSlots[i]);
+        const nextMin = timeToMinutes(sortedSlots[i + 1]);
+        const expectedNextMin = (currentMin + duration) % (24 * 60);
+        if (nextMin !== expectedNextMin) {
           isSequential = false;
           break;
         }
@@ -279,6 +304,13 @@ export function BookingWizardScreen({
     };
   };
 
+  const navigateToDetail = useCallback((bookingId: string) => {
+    router.replace('/(tabs)/bookings');
+    setTimeout(() => {
+      router.push(`/booking/${bookingId}`);
+    }, 100);
+  }, [router]);
+
   const handleConfirmPayment = async () => {
     setSubmitting(true);
     try {
@@ -292,7 +324,7 @@ export function BookingWizardScreen({
 
       if (checkout.confirmed) {
         Alert.alert('Thành công', 'Đặt lịch thành công! Slot đã được thanh toán thông qua Gói hội viên.', [
-          { text: 'Đóng', onPress: () => router.push('/(tabs)/bookings') },
+          { text: 'Đóng', onPress: () => navigateToDetail(booking.booking_id) },
         ]);
         return;
       }
@@ -306,15 +338,15 @@ export function BookingWizardScreen({
           const latestBooking = await bookingWizardApi.getBooking(booking.booking_id);
           if (latestBooking.status === 'PAYMENT_CONFIRMED' || latestBooking.status === 'CONFIRMED') {
             Alert.alert('Thành công', 'Thanh toán thành công! Lịch đặt của bạn đã được xác nhận.', [
-              { text: 'Xem lịch đặt', onPress: () => router.push('/(tabs)/bookings') },
+              { text: 'Xem lịch đặt', onPress: () => navigateToDetail(booking.booking_id) },
             ]);
           } else {
             Alert.alert('Chưa hoàn tất', 'Giao dịch thanh toán chưa được xác nhận hoặc đã bị hủy. Bạn có thể kiểm tra lại trong mục Lịch đặt.', [
-              { text: 'Xem lịch đặt', onPress: () => router.push('/(tabs)/bookings') },
+              { text: 'Xem lịch đặt', onPress: () => navigateToDetail(booking.booking_id) },
             ]);
           }
         } catch {
-          router.push('/(tabs)/bookings');
+          navigateToDetail(booking.booking_id);
         }
       } else {
         throw new Error('Không nhận được URL thanh toán từ cổng VNPay!');
@@ -338,7 +370,7 @@ export function BookingWizardScreen({
       await bookingWizardApi.mockCheckout(booking.booking_id);
 
       Alert.alert('Thành công', 'Mock thanh toán thành công! Lịch đặt đã được xác nhận.', [
-        { text: 'Xem lịch đặt', onPress: () => router.push('/(tabs)/bookings') },
+        { text: 'Xem lịch đặt', onPress: () => navigateToDetail(booking.booking_id) },
       ]);
     } catch (err: any) {
       console.error('[BookingWizard] Mock payment error:', err);
@@ -350,17 +382,17 @@ export function BookingWizardScreen({
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-[#0b0f19]" edges={['top', 'left', 'right']}>
+    <SafeAreaView className="flex-grow flex-1 bg-[#f8fafc] dark:bg-[#0b0f19]" edges={['top', 'left', 'right']}>
       {/* Header Back Button */}
-      <View className="flex-row items-center px-4 py-3 border-b border-slate-900 bg-[#0f172a]/50">
-        <Pressable onPress={handleBack} className="p-1 rounded-full active:bg-slate-800 flex-row items-center gap-1">
-          <ChevronLeft color="#f97316" size={20} />
+      <View className="flex-row items-center px-4 py-3 border-b border-slate-200 dark:border-slate-900 bg-white dark:bg-[#0f172a]/50">
+        <Pressable onPress={handleBack} className="p-1 rounded-full active:bg-slate-100 dark:active:bg-slate-800 flex-row items-center gap-1">
+          <ChevronLeft color={colorScheme === 'dark' ? '#f97316' : '#ea580c'} size={20} />
           <Text className="text-[12px] text-[#f97316] font-bold">
             Quay lại
           </Text>
         </Pressable>
         {cafe && (
-          <Text className="text-[13px] text-white flex-1 text-center font-bold mr-10" numberOfLines={1}>
+          <Text className="text-[13px] text-slate-900 dark:text-white flex-1 text-center font-bold mr-10" numberOfLines={1}>
             Đặt sân {cafe.name}
           </Text>
         )}
@@ -401,6 +433,7 @@ export function BookingWizardScreen({
                   selectedVehicleIds={selectedVehicleIds}
                   setSelectedVehicleIds={setSelectedVehicleIds}
                   catalogs={catalogs}
+                  cafe={cafe}
                 />
               )}
 
@@ -452,6 +485,7 @@ export function BookingWizardScreen({
                   cafeImage={cafe?.image || null}
                   trackConfigName={selectedTrackConfig?.track_type?.name || 'Sân đua'}
                   vehicleCatalogs={catalogs}
+                  slotDurationMinutes={cafe?.slotDurationMinutes}
                 />
               )}
             </ScrollView>
@@ -459,10 +493,10 @@ export function BookingWizardScreen({
             {/* Action Bottom Bar */}
             <View
               style={{ paddingBottom: Math.max(insets.bottom, 16), paddingTop: 14 }}
-              className="border-t border-slate-900 bg-[#0f172a]/95 px-5 flex-row justify-between items-center shadow-lg"
+              className="border-t border-slate-200 dark:border-slate-900 bg-white/95 dark:bg-[#0f172a]/95 px-5 flex-row justify-between items-center shadow-lg"
             >
               <View>
-                <Text className="text-[10px] text-slate-400 font-semibold">Tạm tính</Text>
+                <Text className="text-[10px] text-slate-550 dark:text-slate-400 font-semibold">Tạm tính</Text>
                 <Text className="text-[16px] text-[#f97316]" weight="700">
                   {finalTotalAmount.toLocaleString('vi-VN')}đ
                 </Text>
@@ -489,13 +523,16 @@ export function BookingWizardScreen({
                 <Pressable
                   disabled={isNextDisabled}
                   onPress={handleNext}
-                  className={`flex-row items-center justify-center py-2.5 px-6 rounded-xl gap-1 ${isNextDisabled ? 'bg-slate-800 opacity-50' : 'bg-[#ea580c] active:bg-[#f97316]'
-                    }`}
+                  className={`flex-row items-center justify-center py-2.5 px-6 rounded-xl gap-1 ${
+                    isNextDisabled
+                      ? 'bg-slate-200 dark:bg-slate-800 opacity-50'
+                      : 'bg-[#ea580c] active:bg-[#f97316]'
+                  }`}
                 >
-                  <Text className="text-[12px] text-white font-bold">
+                  <Text className={`text-[12px] font-bold ${isNextDisabled ? 'text-slate-400 dark:text-slate-500' : 'text-white'}`}>
                     Tiếp theo
                   </Text>
-                  <ChevronRight color="#ffffff" size={14} strokeWidth={2.5} />
+                  <ChevronRight color={isNextDisabled ? (colorScheme === 'dark' ? '#64748b' : '#94a3b8') : '#ffffff'} size={14} strokeWidth={2.5} />
                 </Pressable>
               )}
             </View>

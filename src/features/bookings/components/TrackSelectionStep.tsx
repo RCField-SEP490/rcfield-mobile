@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { View, Pressable, ScrollView, ActivityIndicator, Image, Modal, Alert } from 'react-native';
 import { Calendar, Clock, Layers, ShieldCheck, AlertCircle, ChevronLeft, ChevronRight, X, Car, User } from 'lucide-react-native';
+import { useColorScheme } from 'nativewind';
 import { Text } from '@/shared/ui/Text';
 import { bookingWizardApi, type TrackConfig, type VehicleCatalog } from '../api/booking-wizard.api';
+import type { Cafe } from '@/features/explore/types/explore.types';
 
 const TRACK_PLACEHOLDER_IMAGE =
   'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?q=80&w=600&auto=format&fit=crop';
@@ -20,6 +22,7 @@ interface TrackSelectionStepProps {
   selectedVehicleIds: string[];
   setSelectedVehicleIds: (ids: string[]) => void;
   catalogs: VehicleCatalog[];
+  cafe: Cafe | null;
 }
 
 interface SlotDetails {
@@ -75,12 +78,6 @@ const getNext7Days = () => {
   return list;
 };
 
-// Generate time slots from 08:00 to 21:00 (every 1 hour)
-const TIME_SLOTS = [
-  '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00',
-  '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00',
-];
-
 export function TrackSelectionStep({
   cafeId,
   selectedTrackConfig,
@@ -94,11 +91,72 @@ export function TrackSelectionStep({
   selectedVehicleIds,
   setSelectedVehicleIds,
   catalogs,
+  cafe,
 }: TrackSelectionStepProps) {
+  const { colorScheme } = useColorScheme();
   const [tracks, setTracks] = useState<TrackConfig[]>([]);
   const [loadingTracks, setLoadingTracks] = useState(true);
   const [slotDetails, setSlotDetails] = useState<Record<string, SlotDetails>>({});
   const [loadingSlots, setLoadingSlots] = useState(false);
+
+  // Generate dynamic time slots based on Cafe's operatingHours and slotDurationMinutes
+  const timeSlots = React.useMemo(() => {
+    const defaultSlots = [
+      '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00',
+      '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00',
+    ];
+
+    if (!cafe) {
+      return defaultSlots;
+    }
+
+    let parsedHours: Record<string, any> = {};
+    if (typeof cafe.operatingHours === 'string') {
+      try {
+        parsedHours = JSON.parse(cafe.operatingHours);
+      } catch (e) {
+        console.error('[TrackSelectionStep] Error parsing operatingHours string:', e);
+      }
+    } else if (cafe.operatingHours) {
+      parsedHours = cafe.operatingHours;
+    }
+
+    // Get day of the week
+    const dateObj = new Date(selectedDate);
+    const dayIndex = dateObj.getDay();
+    const days = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+    const dayKey = days[dayIndex];
+
+    const schedule = parsedHours[dayKey];
+    if (!schedule || schedule.is_closed || !schedule.open || !schedule.close) {
+      return [];
+    }
+
+    const duration = cafe.slotDurationMinutes || 60;
+
+    const timeToMinutes = (t: string) => {
+      const [h, m] = t.split(':').map(Number);
+      return h * 60 + m;
+    };
+
+    const minutesToTime = (min: number) => {
+      const h = Math.floor(min / 60) % 24;
+      const m = min % 60;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    };
+
+    const start = timeToMinutes(schedule.open);
+    let end = timeToMinutes(schedule.close);
+    if (end <= start) {
+      end += 24 * 60;
+    }
+
+    const list: string[] = [];
+    for (let current = start; current + duration <= end; current += duration) {
+      list.push(minutesToTime(current));
+    }
+    return list.length > 0 ? list : defaultSlots;
+  }, [cafe, selectedDate]);
 
   // Popup warning when switching playMode from RENTAL to BYOC with selected vehicles
   const handleSelectByoc = () => {
@@ -159,7 +217,7 @@ export function TrackSelectionStep({
 
       try {
         await Promise.all(
-          TIME_SLOTS.map(async (slot) => {
+          timeSlots.map(async (slot) => {
             // Optimization: If slot is in the past, disable immediately without calling API
             if (isSlotPast(slot, selectedDate)) {
               updatedDetails[slot] = {
@@ -170,12 +228,27 @@ export function TrackSelectionStep({
               return;
             }
 
+            const duration = cafe?.slotDurationMinutes || 60;
             const [h, m] = slot.split(':').map(Number);
-            const slotStart = `${selectedDate}T${slot}:00+07:00`;
+            const startMinutes = h * 60 + m;
+            const endMinutes = startMinutes + duration;
 
-            // End time is +1 hour
-            const endH = String(h + 1).padStart(2, '0');
-            const slotEnd = `${selectedDate}T${endH}:${String(m).padStart(2, '0')}:00+07:00`;
+            const endH = String(Math.floor(endMinutes / 60) % 24).padStart(2, '0');
+            const endM = String(endMinutes % 60).padStart(2, '0');
+
+            // Handle date overflow when booking crosses midnight
+            let endDateStr = selectedDate;
+            if (endMinutes >= 24 * 60) {
+              const d = new Date(selectedDate);
+              d.setDate(d.getDate() + 1);
+              const y = d.getFullYear();
+              const mo = String(d.getMonth() + 1).padStart(2, '0');
+              const da = String(d.getDate()).padStart(2, '0');
+              endDateStr = `${y}-${mo}-${da}`;
+            }
+
+            const slotStart = `${selectedDate}T${slot}:00+07:00`;
+            const slotEnd = `${endDateStr}T${endH}:${endM}:00+07:00`;
 
             try {
               const res = await bookingWizardApi.checkAvailability(cafeId, {
@@ -212,7 +285,7 @@ export function TrackSelectionStep({
     };
 
     checkAllSlots();
-  }, [cafeId, selectedTrackConfig, selectedDate, playMode]);
+  }, [cafeId, selectedTrackConfig, selectedDate, playMode, timeSlots, cafe]);
 
   // Month-Year Label formatting
   const formattedMonthYear = React.useMemo(() => {
@@ -271,7 +344,7 @@ export function TrackSelectionStep({
       <View>
         <View className="flex-row items-center gap-1.5 mb-3">
           <Layers color="#f97316" size={15} />
-          <Text className="text-[13px] text-slate-400 uppercase tracking-wider font-bold">
+          <Text className="text-[13px] text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold">
             1. Chọn loại sân chạy
           </Text>
         </View>
@@ -290,21 +363,22 @@ export function TrackSelectionStep({
                 <Pressable
                   key={track.id}
                   onPress={() => setSelectedTrackConfig(track)}
-                  className={`p-3 rounded-xl border flex-row gap-3 transition-all duration-200 ${isSelected
-                    ? 'bg-[#ea580c]/10 border-[#f97316]'
-                    : 'bg-[#0f172a]/50 border-slate-800'
-                    }`}
+                  className={`p-3 rounded-xl border flex-row gap-3 transition-all duration-200 ${
+                    isSelected
+                      ? 'bg-[#ea580c]/10 border-[#f97316]'
+                      : 'bg-white dark:bg-[#0f172a]/50 border-slate-200 dark:border-slate-800'
+                  }`}
                 >
                   {/* Sân image */}
                   <Image
                     source={{ uri: trackImage }}
-                    className="h-16 w-16 rounded-lg bg-slate-900 object-cover"
+                    className="h-16 w-16 rounded-lg bg-slate-100 dark:bg-slate-900 object-cover"
                   />
 
                   {/* Sân Info */}
                   <View className="flex-1 pr-1 justify-between">
                     <View className="flex-row items-center justify-between">
-                      <Text className="text-[13px] text-white" weight="700">
+                      <Text className="text-[13px] text-slate-900 dark:text-white" weight="700">
                         {trackName}
                       </Text>
                       {isSelected && (
@@ -314,7 +388,7 @@ export function TrackSelectionStep({
                       )}
                     </View>
 
-                    <Text className="text-[10px] text-slate-400 leading-4 font-semibold" numberOfLines={1}>
+                    <Text className="text-[10px] text-slate-500 dark:text-slate-400 leading-4 font-semibold" numberOfLines={1}>
                       {trackDesc}
                     </Text>
 
@@ -322,13 +396,13 @@ export function TrackSelectionStep({
                     <View className="flex-row gap-4 mt-1.5">
                       <View className="flex-row items-center gap-1">
                         <Car color="#ea580c" size={11} />
-                        <Text className="text-[9px] text-slate-300 font-bold">
+                        <Text className="text-[9px] text-slate-600 dark:text-slate-300 font-bold">
                           Thuê xe: Tối đa {track.max_concurrent} lượt
                         </Text>
                       </View>
                       <View className="flex-row items-center gap-1">
                         <User color="#10b981" size={11} />
-                        <Text className="text-[9px] text-slate-300 font-bold">
+                        <Text className="text-[9px] text-slate-600 dark:text-slate-300 font-bold">
                           Xe riêng: Tối đa {track.byoc_capacity} lượt
                         </Text>
                       </View>
@@ -339,8 +413,8 @@ export function TrackSelectionStep({
             })}
           </View>
         ) : (
-          <View className="bg-slate-900/30 rounded-xl p-4 border border-dashed border-slate-800 items-center justify-center">
-            <Text className="text-[12px] text-slate-400 font-semibold">
+          <View className="bg-slate-100 dark:bg-slate-900/30 rounded-xl p-4 border border-dashed border-slate-200 dark:border-slate-800 items-center justify-center">
+            <Text className="text-[12px] text-slate-500 dark:text-slate-400 font-semibold">
               Không có sân chơi khả dụng.
             </Text>
           </View>
@@ -351,7 +425,7 @@ export function TrackSelectionStep({
       <View className="mt-5">
         <View className="flex-row items-center gap-1.5 mb-3">
           <Clock color="#f97316" size={15} />
-          <Text className="text-[13px] text-slate-400 uppercase tracking-wider font-bold">
+          <Text className="text-[13px] text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold">
             2. Chế độ chơi (Play Mode)
           </Text>
         </View>
@@ -359,30 +433,32 @@ export function TrackSelectionStep({
         <View className="flex-row gap-3">
           <Pressable
             onPress={() => setPlayMode('RENTAL')}
-            className={`flex-1 p-3.5 rounded-xl border items-center justify-center ${playMode === 'RENTAL'
-              ? 'bg-[#ea580c]/10 border-[#f97316]'
-              : 'bg-[#0f172a]/50 border-slate-800'
-              }`}
+            className={`flex-1 p-3.5 rounded-xl border items-center justify-center ${
+              playMode === 'RENTAL'
+                ? 'bg-[#ea580c]/10 border-[#f97316]'
+                : 'bg-white dark:bg-[#0f172a]/50 border-slate-200 dark:border-slate-800'
+            }`}
           >
-            <Text className={`text-[13px] ${playMode === 'RENTAL' ? 'text-[#f97316]' : 'text-slate-300'}`} weight="700">
+            <Text className={`text-[13px] ${playMode === 'RENTAL' ? 'text-[#f97316]' : 'text-slate-700 dark:text-slate-300'}`} weight="700">
               Thuê xe (RENTAL)
             </Text>
-            <Text className="text-[9px] text-slate-400 mt-0.5 text-center font-semibold">
+            <Text className="text-[9px] text-slate-500 dark:text-slate-400 mt-0.5 text-center font-semibold">
               Sử dụng xe đua của cửa hàng
             </Text>
           </Pressable>
 
           <Pressable
             onPress={handleSelectByoc}
-            className={`flex-1 p-3.5 rounded-xl border items-center justify-center ${playMode === 'BYOC'
-              ? 'bg-[#ea580c]/10 border-[#f97316]'
-              : 'bg-[#0f172a]/50 border-slate-800'
-              }`}
+            className={`flex-1 p-3.5 rounded-xl border items-center justify-center ${
+              playMode === 'BYOC'
+                ? 'bg-[#ea580c]/10 border-[#f97316]'
+                : 'bg-white dark:bg-[#0f172a]/50 border-slate-200 dark:border-slate-800'
+            }`}
           >
-            <Text className={`text-[13px] ${playMode === 'BYOC' ? 'text-[#f97316]' : 'text-slate-300'}`} weight="700">
+            <Text className={`text-[13px] ${playMode === 'BYOC' ? 'text-[#f97316]' : 'text-slate-700 dark:text-slate-300'}`} weight="700">
               Xe cá nhân (BYOC)
             </Text>
-            <Text className="text-[9px] text-slate-400 mt-0.5 text-center font-semibold">
+            <Text className="text-[9px] text-slate-500 dark:text-slate-400 mt-0.5 text-center font-semibold">
               Tự mang xe đã đăng ký của bạn
             </Text>
           </Pressable>
@@ -394,11 +470,11 @@ export function TrackSelectionStep({
         <View className="flex-row items-center justify-between mb-3">
           <View className="flex-row items-center gap-1.5">
             <Calendar color="#f97316" size={15} />
-            <Text className="text-[13px] text-slate-400 uppercase tracking-wider font-bold">
+            <Text className="text-[13px] text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold">
               3. Chọn ngày chơi
             </Text>
           </View>
-          <Text className="text-[11px] text-white font-bold bg-slate-900 px-2 py-0.5 rounded-md border border-slate-800">
+          <Text className="text-[11px] text-slate-900 dark:text-white font-bold bg-slate-105 dark:bg-slate-900 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-800">
             {formattedMonthYear}
           </Text>
         </View>
@@ -420,15 +496,16 @@ export function TrackSelectionStep({
                     setSelectedDate(item.fullDate);
                     setSelectedSlots([]); // Reset slots when date changes
                   }}
-                  className={`w-14 py-2.5 rounded-xl border items-center justify-center flex-col ${isSelected
-                    ? 'bg-[#ea580c] border-[#ea580c]'
-                    : 'bg-[#0f172a]/50 border-slate-800'
-                    }`}
+                  className={`w-14 py-2.5 rounded-xl border items-center justify-center flex-col ${
+                    isSelected
+                      ? 'bg-[#ea580c] border-[#ea580c]'
+                      : 'bg-white dark:bg-[#0f172a]/50 border-slate-200 dark:border-slate-800'
+                  }`}
                 >
-                  <Text className={`text-[10px] ${isSelected ? 'text-white' : 'text-slate-400'} font-bold`}>
+                  <Text className={`text-[10px] ${isSelected ? 'text-white' : 'text-slate-500 dark:text-slate-400'} font-bold`}>
                     {item.dayLabel}
                   </Text>
-                  <Text className={`text-[16px] mt-1 ${isSelected ? 'text-white' : 'text-slate-200'}`} weight="700">
+                  <Text className={`text-[16px] mt-1 ${isSelected ? 'text-white' : 'text-slate-800 dark:text-slate-200'}`} weight="700">
                     {item.dateLabel}
                   </Text>
                   {item.isToday && (
@@ -447,10 +524,10 @@ export function TrackSelectionStep({
               setCalendarMonth(m - 1);
               setShowCalendar(true);
             }}
-            className="w-14 py-2.5 bg-[#0f172a]/50 border border-slate-800 rounded-xl items-center justify-center flex-col active:bg-slate-850"
+            className="w-14 py-2.5 bg-white dark:bg-[#0f172a]/50 border border-slate-200 dark:border-slate-800 rounded-xl items-center justify-center flex-col active:bg-slate-100 dark:active:bg-slate-850"
           >
             <Calendar color="#f97316" size={16} />
-            <Text className="text-[9.5px] text-slate-400 mt-1 font-bold">Khác</Text>
+            <Text className="text-[9.5px] text-slate-500 dark:text-slate-400 mt-1 font-bold">Khác</Text>
           </Pressable>
         </View>
       </View>
@@ -460,7 +537,7 @@ export function TrackSelectionStep({
         <View className="flex-row items-center justify-between mb-3 h-6">
           <View className="flex-row items-center gap-1.5">
             <Clock color="#f97316" size={15} />
-            <Text className="text-[13px] text-slate-400 uppercase tracking-wider font-bold">
+            <Text className="text-[13px] text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold">
               4. Chọn khung giờ (Có thể chọn nhiều slot liên tiếp)
             </Text>
           </View>
@@ -468,7 +545,7 @@ export function TrackSelectionStep({
         </View>
 
         {loadingSlots ? (
-          <View className="h-32 items-center justify-center bg-[#0f172a]/20 border border-slate-900 rounded-xl">
+          <View className="h-32 items-center justify-center bg-white dark:bg-[#0f172a]/20 border border-slate-200 dark:border-slate-900 rounded-xl">
             <ActivityIndicator size="small" color="#f97316" />
             <Text className="text-[10px] text-slate-500 mt-2 font-semibold">
               Đang tải danh sách khung giờ trống...
@@ -476,16 +553,16 @@ export function TrackSelectionStep({
           </View>
         ) : (
           <View className="flex-row flex-wrap gap-2">
-            {TIME_SLOTS.map((slot) => {
+            {timeSlots.map((slot) => {
               const isSelected = selectedSlots.includes(slot);
               const detail = slotDetails[slot];
               const isPast = isSlotPast(slot, selectedDate);
               const isAvailable = !isPast && (detail?.available ?? false);
 
               // Dynamic Styling based on slot status
-              let btnStyle = "bg-[#0f172a]/50 border-slate-800";
-              let textStyle = "text-slate-300";
-              let subTextStyle = "text-slate-500";
+              let btnStyle = "bg-white dark:bg-[#0f172a]/50 border-slate-200 dark:border-slate-800";
+              let textStyle = "text-slate-700 dark:text-slate-300";
+              let subTextStyle = "text-slate-400 dark:text-slate-500";
 
               if (isSelected) {
                 btnStyle = "bg-[#ea580c] border-[#ea580c]";
@@ -493,14 +570,14 @@ export function TrackSelectionStep({
                 subTextStyle = "text-orange-200";
               } else if (isPast || (detail && !isAvailable)) {
                 // Disabled state
-                btnStyle = "bg-slate-900/10 border-slate-900/40 opacity-30";
-                textStyle = "text-slate-600 line-through";
-                subTextStyle = "text-slate-600";
+                btnStyle = "bg-slate-100/30 dark:bg-slate-900/10 border-slate-200/40 dark:border-slate-900/40 opacity-30";
+                textStyle = "text-slate-400 dark:text-slate-600 line-through";
+                subTextStyle = "text-slate-400 dark:text-slate-600";
               } else if (isAvailable) {
                 // Available slot gets elegant green borders and indicators
-                btnStyle = "bg-emerald-950/15 border-emerald-500/30";
-                textStyle = "text-emerald-400 font-bold";
-                subTextStyle = "text-emerald-500/80";
+                btnStyle = "bg-emerald-50 dark:bg-emerald-950/15 border-emerald-200 dark:border-emerald-500/30";
+                textStyle = "text-emerald-500 dark:text-emerald-400 font-bold";
+                subTextStyle = "text-emerald-600 dark:text-emerald-500/80";
               }
 
               return (
@@ -547,17 +624,17 @@ export function TrackSelectionStep({
         onRequestClose={() => setShowCalendar(false)}
       >
         <View className="flex-1 bg-black/70 justify-center items-center px-5">
-          <View className="w-full bg-[#0b0f19] border border-slate-800 rounded-2xl p-5">
+          <View className="w-full bg-white dark:bg-[#0b0f19] border border-slate-200 dark:border-slate-800 rounded-2xl p-5">
             {/* Modal Header */}
-            <View className="flex-row justify-between items-center mb-4 pb-2 border-b border-slate-900">
-              <Text className="text-[14px] text-white" weight="700">
+            <View className="flex-row justify-between items-center mb-4 pb-2 border-b border-slate-200 dark:border-slate-900">
+              <Text className="text-[14px] text-slate-900 dark:text-white" weight="700">
                 Chọn ngày chơi khác
               </Text>
               <Pressable
                 onPress={() => setShowCalendar(false)}
-                className="h-7 w-7 rounded-full bg-slate-900 border border-slate-800 items-center justify-center"
+                className="h-7 w-7 rounded-full bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 items-center justify-center"
               >
-                <X color="#94a3b8" size={14} />
+                <X color={colorScheme === 'dark' ? '#94a3b8' : '#475569'} size={14} />
               </Pressable>
             </View>
 
@@ -565,16 +642,16 @@ export function TrackSelectionStep({
             <View className="flex-row justify-between items-center mb-4">
               <Pressable
                 onPress={handlePrevMonth}
-                className="h-8 w-8 bg-slate-900 border border-slate-800 rounded-lg items-center justify-center active:bg-slate-800"
+                className="h-8 w-8 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg items-center justify-center active:bg-slate-200 dark:active:bg-slate-800"
               >
                 <ChevronLeft color="#f97316" size={16} />
               </Pressable>
-              <Text className="text-[13px] text-white" weight="700">
+              <Text className="text-[13px] text-slate-900 dark:text-white" weight="700">
                 {`Tháng ${String(calendarMonth + 1).padStart(2, '0')}, ${calendarYear}`}
               </Text>
               <Pressable
                 onPress={handleNextMonth}
-                className="h-8 w-8 bg-slate-900 border border-slate-800 rounded-lg items-center justify-center active:bg-slate-800"
+                className="h-8 w-8 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg items-center justify-center active:bg-slate-200 dark:active:bg-slate-800"
               >
                 <ChevronRight color="#f97316" size={16} />
               </Pressable>
@@ -615,16 +692,22 @@ export function TrackSelectionStep({
                     key={`day-${dayNum}`}
                     disabled={isPast}
                     onPress={() => handleSelectDateFromCalendar(dayNum)}
-                    className={`w-[14.28%] aspect-square justify-center items-center rounded-lg border ${isSelected
-                      ? 'bg-[#ea580c] border-[#ea580c]'
-                      : isPast
+                    className={`w-[14.28%] aspect-square justify-center items-center rounded-lg border ${
+                      isSelected
+                        ? 'bg-[#ea580c] border-[#ea580c]'
+                        : isPast
                         ? 'opacity-25 border-transparent'
-                        : 'border-transparent active:bg-slate-900'
-                      }`}
+                        : 'border-transparent active:bg-slate-100 dark:active:bg-slate-900'
+                    }`}
                   >
                     <Text
-                      className={`text-[12px] font-bold ${isSelected ? 'text-white' : isPast ? 'text-slate-600 line-through' : 'text-slate-200'
-                        }`}
+                      className={`text-[12px] font-bold ${
+                        isSelected
+                          ? 'text-white'
+                          : isPast
+                          ? 'text-slate-400 dark:text-slate-600 line-through'
+                          : 'text-slate-800 dark:text-slate-200'
+                      }`}
                     >
                       {dayNum}
                     </Text>

@@ -14,6 +14,7 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useColorScheme } from 'nativewind';
 
 import {
   requestPasswordReset,
@@ -33,6 +34,7 @@ import { Text } from '@/shared/ui/Text';
 type Step = 'email' | 'code' | 'password' | 'done';
 
 export function ForgotPasswordScreen() {
+  const { colorScheme } = useColorScheme();
   const router = useRouter();
   const [step, setStep] = useState<Step>('email');
   const [email, setEmail] = useState('');
@@ -172,7 +174,7 @@ export function ForgotPasswordScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-[#0b0f19]" edges={['top', 'left', 'right']}>
+    <SafeAreaView className="flex-1 bg-[#f8fafc] dark:bg-[#0b0f19]" edges={['top', 'left', 'right']}>
       {/* Background Glows */}
       <View className="absolute -top-20 -left-20 w-80 h-80 rounded-full bg-[#f97316]/10 blur-3xl pointer-events-none" />
       <View className="absolute bottom-10 -right-20 w-80 h-80 rounded-full bg-[#6366f1]/10 blur-3xl pointer-events-none" />
@@ -188,8 +190,8 @@ export function ForgotPasswordScreen() {
               if (step === 'password') setStep('code');
             }}
           >
-            <ChevronLeft color="#94a3b8" size={20} />
-            <Text className="text-[14px] text-slate-400 font-bold">
+            <ChevronLeft color={colorScheme === 'dark' ? '#94a3b8' : '#475569'} size={20} />
+            <Text className="text-[14px] text-slate-500 dark:text-slate-400 font-bold">
               {step === 'email' ? 'Quay lại Đăng nhập' : 'Quay lại bước trước'}
             </Text>
           </Pressable>
@@ -205,39 +207,39 @@ export function ForgotPasswordScreen() {
           keyboardShouldPersistTaps="handled"
         >
           {/* Form container */}
-          <View className="rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-5 shadow-2xl">
+          <View className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-5 shadow-2xl shadow-sm">
             {step === 'email' && (
               <View className="gap-5">
                 <View className="mb-2">
-                  <Text className="text-white text-2xl font-bold" weight="700">
+                  <Text className="text-slate-900 dark:text-white text-2xl font-bold" weight="700">
                     Quên mật khẩu?
                   </Text>
-                  <Text className="mt-1.5 text-[13px] text-slate-400 leading-5" weight="500">
+                  <Text className="mt-1.5 text-[13px] text-slate-500 dark:text-slate-400 leading-5" weight="500">
                     Nhập địa chỉ email của bạn, chúng tôi sẽ gửi mã xác thực OTP 6 số để thiết lập mật khẩu mới.
                   </Text>
                 </View>
 
                 {/* Email Input */}
                 <View>
-                  <Text className="mb-2 text-[12px] uppercase text-slate-300 tracking-wider" weight="700">
+                  <Text className="mb-2 text-[12px] uppercase text-slate-500 dark:text-slate-300 tracking-wider" weight="700">
                     Email đăng ký
                   </Text>
                   <Controller
                     control={emailForm.control}
                     name="email"
                     render={({ field: { onChange, onBlur, value } }) => (
-                      <View className={`h-12 flex-row items-center rounded-xl border bg-slate-900/80 px-3.5 focus:border-[#f97316] ${emailForm.formState.errors.email ? 'border-red-500' : 'border-slate-800'}`}>
+                      <View className={`h-12 flex-row items-center rounded-xl border bg-slate-55 dark:bg-slate-900/80 px-3.5 focus:border-[#f97316] ${emailForm.formState.errors.email ? 'border-red-500' : 'border-slate-200 dark:border-slate-800'}`}>
                         <Mail color={emailForm.formState.errors.email ? '#ef4444' : '#94a3b8'} size={18} />
                         <TextInput
                           autoCapitalize="none"
                           autoComplete="email"
-                          className="ml-2.5 flex-1 text-[14px] text-white font-medium"
+                          className="ml-2.5 flex-1 text-[14px] text-slate-900 dark:text-white font-medium"
                           editable={!isLoading}
                           keyboardType="email-address"
                           onBlur={onBlur}
                           onChangeText={onChange}
                           placeholder="name@example.com"
-                          placeholderTextColor="#475569"
+                          placeholderTextColor="#94a3b8"
                           value={value}
                         />
                       </View>
@@ -252,7 +254,7 @@ export function ForgotPasswordScreen() {
 
                 {/* Submit Email */}
                 <Pressable
-                  className={`h-12 flex-row items-center justify-center rounded-xl bg-slate-950 border border-[#f97316]/20 shadow-md ${!emailForm.formState.isValid || isLoading ? 'opacity-50' : 'active:bg-slate-900'}`}
+                  className={`h-12 flex-row items-center justify-center rounded-xl bg-slate-900 dark:bg-slate-950 border border-slate-800 dark:border-[#f97316]/20 shadow-md ${!emailForm.formState.isValid || isLoading ? 'opacity-50' : 'active:bg-slate-850 dark:active:bg-slate-900'}`}
                   disabled={!emailForm.formState.isValid || isLoading}
                   onPress={emailForm.handleSubmit(onSendEmail)}
                 >
@@ -271,10 +273,10 @@ export function ForgotPasswordScreen() {
             {step === 'code' && (
               <View className="gap-5">
                 <View className="mb-2">
-                  <Text className="text-white text-2xl font-bold" weight="700">
+                  <Text className="text-slate-900 dark:text-white text-2xl font-bold" weight="700">
                     Xác thực mã OTP
                   </Text>
-                  <Text className="mt-1.5 text-[13px] text-slate-400 leading-5" weight="500">
+                  <Text className="mt-1.5 text-[13px] text-slate-550 dark:text-slate-400 leading-5" weight="500">
                     Nhập mã 6 chữ số đã được gửi tới email {email}.
                   </Text>
                 </View>
@@ -287,7 +289,7 @@ export function ForgotPasswordScreen() {
                       ref={(el) => {
                         otpInputRefs.current[idx] = el;
                       }}
-                      className="w-11 h-12 rounded-xl border border-slate-800 bg-slate-900 text-center text-[18px] font-bold text-white focus:border-[#f97316]"
+                      className="w-11 h-12 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-center text-[18px] font-bold text-slate-900 dark:text-white focus:border-[#f97316]"
                       keyboardType="number-pad"
                       maxLength={1}
                       onKeyPress={({ nativeEvent }) => handleOtpKeyPress(idx, nativeEvent.key)}
@@ -318,7 +320,7 @@ export function ForgotPasswordScreen() {
 
                 {/* Submit OTP */}
                 <Pressable
-                  className={`h-12 flex-row items-center justify-center rounded-xl bg-slate-950 border border-[#f97316]/20 shadow-md ${!otpForm.formState.isValid || isLoading ? 'opacity-50' : 'active:bg-slate-900'}`}
+                  className={`h-12 flex-row items-center justify-center rounded-xl bg-slate-900 dark:bg-slate-950 border border-slate-800 dark:border-[#f97316]/20 shadow-md ${!otpForm.formState.isValid || isLoading ? 'opacity-50' : 'active:bg-slate-850 dark:active:bg-slate-900'}`}
                   disabled={!otpForm.formState.isValid || isLoading}
                   onPress={otpForm.handleSubmit(onVerifyOtp)}
                 >
@@ -337,33 +339,33 @@ export function ForgotPasswordScreen() {
             {step === 'password' && (
               <View className="gap-5">
                 <View className="mb-2">
-                  <Text className="text-white text-2xl font-bold" weight="700">
+                  <Text className="text-slate-900 dark:text-white text-2xl font-bold" weight="700">
                     Đặt mật khẩu mới
                   </Text>
-                  <Text className="mt-1.5 text-[13px] text-slate-400 leading-5" weight="500">
+                  <Text className="mt-1.5 text-[13px] text-slate-500 dark:text-slate-400 leading-5" weight="500">
                     Nhập mật khẩu mới an toàn gồm ít nhất 6 ký tự.
                   </Text>
                 </View>
 
                 {/* New Password */}
                 <View>
-                  <Text className="mb-2 text-[12px] uppercase text-slate-300 tracking-wider" weight="700">
+                  <Text className="mb-2 text-[12px] uppercase text-slate-500 dark:text-slate-300 tracking-wider" weight="700">
                     Mật khẩu mới
                   </Text>
                   <Controller
                     control={passwordForm.control}
                     name="password"
                     render={({ field: { onChange, onBlur, value } }) => (
-                      <View className={`h-12 flex-row items-center rounded-xl border bg-slate-900/80 px-3.5 focus:border-[#f97316] ${passwordForm.formState.errors.password ? 'border-red-500' : 'border-slate-800'}`}>
+                      <View className={`h-12 flex-row items-center rounded-xl border bg-slate-55 dark:bg-slate-900/80 px-3.5 focus:border-[#f97316] ${passwordForm.formState.errors.password ? 'border-red-500' : 'border-slate-200 dark:border-slate-800'}`}>
                         <LockKeyhole color={passwordForm.formState.errors.password ? '#ef4444' : '#94a3b8'} size={18} />
                         <TextInput
                           autoCapitalize="none"
-                          className="ml-2.5 flex-1 text-[14px] text-white font-medium"
+                          className="ml-2.5 flex-1 text-[14px] text-slate-900 dark:text-white font-medium"
                           editable={!isLoading}
                           onBlur={onBlur}
                           onChangeText={onChange}
                           placeholder="••••••••"
-                          placeholderTextColor="#475569"
+                          placeholderTextColor="#94a3b8"
                           secureTextEntry={!showPassword}
                           value={value}
                         />
@@ -382,23 +384,23 @@ export function ForgotPasswordScreen() {
 
                 {/* Confirm Password */}
                 <View>
-                  <Text className="mb-2 text-[12px] uppercase text-slate-300 tracking-wider" weight="700">
+                  <Text className="mb-2 text-[12px] uppercase text-slate-500 dark:text-slate-300 tracking-wider" weight="700">
                     Xác nhận mật khẩu mới
                   </Text>
                   <Controller
                     control={passwordForm.control}
                     name="confirmPassword"
                     render={({ field: { onChange, onBlur, value } }) => (
-                      <View className={`h-12 flex-row items-center rounded-xl border bg-slate-900/80 px-3.5 focus:border-[#f97316] ${passwordForm.formState.errors.confirmPassword ? 'border-red-500' : 'border-slate-800'}`}>
+                      <View className={`h-12 flex-row items-center rounded-xl border bg-slate-55 dark:bg-slate-900/80 px-3.5 focus:border-[#f97316] ${passwordForm.formState.errors.confirmPassword ? 'border-red-500' : 'border-slate-200 dark:border-slate-800'}`}>
                         <LockKeyhole color={passwordForm.formState.errors.confirmPassword ? '#ef4444' : '#94a3b8'} size={18} />
                         <TextInput
                           autoCapitalize="none"
-                          className="ml-2.5 flex-1 text-[14px] text-white font-medium"
+                          className="ml-2.5 flex-1 text-[14px] text-slate-900 dark:text-white font-medium"
                           editable={!isLoading}
                           onBlur={onBlur}
                           onChangeText={onChange}
                           placeholder="••••••••"
-                          placeholderTextColor="#475569"
+                          placeholderTextColor="#94a3b8"
                           secureTextEntry={!showConfirmPassword}
                           value={value}
                         />
@@ -417,7 +419,7 @@ export function ForgotPasswordScreen() {
 
                 {/* Submit New Password */}
                 <Pressable
-                  className={`h-12 flex-row items-center justify-center rounded-xl bg-slate-950 border border-[#f97316]/20 shadow-md mt-2 ${!passwordForm.formState.isValid || isLoading ? 'opacity-50' : 'active:bg-slate-900'}`}
+                  className={`h-12 flex-row items-center justify-center rounded-xl bg-slate-900 dark:bg-slate-950 border border-slate-800 dark:border-[#f97316]/20 shadow-md mt-2 ${!passwordForm.formState.isValid || isLoading ? 'opacity-50' : 'active:bg-slate-850 dark:active:bg-slate-900'}`}
                   disabled={!passwordForm.formState.isValid || isLoading}
                   onPress={passwordForm.handleSubmit(onResetPassword)}
                 >
@@ -437,16 +439,16 @@ export function ForgotPasswordScreen() {
                 </View>
 
                 <View className="items-center">
-                  <Text className="text-white text-2xl font-bold" weight="700">
+                  <Text className="text-slate-900 dark:text-white text-2xl font-bold" weight="700">
                     Đặt lại mật khẩu thành công
                   </Text>
-                  <Text className="mt-2 text-[13px] text-slate-400 text-center leading-5" weight="500">
+                  <Text className="mt-2 text-[13px] text-slate-500 dark:text-slate-400 text-center leading-5" weight="500">
                     Mật khẩu của bạn đã được cập nhật thành công. Hãy đăng nhập lại bằng mật khẩu mới.
                   </Text>
                 </View>
 
                 <Pressable
-                  className="h-12 w-full items-center justify-center rounded-xl bg-slate-950 border border-[#f97316]/20 shadow-md mt-2 active:bg-slate-900"
+                  className="h-12 w-full items-center justify-center rounded-xl bg-slate-900 dark:bg-slate-950 border border-slate-800 dark:border-[#f97316]/20 shadow-md mt-2 active:bg-slate-850 dark:active:bg-slate-900"
                   onPress={() => router.push('/(auth)/login')}
                 >
                   <Text className="text-[14px] text-white font-bold" weight="700">Về trang đăng nhập</Text>

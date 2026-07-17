@@ -10,6 +10,7 @@ import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import { MapPin, Navigation, Search, ArrowLeft, RotateCcw } from 'lucide-react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useColorScheme } from 'nativewind';
 
 import { getCafes } from '../api/explore.api';
 import type { Cafe } from '../types/explore.types';
@@ -22,6 +23,7 @@ const SAIGON_LONGITUDE = 106.660172;
 
 export function ExploreMapScreen() {
   const router = useRouter();
+  const { colorScheme } = useColorScheme();
   const params = useLocalSearchParams<{ cafeId?: string }>();
   const mapRef = useRef<MapView | null>(null);
   const { location: userLocation, requestLocation, loading: locationLoading } = useLocation();
@@ -115,22 +117,22 @@ export function ExploreMapScreen() {
   const activeCafe = cafes.find((c) => c.id === activeCafeId);
 
   return (
-    <SafeAreaView className="flex-1 bg-[#0b0f19]">
+    <SafeAreaView className="flex-grow flex-1 bg-[#f8fafc] dark:bg-[#0b0f19]">
       {/* Header tìm kiếm */}
       <View className="absolute top-12 left-4 right-4 z-10 flex-row items-center gap-2">
         <Pressable
           onPress={() => router.back()}
-          className="h-11 w-11 items-center justify-center rounded-xl bg-slate-900/90 border border-slate-800 active:bg-slate-800"
+          className="h-11 w-11 items-center justify-center rounded-xl bg-white/90 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 active:bg-slate-100 dark:active:bg-slate-800"
         >
-          <ArrowLeft color="#ffffff" size={20} />
+          <ArrowLeft color={colorScheme === 'dark' ? '#ffffff' : '#475569'} size={20} />
         </Pressable>
 
-        <View className="flex-1 flex-row h-11 items-center rounded-xl border border-slate-800 bg-[#0f172a]/95 px-3.5 shadow-md">
+        <View className="flex-1 flex-row h-11 items-center rounded-xl border border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-[#0f172a]/95 px-3.5 shadow-md">
           <Search color="#94a3b8" size={18} />
           <TextInput
             placeholder="Tìm chi nhánh RC Cafe..."
-            placeholderTextColor="#475569"
-            className="ml-2.5 flex-1 text-[14px] text-white font-medium py-0"
+            placeholderTextColor="#94a3b8"
+            className="ml-2.5 flex-1 text-[14px] text-slate-900 dark:text-white font-medium py-0"
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
@@ -142,7 +144,7 @@ export function ExploreMapScreen() {
         ref={mapRef}
         provider={PROVIDER_DEFAULT}
         style={StyleSheet.absoluteFillObject}
-        customMapStyle={darkMapStyle}
+        customMapStyle={colorScheme === 'dark' ? darkMapStyle : undefined}
         initialRegion={{
           latitude: userLocation?.latitude || SAIGON_LATITUDE,
           longitude: userLocation?.longitude || SAIGON_LONGITUDE,
@@ -215,23 +217,23 @@ export function ExploreMapScreen() {
       <View className="absolute right-4 top-28 z-10 gap-2">
         <Pressable
           onPress={handleFocusUserLocation}
-          className="h-10 w-10 items-center justify-center rounded-xl bg-slate-900/90 border border-slate-800 active:bg-slate-800 shadow-md"
+          className="h-10 w-10 items-center justify-center rounded-xl bg-white/90 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 active:bg-slate-100 dark:active:bg-slate-800 shadow-md"
         >
           {locationLoading ? (
             <ActivityIndicator size="small" color="#f97316" />
           ) : (
-            <Navigation color="#ffffff" size={18} />
+            <Navigation color={colorScheme === 'dark' ? '#ffffff' : '#475569'} size={18} />
           )}
         </Pressable>
 
         <Pressable
           onPress={fetchCafesList}
-          className="h-10 w-10 items-center justify-center rounded-xl bg-slate-900/90 border border-slate-800 active:bg-slate-800 shadow-md"
+          className="h-10 w-10 items-center justify-center rounded-xl bg-white/90 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 active:bg-slate-100 dark:active:bg-slate-800 shadow-md"
         >
           {loading ? (
             <ActivityIndicator size="small" color="#f97316" />
           ) : (
-            <RotateCcw color="#ffffff" size={18} />
+            <RotateCcw color={colorScheme === 'dark' ? '#ffffff' : '#475569'} size={18} />
           )}
         </Pressable>
       </View>

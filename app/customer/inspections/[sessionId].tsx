@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   ScrollView,
@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Platform,
   KeyboardAvoidingView,
+  useWindowDimensions,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -22,6 +23,7 @@ import {
   AlertTriangle,
   ZoomIn,
 } from 'lucide-react-native';
+import { useColorScheme } from 'nativewind';
 import { bookingWizardApi } from '@/features/bookings/api/booking-wizard.api';
 import { Text } from '@/shared/ui/Text';
 
@@ -35,6 +37,11 @@ export default function InspectionReviewScreen() {
     inspectionId?: string | string[];
   }>();
   const router = useRouter();
+  const { colorScheme } = useColorScheme();
+  const { width: windowWidth } = useWindowDimensions();
+  const [containerWidth, setContainerWidth] = useState(windowWidth - 32);
+  const scrollRef = useRef<ScrollView>(null);
+
   const normalizedSessionId = Array.isArray(sessionId) ? sessionId[0] : sessionId;
   const normalizedInspectionId = Array.isArray(inspectionId) ? inspectionId[0] : inspectionId;
 
@@ -42,6 +49,16 @@ export default function InspectionReviewScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [sessionDetail, setSessionDetail] = useState<any>(null);
   const [currentPhotoIdx, setCurrentPhotoIdx] = useState(0);
+
+  // Synchronize ScrollView offset when currentPhotoIdx changes
+  useEffect(() => {
+    if (scrollRef.current && containerWidth > 0) {
+      scrollRef.current.scrollTo({
+        x: currentPhotoIdx * containerWidth,
+        animated: true,
+      });
+    }
+  }, [currentPhotoIdx, containerWidth]);
 
   // States cho việc Từ chối
   const [rejectModalVisible, setRejectModalVisible] = useState(false);
@@ -197,26 +214,26 @@ export default function InspectionReviewScreen() {
 
   if (loading) {
     return (
-      <View className="flex-1 bg-slate-950 justify-center items-center">
+      <View className="flex-1 bg-[#f8fafc] dark:bg-[#0b0f19] justify-center items-center">
         <ActivityIndicator size="large" color="#f97316" />
-        <Text className="text-slate-400 mt-3 text-sm">Đang tải biên bản kiểm xe...</Text>
+        <Text className="text-slate-500 dark:text-slate-400 mt-3 text-sm">Đang tải biên bản kiểm xe...</Text>
       </View>
     );
   }
 
   if (!inspection) {
     return (
-      <View className="flex-1 bg-slate-950 justify-center items-center px-6">
+      <View className="flex-1 bg-[#f8fafc] dark:bg-[#0b0f19] justify-center items-center px-6">
         <XCircle color="#ef4444" size={48} />
-        <Text className="text-white font-bold text-lg mt-4 text-center">Không tìm thấy biên bản</Text>
-        <Text className="text-slate-400 text-sm mt-1 text-center">
+        <Text className="text-slate-900 dark:text-white font-bold text-lg mt-4 text-center">Không tìm thấy biên bản</Text>
+        <Text className="text-slate-500 dark:text-slate-400 text-sm mt-1 text-center">
           Biên bản kiểm xe không tồn tại hoặc đã bị hủy.
         </Text>
         <TouchableOpacity
           onPress={() => router.back()}
-          className="mt-6 bg-slate-900 border border-slate-800 px-5 py-2.5 rounded-xl"
+          className="mt-6 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-5 py-2.5 rounded-xl"
         >
-          <Text className="text-white font-bold text-xs">Quay lại</Text>
+          <Text className="text-slate-900 dark:text-white font-bold text-xs">Quay lại</Text>
         </TouchableOpacity>
       </View>
     );
@@ -225,34 +242,34 @@ export default function InspectionReviewScreen() {
   const currentPhoto = photos[currentPhotoIdx];
 
   return (
-    <SafeAreaView className="flex-1 bg-slate-950" edges={['top', 'bottom']}>
+    <SafeAreaView className="flex-1 bg-[#f8fafc] dark:bg-[#0b0f19]" edges={['top', 'bottom']}>
       {/* Header */}
-      <View className="flex-row items-center justify-between px-4 py-3 border-b border-slate-900 bg-slate-950/80">
-        <TouchableOpacity onPress={() => router.back()} className="p-1 rounded-lg bg-slate-900 border border-slate-800">
-          <ArrowLeft color="#fff" size={20} />
+      <View className="flex-row items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-900 bg-white/95 dark:bg-[#0b0f19]/95">
+        <TouchableOpacity onPress={() => router.back()} className="p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+          <ArrowLeft color={colorScheme === 'dark' ? '#fff' : '#475569'} size={20} />
         </TouchableOpacity>
-        <Text className="text-white font-bold text-base">Kiểm Xe {isCheckIn ? 'Bàn Giao' : 'Trả Xe'}</Text>
+        <Text className="text-slate-900 dark:text-white font-bold text-base">Kiểm Xe {isCheckIn ? 'Bàn Giao' : 'Trả Xe'}</Text>
         <View className="w-8" />
       </View>
 
-      <ScrollView className="flex-1 px-4" contentContainerStyle={{ paddingBottom: 40 }}>
+      <ScrollView className="flex-1 px-4" contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
         {/* Quy trình & Countdown Card */}
-        <View className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 mt-4 shadow-xl">
+        <View className="bg-white dark:bg-[#0f172a]/60 border border-slate-200 dark:border-slate-850 rounded-2xl p-4 mt-4 shadow-xl">
           <View className="flex-row justify-between items-start">
             <View className="flex-1 pr-2">
-              <Text className="text-orange-500 font-bold text-[10px] uppercase tracking-wider mb-1">
+              <Text className="text-[#ea580c] font-bold text-[10px] uppercase tracking-wider mb-1">
                 {isCheckIn ? 'QUY TRÌNH BÀN GIAO XE (CHECK-IN)' : 'QUY TRÌNH KIỂM XE TRẢ (CHECK-OUT)'}
               </Text>
-              <Text className="text-white font-bold text-lg leading-6 mb-1">
+              <Text className="text-slate-900 dark:text-white font-bold text-lg leading-6 mb-1">
                 {isCheckIn ? 'Kiểm Tra Tình Trạng Bàn Giao' : 'Kiểm Tra Tình Trạng Trả Xe'}
               </Text>
-              <Text className="text-slate-400 text-[10px] font-semibold leading-4">
+              <Text className="text-slate-500 dark:text-slate-400 text-[10px] font-semibold leading-4">
                 Phiên chơi:{' '}
-                <Text className="text-slate-300 font-mono">
+                <Text className="text-slate-850 dark:text-slate-300 font-mono" style={{ fontWeight: '700' }}>
                   {normalizedSessionId?.substring(0, 8).toUpperCase()}
                 </Text>{' '}
                 {'\n'}
-                Nhân viên: <Text className="text-slate-300">{sessionDetail?.staffName || 'Nhân viên trực ca'}</Text>
+                Nhân viên: <Text className="text-slate-800 dark:text-slate-300">{sessionDetail?.staffName || 'Nhân viên trực ca'}</Text>
               </Text>
             </View>
 
@@ -277,9 +294,9 @@ export default function InspectionReviewScreen() {
         </View>
 
         {/* Warning Banner */}
-        <View className="bg-amber-500/5 border border-amber-500/10 rounded-xl p-3.5 mt-3 flex-row gap-2.5 items-start">
+        <View className="bg-amber-500/10 dark:bg-amber-500/5 border border-amber-500/20 dark:border-amber-500/10 rounded-xl p-3.5 mt-3 flex-row gap-2.5 items-start">
           <AlertTriangle color="#f59e0b" size={16} className="mt-0.5" />
-          <Text className="text-amber-500/90 text-[11px] font-semibold leading-4 flex-1">
+          <Text className="text-amber-600 dark:text-amber-500/90 text-[11px] font-semibold leading-4 flex-1">
             Lưu ý: Vui lòng xem kỹ các góc ảnh chụp thực tế dưới đây. Bất kỳ điểm sai lệch nào cần được phản hồi ngay để staff kiểm tra lại trước khi tiếp tục quy trình.
           </Text>
         </View>
@@ -289,28 +306,28 @@ export default function InspectionReviewScreen() {
             <View className="flex-row items-start gap-2.5">
               <AlertTriangle color="#ef4444" size={17} />
               <View className="flex-1">
-                <Text className="text-red-300 font-bold text-xs uppercase tracking-wider">
+                <Text className="text-red-650 dark:text-red-300 font-bold text-xs uppercase tracking-wider">
                   Hư hỏng/phí phát sinh
                 </Text>
-                <Text className="text-red-100/80 text-[11px] leading-4 mt-1">
+                <Text className="text-slate-700 dark:text-red-100/80 text-[11px] leading-4 mt-1">
                   {damageSummary.description}
                 </Text>
               </View>
             </View>
-            <View className="mt-3 rounded-xl border border-red-500/20 bg-slate-950/50 p-3">
+            <View className="mt-3 rounded-xl border border-red-500/20 bg-slate-100/60 dark:bg-slate-950/50 p-3">
               <View className="flex-row justify-between gap-3">
-                <Text className="text-red-100/60 text-[11px]">Chi phí dự kiến</Text>
-                <Text className="text-red-100 text-[11px] font-bold">
+                <Text className="text-slate-600 dark:text-red-100/60 text-[11px]">Chi phí dự kiến</Text>
+                <Text className="text-slate-900 dark:text-red-100 text-[11px] font-bold">
                   {formatCurrency(damageSummary.estimatedCost)}
                 </Text>
               </View>
               <View className="mt-2 flex-row justify-between gap-3">
-                <Text className="text-red-100/60 text-[11px]">Hệ số hư hỏng</Text>
-                <Text className="text-red-100 text-[11px] font-bold">x{damageSummary.damageMultiplier}</Text>
+                <Text className="text-slate-600 dark:text-red-100/60 text-[11px]">Hệ số hư hỏng</Text>
+                <Text className="text-slate-900 dark:text-red-100 text-[11px] font-bold">x{damageSummary.damageMultiplier}</Text>
               </View>
               <View className="mt-2 flex-row justify-between gap-3">
-                <Text className="text-red-100/60 text-[11px]">Tổng tính phí</Text>
-                <Text className="text-red-300 text-[12px] font-black">
+                <Text className="text-slate-650 dark:text-red-100/60 text-[11px]">Tổng tính phí</Text>
+                <Text className="text-red-600 dark:text-red-300 text-[12px] font-black">
                   {formatCurrency(damageSummary.finalCharge)}
                 </Text>
               </View>
@@ -319,15 +336,40 @@ export default function InspectionReviewScreen() {
         ) : null}
 
         {/* Photo Section */}
-        <View className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 mt-4 shadow-xl">
+        <View className="bg-white dark:bg-[#0f172a]/60 border border-slate-200 dark:border-slate-850 rounded-2xl p-4 mt-4 shadow-xl">
           {photos.length > 0 ? (
             <View>
-              {/* Main Photo Card */}
-              <View className="w-full aspect-[4/3] rounded-xl bg-slate-950 border border-slate-900 overflow-hidden relative">
-                <Image
-                  source={{ uri: currentPhoto?.url }}
-                  className="w-full h-full object-cover"
-                />
+              {/* Main Photo Card with Swiping support */}
+              <View
+                onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
+                className="w-full aspect-[4/3] rounded-xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-900 overflow-hidden relative"
+              >
+                <ScrollView
+                  ref={scrollRef}
+                  horizontal
+                  pagingEnabled
+                  showsHorizontalScrollIndicator={false}
+                  onMomentumScrollEnd={(e) => {
+                    const contentOffset = e.nativeEvent.contentOffset.x;
+                    const layoutWidth = e.nativeEvent.layoutMeasurement.width;
+                    if (layoutWidth > 0) {
+                      const newIndex = Math.round(contentOffset / layoutWidth);
+                      if (newIndex !== currentPhotoIdx && newIndex >= 0 && newIndex < photos.length) {
+                        setCurrentPhotoIdx(newIndex);
+                      }
+                    }
+                  }}
+                  className="w-full h-full"
+                >
+                  {photos.map((p: any, idx: number) => (
+                    <View key={idx} style={{ width: containerWidth, height: '100%' }}>
+                      <Image
+                        source={{ uri: p.url }}
+                        className="w-full h-full object-cover"
+                      />
+                    </View>
+                  ))}
+                </ScrollView>
                 
                 {/* Angle Tag */}
                 <View className="absolute top-3 left-3 bg-black/70 px-2.5 py-1 rounded-md border border-slate-800">
@@ -346,9 +388,9 @@ export default function InspectionReviewScreen() {
               </View>
 
               {/* Angle Description */}
-              <View className="mt-3 p-3 rounded-xl bg-slate-950 border border-slate-900/50">
+              <View className="mt-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-900/50">
                 <Text className="text-slate-500 text-[9px] font-black uppercase tracking-wider">Ghi chú ảnh của staff</Text>
-                <Text className="text-slate-300 text-xs font-semibold mt-0.5">
+                <Text className="text-slate-700 dark:text-slate-300 text-xs font-semibold mt-0.5">
                   {currentPhoto?.notes || `Ảnh kiểm xe góc ${currentPhoto?.angle || ''}`}
                 </Text>
               </View>
@@ -360,16 +402,16 @@ export default function InspectionReviewScreen() {
                   onPress={() => setCurrentPhotoIdx((p) => p - 1)}
                   className={`px-4 py-2 rounded-lg border flex-row items-center gap-1 ${
                     currentPhotoIdx === 0
-                      ? 'border-slate-900 bg-slate-950/30'
-                      : 'border-slate-800 bg-slate-950'
+                      ? 'border-slate-200 dark:border-slate-900 bg-slate-100/30 dark:bg-slate-950/30 opacity-40'
+                      : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950'
                   }`}
                 >
-                  <Text className={`text-xs font-bold ${currentPhotoIdx === 0 ? 'text-slate-600' : 'text-white'}`}>
+                  <Text className={`text-xs font-bold ${currentPhotoIdx === 0 ? 'text-slate-400 dark:text-slate-600' : 'text-slate-700 dark:text-white'}`}>
                     ‹ Góc trước
                   </Text>
                 </TouchableOpacity>
 
-                <Text className="text-slate-400 font-bold text-xs">
+                <Text className="text-slate-500 dark:text-slate-400 font-bold text-xs">
                   Góc {currentPhotoIdx + 1} / {photos.length}
                 </Text>
 
@@ -378,11 +420,11 @@ export default function InspectionReviewScreen() {
                   onPress={() => setCurrentPhotoIdx((p) => p + 1)}
                   className={`px-4 py-2 rounded-lg border flex-row items-center gap-1 ${
                     currentPhotoIdx === photos.length - 1
-                      ? 'border-slate-900 bg-slate-950/30'
-                      : 'border-slate-800 bg-slate-950'
+                      ? 'border-slate-200 dark:border-slate-900 bg-slate-100/30 dark:bg-slate-950/30 opacity-40'
+                      : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950'
                   }`}
                 >
-                  <Text className={`text-xs font-bold ${currentPhotoIdx === photos.length - 1 ? 'text-slate-600' : 'text-white'}`}>
+                  <Text className={`text-xs font-bold ${currentPhotoIdx === photos.length - 1 ? 'text-slate-400 dark:text-slate-600' : 'text-slate-700 dark:text-white'}`}>
                     Góc sau ›
                   </Text>
                 </TouchableOpacity>
@@ -395,7 +437,7 @@ export default function InspectionReviewScreen() {
                     key={idx}
                     onPress={() => setCurrentPhotoIdx(idx)}
                     className={`w-14 aspect-square rounded-lg overflow-hidden border-2 ${
-                      idx === currentPhotoIdx ? 'border-orange-500' : 'border-slate-800 opacity-60'
+                      idx === currentPhotoIdx ? 'border-orange-500' : 'border-slate-200 dark:border-slate-850 opacity-60'
                     }`}
                   >
                     <Image source={{ uri: p.url }} className="w-full h-full object-cover" />
@@ -404,7 +446,7 @@ export default function InspectionReviewScreen() {
               </View>
             </View>
           ) : (
-            <View className="w-full aspect-[4/3] rounded-xl bg-slate-950 border border-slate-900 justify-center items-center p-6">
+            <View className="w-full aspect-[4/3] rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-900 justify-center items-center p-6">
               <Camera color="#475569" size={32} />
               <Text className="text-slate-500 font-bold text-xs mt-2">Chưa cập nhật ảnh</Text>
             </View>
@@ -412,12 +454,12 @@ export default function InspectionReviewScreen() {
         </View>
 
         {/* Checklist Section */}
-        <View className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 mt-4 shadow-xl">
-          <View className="flex-row items-center gap-2 mb-3.5 border-b border-slate-800/80 pb-2.5">
+        <View className="bg-white dark:bg-[#0f172a]/60 border border-slate-200 dark:border-slate-850 rounded-2xl p-4 mt-4 shadow-xl">
+          <View className="flex-row items-center gap-2 mb-3.5 border-b border-slate-200 dark:border-slate-800/80 pb-2.5">
             <CheckCircle2 color="#10b981" size={16} />
             <View>
-              <Text className="text-white font-bold text-xs">CHECKLIST AN TOÀN THIẾT BỊ</Text>
-              <Text className="text-slate-500 text-[9px] font-bold mt-0.5">Nhân viên đã kiểm thử thực tế và tick chọn.</Text>
+              <Text className="text-slate-900 dark:text-white font-bold text-xs">CHECKLIST AN TOÀN THIẾT BỊ</Text>
+              <Text className="text-slate-550 dark:text-slate-500 text-[9px] font-bold mt-0.5">Nhân viên đã kiểm thử thực tế và tick chọn.</Text>
             </View>
           </View>
 
@@ -426,7 +468,7 @@ export default function InspectionReviewScreen() {
               {checklist.map((item: any, idx: number) => (
                 <View
                   key={idx}
-                  className="flex-row items-center gap-3 p-3 rounded-xl bg-slate-950 border border-slate-900/60"
+                  className="flex-row items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-900/60"
                 >
                   <View
                     className={`p-1.5 rounded-full border ${
@@ -442,7 +484,7 @@ export default function InspectionReviewScreen() {
                     )}
                   </View>
                   <View className="flex-1">
-                    <Text className="text-slate-200 text-xs font-semibold">{item.label}</Text>
+                    <Text className="text-slate-700 dark:text-slate-200 text-xs font-semibold">{item.label}</Text>
                     {item.notes ? (
                       <Text className="text-slate-500 text-[10px] mt-0.5">Ghi chú: {item.notes}</Text>
                     ) : null}
@@ -456,11 +498,11 @@ export default function InspectionReviewScreen() {
               ))}
             </View>
           ) : (
-            <View className="p-3 rounded-xl bg-slate-950 border border-slate-900/60 flex-row items-center gap-3">
+            <View className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-900/60 flex-row items-center gap-3">
               <View className="bg-emerald-500/10 p-1.5 rounded-full border border-emerald-500/20">
                 <CheckCircle2 color="#10b981" size={14} />
               </View>
-              <Text className="text-slate-300 text-xs font-semibold">Tất cả linh kiện đã qua kiểm tra an toàn</Text>
+              <Text className="text-slate-700 dark:text-slate-300 text-xs font-semibold">Tất cả linh kiện đã qua kiểm tra an toàn</Text>
             </View>
           )}
         </View>
@@ -471,14 +513,14 @@ export default function InspectionReviewScreen() {
             <TouchableOpacity
               disabled={submitting}
               onPress={handleConfirm}
-              className="w-full bg-[#0a0f1d] border border-orange-500/30 h-12 rounded-xl justify-center items-center shadow-lg active:opacity-80 flex-row gap-2"
+              className="w-full bg-[#ea580c] active:bg-[#f97316] h-12 rounded-xl justify-center items-center shadow-lg flex-row gap-2"
             >
               {submitting ? (
-                <ActivityIndicator size="small" color="#f97316" />
+                <ActivityIndicator size="small" color="#ffffff" />
               ) : (
                 <>
-                  <CheckCircle2 color="#f97316" size={16} />
-                  <Text className="text-orange-500 font-bold text-xs uppercase tracking-wider">
+                  <CheckCircle2 color="#ffffff" size={16} />
+                  <Text className="text-white font-bold text-xs uppercase tracking-wider">
                     Tôi đồng ý biên bản trả xe & Hoàn tất
                   </Text>
                 </>
@@ -488,19 +530,19 @@ export default function InspectionReviewScreen() {
             <TouchableOpacity
               disabled={submitting}
               onPress={() => setRejectModalVisible(true)}
-              className="w-full bg-red-500/5 border border-red-500/20 h-12 rounded-xl justify-center items-center active:opacity-80 flex-row gap-2 mt-2"
+              className="w-full bg-red-500/10 border border-red-500/20 dark:border-red-500/10 h-12 rounded-xl justify-center items-center active:opacity-80 flex-row gap-2 mt-2"
             >
               <XCircle color="#ef4444" size={16} />
-              <Text className="text-red-400 font-bold text-xs uppercase tracking-wider">
+              <Text className="text-red-500 dark:text-red-400 font-bold text-xs uppercase tracking-wider">
                 Tôi phát hiện sai lệch / Từ chối trả xe
               </Text>
             </TouchableOpacity>
           </View>
         ) : (
-          <View className="mt-6 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4">
+          <View className="mt-6 rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-4">
             <View className="flex-row items-center gap-2">
               <CheckCircle2 color="#34d399" size={16} />
-              <Text className="text-emerald-300 text-xs font-bold">
+              <Text className="text-emerald-600 dark:text-emerald-300 text-xs font-bold">
                 Biên bản này đã được ghi nhận, không cần thao tác thêm.
               </Text>
             </View>
@@ -533,15 +575,15 @@ export default function InspectionReviewScreen() {
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
           >
-            <View className="bg-slate-900 border-t border-slate-800 rounded-t-3xl p-6 pb-10 space-y-4">
-              <View className="flex-row justify-between items-center border-b border-slate-800 pb-3">
-                <Text className="text-white font-bold text-base">Lý Do Từ Chối Biên Bản</Text>
+            <View className="bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 rounded-t-3xl p-6 pb-10 space-y-4">
+              <View className="flex-row justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-3">
+                <Text className="text-slate-900 dark:text-white font-bold text-base">Lý Do Từ Chối Biên Bản</Text>
                 <TouchableOpacity onPress={() => setRejectModalVisible(false)}>
-                  <XCircle color="#94a3b8" size={22} />
+                  <XCircle color={colorScheme === 'dark' ? '#94a3b8' : '#64748b'} size={22} />
                 </TouchableOpacity>
               </View>
 
-              <Text className="text-slate-400 text-xs leading-4">
+              <Text className="text-slate-500 dark:text-slate-400 text-xs leading-4">
                 Vui lòng chỉ rõ điểm không đồng ý hoặc sai lệch về hình ảnh/checklist xe để nhân viên trực ca thực hiện điều chỉnh và bàn giao lại.
               </Text>
 
@@ -551,17 +593,17 @@ export default function InspectionReviewScreen() {
                 value={disagreementNote}
                 onChangeText={setDisagreementNote}
                 placeholder="Nhập lý do chi tiết (ví dụ: ảnh xe không khớp, xước cánh gió nhưng chưa note, v.v.)..."
-                placeholderTextColor="#475569"
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3.5 text-white text-xs font-semibold leading-5 text-start"
+                placeholderTextColor={colorScheme === 'dark' ? '#475569' : '#94a3b8'}
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 text-slate-900 dark:text-white text-xs font-semibold leading-5 text-start"
                 style={{ minHeight: 100, textAlignVertical: 'top' }}
               />
 
               <View className="flex-row gap-3 pt-2">
                 <TouchableOpacity
                   onPress={() => setRejectModalVisible(false)}
-                  className="flex-1 bg-slate-950 border border-slate-800 h-11 rounded-xl justify-center items-center"
+                  className="flex-1 bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 h-11 rounded-xl justify-center items-center"
                 >
-                  <Text className="text-slate-400 font-bold text-xs">Hủy bỏ</Text>
+                  <Text className="text-slate-650 dark:text-slate-450 font-bold text-xs">Hủy bỏ</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity

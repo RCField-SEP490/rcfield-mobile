@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
   Pressable,
   ScrollView,
   View,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -14,7 +14,6 @@ import {
   MapPin,
   CalendarDays,
   Package as PackageIcon,
-  Car,
   ArrowRight,
   Star,
   Clock,
@@ -138,6 +137,7 @@ const STEPS = [
 export function HomeScreen() {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   const [loading, setLoading] = useState(true);
   const [upcomingBooking, setUpcomingBooking] = useState<BookingListItem | null>(null);
@@ -151,7 +151,7 @@ export function HomeScreen() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      if (!isCustomer) {
+      if (!isAuthenticated || !isCustomer) {
         const cafesResult = await getCafes();
         setUpcomingBooking(null);
         setActivePackages([]);
@@ -177,18 +177,35 @@ export function HomeScreen() {
     } finally {
       setLoading(false);
     }
-  }, [isCustomer]);
+  }, [isAuthenticated, isCustomer]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const handleActionWithAuth = (action: () => void, actionName: string) => {
+    if (!isAuthenticated) {
+      Alert.alert(
+        'Yêu cầu đăng nhập',
+        `Vui lòng đăng nhập để sử dụng tính năng ${actionName}.`,
+        [
+          { text: 'Hủy', style: 'cancel' },
+          { text: 'Đăng nhập', onPress: () => router.push('/(auth)/login') },
+        ]
+      );
+      return;
+    }
+    action();
+  };
 
   const handleNavigateToExplore = () => {
     requestMainTab(1);
   };
 
   const handleNavigateToBookings = () => {
-    requestMainTab(2);
+    handleActionWithAuth(() => {
+      requestMainTab(2);
+    }, 'Lịch đặt');
   };
 
   const handleSelectCafe = (cafeId: string) => {
@@ -199,13 +216,13 @@ export function HomeScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-[#0b0f19]" edges={['top', 'left', 'right']}>
-      {/* Background Glows */}
-      <View className="absolute -top-20 -right-20 w-85 h-85 rounded-full bg-[#f97316]/5 blur-3xl pointer-events-none" />
-      <View className="absolute bottom-10 -left-20 w-85 h-85 rounded-full bg-[#3b82f6]/5 blur-3xl pointer-events-none" />
+    <SafeAreaView className="flex-grow flex-1 bg-[#f8fafc] dark:bg-[#0b0f19]" edges={['top', 'left', 'right']}>
+      {/* Background Glows (Hiển thị mờ ở light mode và rõ ở dark mode) */}
+      <View className="absolute -top-20 -right-20 w-85 h-85 rounded-full bg-[#f97316]/5 blur-3xl opacity-30 dark:opacity-100 pointer-events-none" />
+      <View className="absolute bottom-10 -left-20 w-85 h-85 rounded-full bg-[#3b82f6]/5 blur-3xl opacity-30 dark:opacity-100 pointer-events-none" />
 
       {loading ? (
-        <View className="flex-1 items-center justify-center">
+        <View className="flex-1 items-center justify-center bg-[#f8fafc] dark:bg-[#0b0f19]">
           <ActivityIndicator size="large" color="#f97316" />
         </View>
       ) : (
@@ -224,7 +241,7 @@ export function HomeScreen() {
           {/* Header Section */}
           <View className="flex-row items-center justify-between mb-5">
             <View className="flex-row items-center gap-3.5">
-              {user?.avatarUrl ? (
+              {isAuthenticated && user?.avatarUrl ? (
                 <Image
                   source={{ uri: user.avatarUrl }}
                   className="h-11 w-11 rounded-full border border-[#f97316]/30 shadow-md"
@@ -232,145 +249,80 @@ export function HomeScreen() {
               ) : (
                 <View className="h-11 w-11 items-center justify-center rounded-full bg-[#ea580c]/10 border border-[#ea580c]/30">
                   <Text className="text-[13px] font-bold text-[#f97316]">
-                    {getInitials(displayName)}
+                    {isAuthenticated ? getInitials(displayName) : 'G'}
                   </Text>
                 </View>
               )}
               <View>
-                <Text className="text-[11px] text-slate-400 font-semibold">{greeting},</Text>
-                <Text className="text-[16px] text-white" weight="700">
-                  {displayName}
+                <Text className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">
+                  {isAuthenticated ? `${greeting},` : 'Chào mừng bạn đến với'}
+                </Text>
+                <Text className="text-[16px] text-slate-900 dark:text-white" weight="700">
+                  {isAuthenticated ? displayName : 'RCField Platform'}
                 </Text>
               </View>
             </View>
-            <NotificationBellButton size="md" />
+            {isAuthenticated ? (
+              <NotificationBellButton size="md" />
+            ) : (
+              <Pressable
+                onPress={() => router.push('/(auth)/login')}
+                className="rounded-xl bg-[#ea580c] px-3.5 py-1.5 active:bg-[#f97316] shadow-sm"
+              >
+                <Text className="text-[11px] text-white font-bold">Đăng nhập</Text>
+              </Pressable>
+            )}
           </View>
 
-          {/* Hero Promo Banner (Bổ sung mới theo Web) */}
-          <Pressable
-            onPress={handleNavigateToExplore}
-            className="mb-6 rounded-2xl border border-slate-800 bg-[#0f172a]/70 p-5 shadow-lg overflow-hidden"
-          >
-            {/* Background overlay glow */}
-            <View className="absolute -top-12 -right-12 w-28 h-28 rounded-full bg-[#f97316]/5 blur-xl pointer-events-none" />
-
-            <View className="flex-row gap-4">
-              {/* Cột trái: Nội dung chữ */}
-              <View className="flex-1 pr-1">
-                <View className="rounded-lg bg-[#ea580c]/10 border border-[#ea580c]/20 px-2 py-0.5 self-start mb-2.5">
-                  <Text className="text-[8px] text-[#f97316] font-bold uppercase tracking-wider">
-                    Nền tảng đặt lịch RC tại Việt Nam
-                  </Text>
-                </View>
-
-                <Text className="text-[17px] text-white leading-6.5" weight="700">
-                  Chạy RC <Text className="text-[#f97316]">đúng sân</Text>,{'\n'}đúng giờ, không lo cọc.
-                </Text>
-                
-                <Text className="text-[10px] text-slate-400 mt-2 leading-4 font-semibold">
-                  Tìm RC Cafe gần bạn, thuê xe và thanh toán cọc online trong vài phút.
-                </Text>
-
-                <View className="flex-row items-center gap-1.5 mt-3.5">
-                  <Text className="text-[11px] text-[#f97316]" weight="700">
-                    Khám phá ngay
-                  </Text>
-                  <ArrowRight color="#f97316" size={12} />
-                </View>
-              </View>
-
-              {/* Cột phải: Hình ảnh minh hoạ xe RC đỏ giống Web */}
-              <View className="justify-center items-center">
-                <Image
-                  source={{ uri: 'https://images.unsplash.com/photo-1594787318286-3d835c1d207f?q=80&w=250&auto=format&fit=crop' }}
-                  className="h-24 w-24 rounded-2xl border border-slate-800"
-                  style={{ transform: [{ rotate: '-6deg' }] }}
-                />
-              </View>
-            </View>
-
-            {/* Stats chân banner */}
-            <View className="h-[1px] bg-slate-800/80 my-4" />
-            <View className="flex-row justify-between items-center px-1">
-              <View className="items-center">
-                <Text className="text-[13px] text-white" weight="700">50+</Text>
-                <Text className="text-[9px] text-slate-500 font-semibold mt-0.5">RC Cafe</Text>
-              </View>
-              <View className="items-center">
-                <Text className="text-[13px] text-white" weight="700">12k+</Text>
-                <Text className="text-[9px] text-slate-500 font-semibold mt-0.5">Phiên chơi</Text>
-              </View>
-              <View className="items-center">
-                <Text className="text-[13px] text-white" weight="700">4.8★</Text>
-                <Text className="text-[9px] text-slate-500 font-semibold mt-0.5">Đánh giá TB</Text>
-              </View>
-            </View>
-          </Pressable>
 
           {/* Quick Actions Grid */}
           <View className="flex-row gap-3 mb-6">
             <Pressable
               onPress={handleNavigateToExplore}
-              className="flex-1 flex-col items-center gap-2 rounded-2xl border border-slate-800 bg-[#0f172a]/50 py-3.5 shadow-sm active:bg-slate-900/50"
+              className="flex-1 flex-col items-center gap-2 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/50 py-3.5 shadow-sm active:bg-slate-100 dark:active:bg-slate-900/50"
             >
               <View className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-600/10 border border-orange-500/20">
                 <MapPin color="#ea580c" size={20} />
               </View>
-              <Text className="text-[12px] text-slate-200" weight="700">
+              <Text className="text-[12px] text-slate-800 dark:text-slate-200" weight="700">
                 Tìm sân
               </Text>
             </Pressable>
 
             <Pressable
               onPress={handleNavigateToBookings}
-              className="flex-1 flex-col items-center gap-2 rounded-2xl border border-slate-800 bg-[#0f172a]/50 py-3.5 shadow-sm active:bg-slate-900/50"
+              className="flex-1 flex-col items-center gap-2 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/50 py-3.5 shadow-sm active:bg-slate-100 dark:active:bg-slate-900/50"
             >
               <View className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600/10 border border-emerald-500/20">
                 <CalendarDays color="#10b981" size={20} />
               </View>
-              <Text className="text-[12px] text-slate-200" weight="700">
+              <Text className="text-[12px] text-slate-800 dark:text-slate-200" weight="700">
                 Lịch đặt
               </Text>
             </Pressable>
 
             <Pressable
-              onPress={() => router.push('/customer/packages' as any)}
-              className="flex-1 flex-col items-center gap-2 rounded-2xl border border-slate-800 bg-[#0f172a]/50 py-3.5 shadow-sm active:bg-slate-900/50"
+              onPress={() => handleActionWithAuth(() => router.push('/customer/packages' as any), 'Gói chơi')}
+              className="flex-1 flex-col items-center gap-2 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/50 py-3.5 shadow-sm active:bg-slate-100 dark:active:bg-slate-900/50"
             >
               <View className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-600/10 border border-violet-500/20">
                 <PackageIcon color="#8b5cf6" size={20} />
               </View>
-              <Text className="text-[12px] text-slate-200" weight="700">
+              <Text className="text-[12px] text-slate-800 dark:text-slate-200" weight="700">
                 Gói chơi
-              </Text>
-            </Pressable>
-
-            <Pressable
-              onPress={() =>
-                React['startTransition'](() => {
-                  Alert.alert('Đội xe', 'Tính năng Xe của tôi (BYOC) đang được nâng cấp.');
-                })
-              }
-              className="flex-1 flex-col items-center gap-2 rounded-2xl border border-slate-800 bg-[#0f172a]/50 py-3.5 shadow-sm active:bg-slate-900/50"
-            >
-              <View className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-600/10 border border-sky-500/20">
-                <Car color="#0ea5e9" size={20} />
-              </View>
-              <Text className="text-[12px] text-slate-200" weight="700">
-                Đội xe
               </Text>
             </Pressable>
           </View>
 
           {/* Upcoming Booking / Payment Alert */}
           <View className="mb-6">
-            <Text className="text-[13px] text-slate-400 uppercase tracking-wider mb-2.5 font-bold">
+            <Text className="text-[13px] text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2.5 font-bold">
               Lịch đặt sắp tới
             </Text>
 
             {upcomingBooking ? (
               upcomingBooking.status === 'PENDING' ? (
-                <View className="rounded-2xl border border-amber-900/40 bg-amber-950/15 p-4 flex-row gap-3">
+                <View className="rounded-2xl border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-950/15 p-4 flex-row gap-3">
                   <View className="h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 border border-amber-500/20">
                     <AlertTriangle color="#f59e0b" size={20} />
                   </View>
@@ -379,10 +331,10 @@ export function HomeScreen() {
                       <Text className="text-[14px] text-amber-500" weight="700">
                         Chờ thanh toán
                       </Text>
-                      <Text className="text-[11px] text-amber-500/80 mt-0.5 leading-4 font-semibold">
+                      <Text className="text-[11px] text-slate-600 dark:text-amber-500/80 mt-0.5 leading-4 font-semibold">
                         Lịch đặt của bạn sẽ bị hủy nếu không thanh toán trước khi hết hạn.
                       </Text>
-                      <Text className="text-[12px] text-slate-200 mt-2 font-bold">
+                      <Text className="text-[12px] text-slate-800 dark:text-slate-200 mt-2 font-bold">
                         {formatTimeRange(upcomingBooking.slotStart, upcomingBooking.slotEnd)}
                       </Text>
                     </View>
@@ -395,41 +347,41 @@ export function HomeScreen() {
                   </View>
                 </View>
               ) : (
-                <View className="rounded-2xl border border-emerald-950 bg-emerald-950/10 p-4 flex-row gap-3">
+                <View className="rounded-2xl border border-emerald-200 dark:border-emerald-950 bg-emerald-50 dark:bg-emerald-950/10 p-4 flex-row gap-3">
                   <View className="h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 border border-emerald-500/20">
                     <Clock color="#10b981" size={20} />
                   </View>
                   <View className="flex-1">
                     <View className="flex-row justify-between items-center">
-                      <Text className="text-[14px] text-emerald-400 font-bold">
+                      <Text className="text-[14px] text-emerald-600 dark:text-emerald-400 font-bold">
                         Sắp diễn ra
                       </Text>
                       <View className="rounded bg-emerald-500/20 px-1.5 py-0.5">
-                        <Text className="text-[9px] text-emerald-400 font-bold">
+                        <Text className="text-[9px] text-emerald-600 dark:text-emerald-400 font-bold">
                           {upcomingBooking.playMode}
                         </Text>
                       </View>
                     </View>
-                    <Text className="text-[12px] text-slate-300 mt-1">
+                    <Text className="text-[12px] text-slate-500 dark:text-slate-300 mt-1">
                       Thời gian:
                     </Text>
-                    <Text className="text-[13px] text-white mt-0.5 font-bold">
+                    <Text className="text-[13px] text-slate-900 dark:text-white mt-0.5 font-bold">
                       {formatTimeRange(upcomingBooking.slotStart, upcomingBooking.slotEnd)}
                     </Text>
                     <Pressable
                       onPress={handleNavigateToBookings}
                       className="mt-3 flex-row items-center gap-1 active:opacity-75"
                     >
-                      <Text className="text-[12px] text-emerald-400 font-bold">Xem vé check-in</Text>
+                      <Text className="text-[12px] text-emerald-600 dark:text-emerald-400 font-bold">Xem vé check-in</Text>
                       <ArrowRight color="#10b981" size={13} />
                     </Pressable>
                   </View>
                 </View>
               )
             ) : (
-              <View className="rounded-2xl border border-dashed border-slate-800 bg-[#0f172a]/30 p-5 items-center">
-                <Text className="text-[13px] text-slate-300 font-bold">Chưa có lịch đặt sân nào</Text>
-                <Text className="mt-1 text-[11px] text-slate-400 text-center leading-4 font-semibold">
+              <View className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/30 p-5 items-center">
+                <Text className="text-[13px] text-slate-800 dark:text-slate-300 font-bold">Chưa có lịch đặt sân nào</Text>
+                <Text className="mt-1 text-[11px] text-slate-500 dark:text-slate-400 text-center leading-4 font-semibold">
                   Tìm sân đua gần bạn và lên lịch chạy ngay hôm nay!
                 </Text>
                 <Pressable
@@ -447,7 +399,7 @@ export function HomeScreen() {
 
           {/* Active Packages (Gói hội viên đang dùng) */}
           <View className="mb-6">
-            <Text className="text-[13px] text-slate-400 uppercase tracking-wider mb-2.5 font-bold">
+            <Text className="text-[13px] text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2.5 font-bold">
               Gói hội viên đang dùng
             </Text>
 
@@ -463,15 +415,15 @@ export function HomeScreen() {
                   return (
                     <Pressable
                       key={pkg.id}
-                      onPress={() => router.push('/customer/packages' as any)}
-                      className="w-64 rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-4 shadow-sm active:bg-slate-900/60"
+                      onPress={() => handleActionWithAuth(() => router.push('/customer/packages' as any), 'Gói chơi')}
+                      className="w-64 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-4 shadow-sm active:bg-slate-100 dark:active:bg-slate-900/60"
                     >
                       <View className="flex-row justify-between items-start">
                         <View className="flex-1 pr-2">
-                          <Text className="text-[13px] text-white" weight="700" numberOfLines={1}>
+                          <Text className="text-[13px] text-slate-900 dark:text-white" weight="700" numberOfLines={1}>
                             {pkg.package_name}
                           </Text>
-                          <Text className="text-[10px] text-slate-400 mt-0.5" numberOfLines={1}>
+                          <Text className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5" numberOfLines={1}>
                             {pkg.cafe_name}
                           </Text>
                         </View>
@@ -482,12 +434,12 @@ export function HomeScreen() {
 
                       <View className="mt-4">
                         <View className="flex-row justify-between items-baseline mb-1">
-                          <Text className="text-[10px] text-slate-400 font-semibold">Tình trạng sử dụng</Text>
-                          <Text className="text-[12px] text-white" weight="700">
+                          <Text className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">Tình trạng sử dụng</Text>
+                          <Text className="text-[12px] text-slate-800 dark:text-white" weight="700">
                             {pkg.slots_remaining} / {pkg.slots_total} slots
                           </Text>
                         </View>
-                        <View className="h-2 w-full rounded-full bg-slate-800 overflow-hidden">
+                        <View className="h-2 w-full rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
                           <View
                             className="h-full rounded-full bg-[#f97316]"
                             style={{ width: `${100 - usedPercent}%` }}
@@ -497,7 +449,7 @@ export function HomeScreen() {
 
                       <View className="mt-4 flex-row items-center gap-1">
                         <Clock color="#94a3b8" size={11} />
-                        <Text className="text-[10px] text-slate-400 font-semibold">
+                        <Text className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">
                           Hạn dùng: {formatExpiryDate(pkg.expires_at)}
                         </Text>
                       </View>
@@ -506,20 +458,20 @@ export function HomeScreen() {
                 })}
               </ScrollView>
             ) : (
-              <View className="rounded-2xl border border-dashed border-slate-800 bg-[#0f172a]/30 p-5 items-center">
-                <Text className="text-[13px] text-slate-300 font-bold">Bạn chưa sở hữu gói hội viên nào</Text>
-                <Text className="mt-1 text-[11px] text-slate-400 text-center leading-4 font-semibold">
+              <View className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/30 p-5 items-center">
+                <Text className="text-[13px] text-slate-800 dark:text-slate-300 font-bold">Bạn chưa sở hữu gói hội viên nào</Text>
+                <Text className="mt-1 text-[11px] text-slate-500 dark:text-slate-400 text-center leading-4 font-semibold text-center">
                   Mua gói hội viên ngay để tiết kiệm chi phí và nhận nhiều ưu đãi slots chơi.
                 </Text>
               </View>
             )}
           </View>
 
-          {/* Quy trình 4 bước (Bổ sung mới theo Web) */}
+          {/* Quy trình 4 bước */}
           <View className="mb-6">
             <View className="flex-row items-center gap-1.5 mb-2.5">
               <Sparkles color="#f97316" size={15} />
-              <Text className="text-[13px] text-slate-400 uppercase tracking-wider font-bold">
+              <Text className="text-[13px] text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold">
                 Quy trình đặt sân
               </Text>
             </View>
@@ -535,7 +487,7 @@ export function HomeScreen() {
                 return (
                   <View
                     key={idx}
-                    className="w-52 rounded-2xl border border-slate-800 bg-[#0f172a]/40 p-4 shadow-sm"
+                    className="w-52 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/40 p-4 shadow-sm"
                   >
                     <View className="flex-row justify-between items-center mb-3">
                       <View
@@ -547,14 +499,14 @@ export function HomeScreen() {
                       >
                         <IconComponent color={step.color} size={16} />
                       </View>
-                      <Text className="text-[14px] text-slate-600" weight="700">
+                      <Text className="text-[14px] text-slate-400 dark:text-slate-600" weight="700">
                         {step.num}
                       </Text>
                     </View>
-                    <Text className="text-[12px] text-white" weight="700">
+                    <Text className="text-[12px] text-slate-900 dark:text-white" weight="700">
                       {step.title}
                     </Text>
-                    <Text className="text-[10px] text-slate-400 mt-1 leading-4.5 font-semibold">
+                    <Text className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 leading-4.5 font-semibold">
                       {step.desc}
                     </Text>
                   </View>
@@ -563,11 +515,11 @@ export function HomeScreen() {
             </ScrollView>
           </View>
 
-          {/* Người chơi nói gì (Testimonial - Bổ sung mới theo Web) */}
+          {/* Người chơi nói gì */}
           <View className="mb-6">
             <View className="flex-row items-center gap-1.5 mb-2.5">
               <MessageSquare color="#f97316" size={15} />
-              <Text className="text-[13px] text-slate-400 uppercase tracking-wider font-bold">
+              <Text className="text-[13px] text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold">
                 Người chơi nói gì
               </Text>
             </View>
@@ -581,7 +533,7 @@ export function HomeScreen() {
               {REVIEWS.map((rev) => (
                 <View
                   key={rev.id}
-                  className="w-64 rounded-2xl border border-slate-800 bg-[#0f172a]/40 p-4 shadow-sm"
+                  className="w-64 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/40 p-4 shadow-sm"
                 >
                   {/* Sao đánh giá */}
                   <View className="flex-row gap-0.5 mb-2">
@@ -590,12 +542,12 @@ export function HomeScreen() {
                     ))}
                   </View>
 
-                  <Text className="text-[11px] text-slate-300 italic leading-4.5 font-semibold">
+                  <Text className="text-[11px] text-slate-700 dark:text-slate-300 italic leading-4.5 font-semibold">
                     &quot;{rev.content}&quot;
                   </Text>
 
                   {/* Divider */}
-                  <View className="h-[1px] bg-slate-800/60 my-3" />
+                  <View className="h-[1px] bg-slate-200 dark:bg-slate-800/60 my-3" />
 
                   {/* Info reviewer */}
                   <View className="flex-row items-center gap-2.5">
@@ -603,10 +555,10 @@ export function HomeScreen() {
                       <Text className="text-[9px] font-bold text-[#f97316]">{rev.avatar}</Text>
                     </View>
                     <View className="flex-1">
-                      <Text className="text-[11px] text-white" weight="700" numberOfLines={1}>
+                      <Text className="text-[11px] text-slate-900 dark:text-white" weight="700" numberOfLines={1}>
                         {rev.name}
                       </Text>
-                      <Text className="text-[9px] text-slate-500 font-semibold" numberOfLines={1}>
+                      <Text className="text-[9px] text-slate-500 dark:text-slate-400 font-semibold" numberOfLines={1}>
                         {rev.role}
                       </Text>
                     </View>
@@ -616,10 +568,10 @@ export function HomeScreen() {
             </ScrollView>
           </View>
 
-          {/* Featured Cafes (Sân RC nổi bật - Giữ nguyên vị trí ưu tiên hiện tại) */}
+          {/* Featured Cafes */}
           <View className="mb-6">
             <View className="flex-row justify-between items-center mb-2.5">
-              <Text className="text-[13px] text-slate-400 uppercase tracking-wider font-bold">
+              <Text className="text-[13px] text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold">
                 Sân RC nổi bật
               </Text>
               <Pressable onPress={handleNavigateToExplore} className="flex-row items-center gap-0.5 active:opacity-75">
@@ -641,14 +593,14 @@ export function HomeScreen() {
                   <Pressable
                     key={cafe.id}
                     onPress={() => handleSelectCafe(cafe.id)}
-                    className="w-48 overflow-hidden rounded-2xl border border-slate-800 bg-[#0f172a]/60 shadow-sm active:bg-slate-900/60"
+                    className="w-48 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 shadow-sm active:bg-slate-100 dark:active:bg-slate-900/60"
                   >
-                    <Image source={{ uri: cafe.image }} className="h-28 w-full object-cover bg-slate-900" />
+                    <Image source={{ uri: cafe.image }} className="h-28 w-full object-cover bg-slate-950" />
                     <View className="p-3">
-                      <Text className="text-[13px] text-white" weight="700" numberOfLines={1}>
+                      <Text className="text-[13px] text-slate-900 dark:text-white" weight="700" numberOfLines={1}>
                         {cafe.name}
                       </Text>
-                      <Text className="text-[10px] text-slate-400 mt-0.5" numberOfLines={1}>
+                      <Text className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5" numberOfLines={1}>
                         {cafe.district}, {cafe.city}
                       </Text>
                       
@@ -666,8 +618,8 @@ export function HomeScreen() {
                 ))}
               </ScrollView>
             ) : (
-              <View className="rounded-2xl border border-slate-800 bg-[#0f172a]/30 p-5 items-center">
-                <Text className="text-[12px] text-slate-400 font-semibold">Chưa có chi nhánh nổi bật</Text>
+              <View className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/30 p-5 items-center">
+                <Text className="text-[12px] text-slate-500 dark:text-slate-400 font-semibold">Chưa có chi nhánh nổi bật</Text>
               </View>
             )}
           </View>

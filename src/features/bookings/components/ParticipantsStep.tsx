@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, TextInput, Pressable, Image, ActivityIndicator } from 'react-native';
 import { User, Plus, Minus, AlertTriangle, Car, Smartphone } from 'lucide-react-native';
+import { useColorScheme } from 'nativewind';
 import { Text } from '@/shared/ui/Text';
 import { bookingWizardApi, type Companion, type VehicleCatalog } from '../api/booking-wizard.api';
 
@@ -31,6 +32,7 @@ export function ParticipantsStep({
   slotEnd,
   trackConfigId,
 }: ParticipantsStepProps) {
+  const { colorScheme } = useColorScheme();
   const [catalogs, setCatalogs] = useState<VehicleCatalog[]>([]);
   const [loadingVehicles, setLoadingVehicles] = useState(false);
   const [byocRemaining, setByocRemaining] = useState<number | null>(null);
@@ -118,17 +120,17 @@ export function ParticipantsStep({
       <View>
         <View className="flex-row items-center gap-1.5 mb-3">
           <User color="#f97316" size={15} />
-          <Text className="text-[13px] text-slate-400 uppercase tracking-wider font-bold">
+          <Text className="text-[13px] text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold">
             1. Số lượng người chơi
           </Text>
         </View>
 
-        <View className="flex-row items-center bg-[#0f172a]/50 border border-slate-800 rounded-xl p-4 justify-between">
+        <View className="flex-row items-center bg-white dark:bg-[#0f172a]/50 border border-slate-200 dark:border-slate-800 rounded-xl p-4 justify-between shadow-sm">
           <View>
-            <Text className="text-[14px] text-white" weight="700">
+            <Text className="text-[14px] text-slate-900 dark:text-white" weight="700">
               Tổng số người chơi
             </Text>
-            <Text className="text-[10px] text-slate-400 mt-0.5 font-semibold">
+            <Text className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 font-semibold">
               Bao gồm người đặt và người chơi đi cùng
             </Text>
           </View>
@@ -136,13 +138,13 @@ export function ParticipantsStep({
             <Pressable
               disabled={participants <= 1}
               onPress={handleDecrease}
-              className={`h-8 w-8 rounded-full bg-slate-800 items-center justify-center active:bg-slate-700 ${
+              className={`h-8 w-8 rounded-full bg-slate-100 dark:bg-slate-800 items-center justify-center active:bg-slate-200 dark:active:bg-slate-700 ${
                 participants <= 1 ? 'opacity-40' : ''
               }`}
             >
-              <Minus color="#ffffff" size={16} />
+              <Minus color={colorScheme === 'dark' ? '#ffffff' : '#475569'} size={16} />
             </Pressable>
-            <Text className="text-[16px] text-white font-bold w-6 text-center">
+            <Text className="text-[16px] text-slate-900 dark:text-white font-bold w-6 text-center">
               {participants}
             </Text>
             <Pressable
@@ -160,7 +162,7 @@ export function ParticipantsStep({
         <View className="mt-5">
           <View className="flex-row items-center gap-1.5 mb-3">
             <Smartphone color="#f97316" size={15} />
-            <Text className="text-[13px] text-slate-400 uppercase tracking-wider font-bold">
+            <Text className="text-[13px] text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold">
               2. Thông tin người đi cùng
             </Text>
           </View>
@@ -169,21 +171,21 @@ export function ParticipantsStep({
             {companions.map((comp, idx) => (
               <View
                 key={idx}
-                className="bg-[#0f172a]/30 border border-slate-800 rounded-xl p-4 gap-3"
+                className="bg-white dark:bg-[#0f172a]/30 border border-slate-200 dark:border-slate-800 rounded-xl p-4 gap-3 shadow-sm"
               >
-                <Text className="text-[11px] text-slate-400 uppercase font-bold">
+                <Text className="text-[11px] text-slate-500 dark:text-slate-400 uppercase font-bold">
                   Người chơi #{idx + 2}
                 </Text>
                 
                 {/* Tên */}
                 <View className="space-y-1">
-                  <Text className="text-[11px] text-slate-400 font-semibold mb-1">Họ và tên</Text>
+                  <Text className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold mb-1">Họ và tên</Text>
                   <TextInput
                     value={comp.name}
                     onChangeText={(val) => updateCompanion(idx, 'name', val)}
                     placeholder="Nhập tên người đi cùng"
-                    placeholderTextColor="#475569"
-                    className="h-10 px-3 bg-[#0b0f19] border border-slate-800 text-white text-[12px] rounded-lg"
+                    placeholderTextColor="#94a3b8"
+                    className="h-10 px-3 bg-slate-50 dark:bg-[#0b0f19] border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-[12px] rounded-lg"
                   />
                   {comp.name.trim() === '' && (
                     <Text className="text-[9px] text-[#ef4444] font-semibold mt-1">
@@ -194,14 +196,14 @@ export function ParticipantsStep({
 
                 {/* SĐT */}
                 <View className="space-y-1">
-                  <Text className="text-[11px] text-slate-400 font-semibold mb-1">Số điện thoại</Text>
+                  <Text className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold mb-1">Số điện thoại</Text>
                   <TextInput
                     value={comp.phone}
                     onChangeText={(val) => updateCompanion(idx, 'phone', val)}
                     placeholder="Nhập số điện thoại"
-                    placeholderTextColor="#475569"
+                    placeholderTextColor="#94a3b8"
                     keyboardType="phone-pad"
-                    className="h-10 px-3 bg-[#0b0f19] border border-slate-800 text-white text-[12px] rounded-lg"
+                    className="h-10 px-3 bg-slate-50 dark:bg-[#0b0f19] border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-[12px] rounded-lg"
                   />
                   {comp.phone.trim() !== '' && !phoneRegex.test(comp.phone) && (
                     <Text className="text-[9px] text-[#ef4444] font-semibold mt-1">
@@ -221,11 +223,11 @@ export function ParticipantsStep({
           <View className="flex-row items-center justify-between mb-3">
             <View className="flex-row items-center gap-1.5">
               <Car color="#f97316" size={15} />
-              <Text className="text-[13px] text-slate-400 uppercase tracking-wider font-bold">
+              <Text className="text-[13px] text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold">
                 3. Chọn xe thuê để đua
               </Text>
             </View>
-            <Text className="text-[10px] text-slate-400 font-semibold">
+            <Text className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">
               Đã chọn: {selectedVehicleIds.length} xe
             </Text>
           </View>
@@ -243,40 +245,40 @@ export function ParticipantsStep({
                     className={`p-3 rounded-xl border flex-row gap-3.5 transition-all duration-200 ${
                       isSelected
                         ? 'bg-[#ea580c]/10 border-[#f97316]'
-                        : 'bg-[#0f172a]/50 border-slate-800'
+                        : 'bg-white dark:bg-[#0f172a]/50 border-slate-200 dark:border-slate-800'
                     }`}
                   >
                     {vehicle.coverImageUrl ? (
                       <Image
                         source={{ uri: vehicle.coverImageUrl }}
-                        className="h-16 w-16 rounded-lg bg-slate-900 object-cover"
+                        className="h-16 w-16 rounded-lg bg-slate-100 dark:bg-slate-900 object-cover"
                       />
                     ) : (
-                      <View className="h-16 w-16 rounded-lg bg-slate-900 border border-slate-800 items-center justify-center">
+                      <View className="h-16 w-16 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 items-center justify-center">
                         <Car color="#475569" size={24} />
                       </View>
                     )}
                     <View className="flex-1 justify-center">
                       <View className="flex-row items-center justify-between">
-                        <Text className="text-[13px] text-white" weight="700">
+                        <Text className="text-[13px] text-slate-900 dark:text-white" weight="700">
                           {vehicle.name}
                         </Text>
-                        <View className="bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
-                          <Text className="text-[8px] text-slate-400 font-bold uppercase">
+                        <View className="bg-slate-50 dark:bg-slate-900 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-800">
+                          <Text className="text-[8px] text-slate-500 dark:text-slate-400 font-bold uppercase">
                             {vehicle.tier}
                           </Text>
                         </View>
                       </View>
                       {vehicle.description && (
-                        <Text className="text-[10px] text-slate-400 mt-0.5 font-semibold" numberOfLines={1}>
+                        <Text className="text-[10px] text-slate-550 dark:text-slate-400 mt-0.5 font-semibold" numberOfLines={1}>
                           {vehicle.description}
                         </Text>
                       )}
                       {vehicle.compatibleTrackTypes && vehicle.compatibleTrackTypes.length > 0 && (
                         <View className="flex-row flex-wrap gap-1 mt-1">
                           {vehicle.compatibleTrackTypes.map((type) => (
-                            <View key={type.id} className="bg-[#0b0f19] px-1.5 py-0.5 rounded border border-slate-800">
-                              <Text className="text-[7.5px] text-slate-400 font-bold">
+                            <View key={type.id} className="bg-slate-100 dark:bg-[#0b0f19] px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-800">
+                              <Text className="text-[7.5px] text-slate-500 dark:text-slate-400 font-bold">
                                 Sân: {type.name}
                               </Text>
                             </View>
@@ -297,8 +299,8 @@ export function ParticipantsStep({
               })}
             </View>
           ) : (
-            <View className="bg-slate-900/30 rounded-xl p-4 border border-dashed border-slate-800 items-center justify-center">
-              <Text className="text-[12px] text-slate-400 font-semibold">
+            <View className="bg-slate-100 dark:bg-slate-900/30 rounded-xl p-4 border border-dashed border-slate-200 dark:border-slate-800 items-center justify-center">
+              <Text className="text-[12px] text-slate-500 dark:text-slate-400 font-semibold">
                 Không có xe thuê khả dụng.
               </Text>
             </View>
@@ -317,21 +319,21 @@ export function ParticipantsStep({
         <View className="mt-5">
           <View className="flex-row items-center gap-1.5 mb-3">
             <Car color="#f97316" size={15} />
-            <Text className="text-[13px] text-slate-400 uppercase tracking-wider font-bold">
+            <Text className="text-[13px] text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold">
               3. Xe cá nhân (BYOC)
             </Text>
           </View>
 
-          <View className="bg-[#0f172a]/50 border border-slate-800 rounded-xl p-4 gap-3.5">
+          <View className="bg-white dark:bg-[#0f172a]/50 border border-slate-200 dark:border-slate-800 rounded-xl p-4 gap-3.5 shadow-sm">
             <View className="flex-row gap-2.5 items-start">
               <View className="h-8 w-8 items-center justify-center rounded bg-orange-600/10 border border-orange-500/20">
                 <Car color="#ea580c" size={16} />
               </View>
               <View className="flex-1">
-                <Text className="text-[13px] text-slate-200" weight="700">
+                <Text className="text-[13px] text-slate-800 dark:text-slate-200" weight="700">
                   Tự mang xe đua của bạn
                 </Text>
-                <Text className="text-[10px] text-slate-400 mt-1 leading-4.5 font-semibold">
+                <Text className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 leading-4.5 font-semibold">
                   Chế độ này không phát sinh phí thuê xe. Vui lòng đảm bảo xe của bạn đã được kiểm định an toàn trước khi xuống làn.
                 </Text>
               </View>
@@ -340,10 +342,10 @@ export function ParticipantsStep({
             {checkingByoc ? (
               <ActivityIndicator size="small" color="#f97316" />
             ) : byocRemaining !== null ? (
-              <View className="h-[1px] bg-slate-800/80 my-0.5">
+              <View className="h-[1px] bg-slate-200 dark:bg-slate-800/80 my-0.5">
                 <View className="flex-row justify-between items-center pt-2">
-                  <Text className="text-[11px] text-slate-400 font-semibold">Số chỗ BYOC còn lại:</Text>
-                  <Text className="text-[13px] text-white" weight="700">
+                  <Text className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Số chỗ BYOC còn lại:</Text>
+                  <Text className="text-[13px] text-slate-900 dark:text-white" weight="700">
                     {byocRemaining} slot trống
                   </Text>
                 </View>

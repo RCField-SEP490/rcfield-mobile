@@ -74,7 +74,7 @@ class WebSocketClient {
 
     this.intentionalDisconnect = false;
     this.isConnecting = true;
-    const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.4:3000/api/v1';
+    const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.18:3000/api/v1';
     const wsUrl = toWebSocketUrl(apiUrl, accessToken);
 
     console.log('[WS] Connecting to:', redactToken(wsUrl, accessToken));
@@ -147,12 +147,24 @@ class WebSocketClient {
     const role = useAuthStore.getState().role;
 
     switch (event) {
-      case 'SESSION_CHECKIN_INSPECTION':
+      case 'SESSION_CHECKIN_INSPECTION': {
+        const bookingId = data?.bookingId || data?.booking_id;
         Alert.alert(
           'Biên bản bàn giao xe',
-          'Nhân viên trực ca vừa bàn giao xe và bắt đầu phiên chơi của bạn. Lượt chơi hiện đã có hiệu lực.'
+          'Nhân viên trực ca vừa bàn giao xe và bắt đầu phiên chơi của bạn. Lượt chơi hiện đã có hiệu lực.',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                if (bookingId) {
+                  router.push(`/booking/${bookingId}` as any);
+                }
+              },
+            },
+          ]
         );
         break;
+      }
       case 'SESSION_CHECKOUT_INSPECTION':
         Alert.alert(
           'Biên bản trả xe',

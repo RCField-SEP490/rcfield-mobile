@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+
 import {
   ChevronLeft,
   Heart,
@@ -284,7 +285,7 @@ export function CafeDetailScreen({ cafeId }: CafeDetailScreenProps) {
 
   if (loading) {
     return (
-      <View className="flex-1 bg-[#0b0f19] items-center justify-center">
+      <View className="flex-1 bg-[#f8fafc] dark:bg-[#0b0f19] items-center justify-center">
         <ActivityIndicator size="large" color="#f97316" />
       </View>
     );
@@ -293,7 +294,7 @@ export function CafeDetailScreen({ cafeId }: CafeDetailScreenProps) {
   if (!cafe) return null;
 
   return (
-    <SafeAreaView className="flex-1 bg-[#0b0f19]" edges={['top', 'left', 'right', 'bottom']}>
+    <SafeAreaView className="flex-grow flex-1 bg-[#f8fafc] dark:bg-[#0b0f19]" edges={['top', 'left', 'right', 'bottom']}>
       <ScrollView
         contentContainerClassName="pb-40"
         showsVerticalScrollIndicator={false}
@@ -363,17 +364,17 @@ export function CafeDetailScreen({ cafeId }: CafeDetailScreenProps) {
           <View>
             <View className="flex-row flex-wrap gap-1.5 mb-2">
               {cafe.trackTypes.map((type, idx) => (
-                <View key={idx} className="rounded-lg bg-slate-800 border border-slate-700 px-2.5 py-0.5">
-                  <Text className="text-[10px] text-slate-300 font-bold">{type}</Text>
+                <View key={idx} className="rounded-lg bg-slate-200 dark:bg-slate-800 border border-slate-350 dark:border-slate-700 px-2.5 py-0.5">
+                  <Text className="text-[10px] text-slate-700 dark:text-slate-300 font-bold">{type}</Text>
                 </View>
               ))}
             </View>
-            <Text className="text-white text-2xl" weight="700">
+            <Text className="text-slate-900 dark:text-white text-2xl" weight="700">
               {cafe.name}
             </Text>
             <View className="flex-row items-center gap-1.5 mt-2">
               <MapPin color="#f97316" size={14} />
-              <Text className="text-[12px] text-slate-400 flex-1 leading-4" numberOfLines={2}>
+              <Text className="text-[12px] text-slate-500 dark:text-slate-400 flex-1 leading-4" numberOfLines={2}>
                 {cafe.address}, {cafe.district}, {cafe.city}
               </Text>
             </View>
@@ -389,47 +390,47 @@ export function CafeDetailScreen({ cafeId }: CafeDetailScreenProps) {
           </View>
 
           {/* Divider */}
-          <View className="h-[1px] bg-slate-800/80" />
+          <View className="h-[1px] bg-slate-200 dark:bg-slate-800/80" />
 
           {/* 3. Quick Facts */}
           <View className="grid flex-row flex-wrap gap-3">
-            <View className="flex-1 min-w-[45%] flex-row items-center gap-3 rounded-2xl border border-slate-800 bg-[#0f172a]/40 p-3 shadow-md">
+            <View className="flex-1 min-w-[45%] flex-row items-center gap-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/40 p-3 shadow-md">
               <View className="size-9 bg-orange-500/10 border border-orange-500/20 rounded-xl justify-center items-center">
                 <Wallet color="#f97316" size={16} />
               </View>
               <View>
                 <Text className="text-[10px] text-slate-500 font-bold uppercase">Giá slot</Text>
-                <Text className="text-[12px] text-white font-extrabold mt-0.5">{cafe.priceRange}</Text>
+                <Text className="text-[12px] text-slate-900 dark:text-white font-extrabold mt-0.5">{cafe.priceRange}</Text>
               </View>
             </View>
 
-            <View className="flex-1 min-w-[45%] flex-row items-center gap-3 rounded-2xl border border-slate-800 bg-[#0f172a]/40 p-3 shadow-md">
+            <View className="flex-1 min-w-[45%] flex-row items-center gap-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/40 p-3 shadow-md">
               <View className="size-9 bg-emerald-500/10 border border-emerald-500/20 rounded-xl justify-center items-center">
                 <Clock color="#10b981" size={16} />
               </View>
               <View>
                 <Text className="text-[10px] text-slate-500 font-bold uppercase">Slot chuẩn</Text>
-                <Text className="text-[12px] text-white font-extrabold mt-0.5">60 phút/slot</Text>
+                <Text className="text-[12px] text-slate-900 dark:text-white font-extrabold mt-0.5">60 phút/slot</Text>
               </View>
             </View>
 
-            <View className="flex-1 min-w-[45%] flex-row items-center gap-3 rounded-2xl border border-slate-800 bg-[#0f172a]/40 p-3 shadow-md">
+            <View className="flex-1 min-w-[45%] flex-row items-center gap-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/40 p-3 shadow-md">
               <View className="size-9 bg-blue-500/10 border border-blue-500/20 rounded-xl justify-center items-center">
                 <Car color="#3b82f6" size={16} />
               </View>
               <View>
                 <Text className="text-[10px] text-slate-500 font-bold uppercase">Xe thuê</Text>
-                <Text className="text-[12px] text-white font-extrabold mt-0.5">{catalogs.length} mẫu xe</Text>
+                <Text className="text-[12px] text-slate-900 dark:text-white font-extrabold mt-0.5">{catalogs.length} mẫu xe</Text>
               </View>
             </View>
 
-            <View className="flex-1 min-w-[45%] flex-row items-center gap-3 rounded-2xl border border-slate-800 bg-[#0f172a]/40 p-3 shadow-md">
+            <View className="flex-1 min-w-[45%] flex-row items-center gap-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/40 p-3 shadow-md">
               <View className="size-9 bg-purple-500/10 border border-purple-500/20 rounded-xl justify-center items-center">
                 <Star color="#a855f7" size={16} />
               </View>
               <View>
                 <Text className="text-[10px] text-slate-500 font-bold uppercase">Đánh giá</Text>
-                <Text className="text-[12px] text-white font-extrabold mt-0.5">{cafe.rating > 0 ? `${cafe.rating.toFixed(1)}/5` : '5.0/5'}</Text>
+                <Text className="text-[12px] text-slate-900 dark:text-white font-extrabold mt-0.5">{cafe.rating > 0 ? `${cafe.rating.toFixed(1)}/5` : '5.0/5'}</Text>
               </View>
             </View>
           </View>
@@ -438,7 +439,7 @@ export function CafeDetailScreen({ cafeId }: CafeDetailScreenProps) {
           <View className="gap-2.5">
             <View className="flex-row items-center gap-1.5">
               <Sparkles color="#f97316" size={16} />
-              <Text className="text-[14px] text-white font-bold uppercase tracking-wider">Ưu đãi hôm nay</Text>
+              <Text className="text-[14px] text-slate-900 dark:text-white font-bold uppercase tracking-wider">Ưu đãi hôm nay</Text>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-3">
               {mockPromos.map((p, idx) => (
@@ -448,36 +449,36 @@ export function CafeDetailScreen({ cafeId }: CafeDetailScreenProps) {
                   className="rounded-2xl border border-dashed border-orange-500/40 bg-orange-500/5 p-4 justify-center items-start min-w-[200px]"
                 >
                   <Text className="text-[13px] text-[#f97316]" weight="700">Mã: {p.code}</Text>
-                  <Text className="text-[11px] text-slate-400 mt-1 font-semibold">{p.description}</Text>
+                  <Text className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 font-semibold">{p.description}</Text>
                 </Pressable>
               ))}
             </ScrollView>
           </View>
 
           {/* Divider */}
-          <View className="h-[1px] bg-slate-800/80" />
+          <View className="h-[1px] bg-slate-200 dark:bg-slate-800/80" />
 
           {/* 5. Track Configurations */}
           <View className="gap-3">
-            <Text className="text-[14px] text-white font-bold uppercase tracking-wider">Cấu hình sân chạy</Text>
+            <Text className="text-[14px] text-slate-900 dark:text-white font-bold uppercase tracking-wider">Cấu hình sân chạy</Text>
             {tracks.length === 0 ? (
               <Text className="text-[11px] text-slate-500 font-medium">Chi nhánh chưa cập nhật cấu hình làn.</Text>
             ) : (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-4">
                 {tracks.map((config) => (
-                  <View key={config.id} className="w-64 rounded-2xl border border-slate-800 bg-[#0f172a]/40 overflow-hidden shadow-lg">
+                  <View key={config.id} className="w-64 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/40 overflow-hidden shadow-lg">
                     {config.images && config.images.length > 0 ? (
                       <Image source={{ uri: config.images[0] }} className="h-32 w-full object-cover" />
                     ) : (
-                      <View className="h-32 w-full bg-slate-900 justify-center items-center">
-                        <Text className="text-[11px] text-slate-600">Chưa có ảnh</Text>
+                      <View className="h-32 w-full bg-slate-100 dark:bg-slate-900 justify-center items-center">
+                        <Text className="text-[11px] text-slate-550 dark:text-slate-600">Chưa có ảnh</Text>
                       </View>
                     )}
                     <View className="p-3">
-                      <Text className="text-[13px] text-white" weight="700">{config.track_type?.name || 'Sân đua'}</Text>
+                      <Text className="text-[13px] text-slate-900 dark:text-white" weight="700">{config.track_type?.name || 'Sân đua'}</Text>
                       <Text className="text-[10px] text-emerald-500 font-bold mt-1">BYOC: tối đa {config.byoc_capacity || 0} xe/slot</Text>
                       {config.description ? (
-                        <Text className="text-[10px] text-slate-400 mt-1 leading-4" numberOfLines={2}>{config.description}</Text>
+                        <Text className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 leading-4" numberOfLines={2}>{config.description}</Text>
                       ) : null}
                     </View>
                   </View>
@@ -487,12 +488,12 @@ export function CafeDetailScreen({ cafeId }: CafeDetailScreenProps) {
           </View>
 
           {/* Divider */}
-          <View className="h-[1px] bg-slate-800/80" />
+          <View className="h-[1px] bg-slate-200 dark:bg-slate-800/80" />
 
           {/* 6. Available Rental Vehicles */}
           <View className="gap-3">
             <View>
-              <Text className="text-[14px] text-white font-bold uppercase tracking-wider">Chọn thuê xe đua nhanh</Text>
+              <Text className="text-[14px] text-slate-900 dark:text-white font-bold uppercase tracking-wider">Chọn thuê xe đua nhanh</Text>
               <Text className="text-[11px] text-slate-500 font-semibold mt-0.5">Xe chọn tại đây sẽ tự động đưa vào giỏ hàng đặt lịch.</Text>
             </View>
             {catalogs.length === 0 ? (
@@ -507,23 +508,23 @@ export function CafeDetailScreen({ cafeId }: CafeDetailScreenProps) {
                     <Pressable
                       key={v.id}
                       onPress={() => setSelectedVehicleId(isSelected ? null : v.id)}
-                      className={`w-[47%] rounded-2xl border bg-[#0f172a]/40 overflow-hidden p-2.5 shadow-md justify-between ${
-                        isSelected ? 'border-[#ea580c] ring-1 ring-[#ea580c]/50' : 'border-slate-800'
+                      className={`w-[47%] rounded-2xl border bg-white dark:bg-[#0f172a]/40 overflow-hidden p-2.5 shadow-md justify-between ${
+                        isSelected ? 'border-[#ea580c] ring-1 ring-[#ea580c]/50' : 'border-slate-200 dark:border-slate-800'
                       }`}
                     >
                       {v.coverImageUrl ? (
-                        <Image source={{ uri: v.coverImageUrl }} className="h-24 w-full rounded-xl object-cover bg-slate-900" />
+                        <Image source={{ uri: v.coverImageUrl }} className="h-24 w-full rounded-xl object-cover bg-slate-50 dark:bg-slate-900" />
                       ) : (
-                        <View className="h-24 w-full bg-slate-900 rounded-xl justify-center items-center">
+                        <View className="h-24 w-full bg-slate-50 dark:bg-slate-900 rounded-xl justify-center items-center">
                           <Car color="#475569" size={24} />
                         </View>
                       )}
                       <View className="mt-2 flex-grow justify-between">
                         <View>
-                          <Text className="text-[12px] text-white" weight="700" numberOfLines={1}>{v.name}</Text>
-                          <Text className="text-[10px] text-slate-400 mt-0.5">{v.tier} · Tỷ lệ: 1:10</Text>
+                           <Text className="text-[12px] text-slate-900 dark:text-white" weight="700" numberOfLines={1}>{v.name}</Text>
+                           <Text className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">{v.tier} · Tỷ lệ: 1:10</Text>
                         </View>
-                        <View className="mt-3 flex-row items-baseline justify-start border-t border-slate-800 pt-2 gap-1">
+                        <View className="mt-3 flex-row items-baseline justify-start border-t border-slate-150 dark:border-slate-800 pt-2 gap-1">
                           <Text className="text-[12px] text-[#f97316] font-bold">{rate.toLocaleString('vi-VN')}đ</Text>
                           <Text className="text-[8px] text-slate-500 font-semibold">/ giờ</Text>
                         </View>
@@ -536,47 +537,47 @@ export function CafeDetailScreen({ cafeId }: CafeDetailScreenProps) {
           </View>
 
           {/* Divider */}
-          <View className="h-[1px] bg-slate-800/80" />
+          <View className="h-[1px] bg-slate-200 dark:bg-slate-800/80" />
 
           {/* 7. Packages Section */}
           <View className="gap-3">
-            <Text className="text-[14px] text-white font-bold uppercase tracking-wider">Gói slot hội viên</Text>
+            <Text className="text-[14px] text-slate-900 dark:text-white font-bold uppercase tracking-wider">Gói slot hội viên</Text>
             {packages.length === 0 ? (
               <Text className="text-[11px] text-slate-500 font-medium">Chi nhánh chưa phát hành gói chơi.</Text>
             ) : (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-4">
                 {packages.map((pkg) => (
-                  <View key={pkg.id} className="w-60 rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-4 shadow-lg justify-between">
+                  <View key={pkg.id} className="w-60 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-4 shadow-lg justify-between">
                     <View>
                       <View className="flex-row justify-between items-start">
-                        <Text className="text-[13px] text-white flex-1 pr-1 font-bold leading-5" numberOfLines={1}>{pkg.name}</Text>
+                        <Text className="text-[13px] text-slate-900 dark:text-white flex-1 pr-1 font-bold leading-5" numberOfLines={1}>{pkg.name}</Text>
                         {pkg.is_popular && (
                           <View className="bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 rounded-md">
                             <Text className="text-[8px] text-[#f97316] font-bold">Hot</Text>
                           </View>
                         )}
                       </View>
-                      <Text className="text-[10px] text-slate-400 mt-1 leading-4" numberOfLines={2}>{pkg.description || 'Gói slot ưu đãi cho hội viên.'}</Text>
+                      <Text className="text-[10px] text-slate-550 dark:text-slate-400 mt-1 leading-4" numberOfLines={2}>{pkg.description || 'Gói slot ưu đãi cho hội viên.'}</Text>
                       
-                      <View className="h-[1px] bg-slate-800/85 my-3" />
+                      <View className="h-[1px] bg-slate-200 dark:bg-slate-800/85 my-3" />
                       
-                      <View className="flex-row justify-between items-center bg-slate-900/60 p-2 rounded-xl border border-slate-800/40">
+                      <View className="flex-row justify-between items-center bg-slate-50 dark:bg-slate-900/60 p-2 rounded-xl border border-slate-200 dark:border-slate-800/40">
                         <Text className="text-[10px] text-slate-500 font-bold">Số slot:</Text>
-                        <Text className="text-[11px] text-white font-black">{pkg.slot_count} slot</Text>
+                        <Text className="text-[11px] text-slate-800 dark:text-white font-black">{pkg.slot_count} slot</Text>
                       </View>
 
                       <View className="mt-2.5 gap-1">
-                        <Text className="text-[9px] text-slate-400 font-medium">• Hiệu lực: {pkg.valid_days} ngày</Text>
+                        <Text className="text-[9px] text-slate-500 dark:text-slate-400 font-medium">• Hiệu lực: {pkg.valid_days} ngày</Text>
                         {pkg.benefits.slice(0, 2).map((b, idx) => (
                           <Text key={idx} className="text-[9px] text-emerald-400 font-medium">• {b}</Text>
                         ))}
                       </View>
                     </View>
 
-                    <View className="mt-4 gap-2 border-t border-slate-850 pt-3">
+                    <View className="mt-4 gap-2 border-t border-slate-200 dark:border-slate-850 pt-3">
                       <View className="flex-row justify-between items-baseline">
                         <Text className="text-[9px] text-slate-500 font-bold">Giá gói:</Text>
-                        <Text className="text-[13px] text-white font-black">
+                        <Text className="text-[13px] text-slate-900 dark:text-white font-black">
                           {Number(pkg.price).toLocaleString('vi-VN')}đ
                         </Text>
                       </View>
@@ -599,12 +600,12 @@ export function CafeDetailScreen({ cafeId }: CafeDetailScreenProps) {
           </View>
 
           {/* Divider */}
-          <View className="h-[1px] bg-slate-800/80" />
+          <View className="h-[1px] bg-slate-200 dark:bg-slate-800/80" />
 
           {/* 8. F&B Pre-order */}
           <View className="gap-3">
             <View>
-              <Text className="text-[14px] text-white font-bold uppercase tracking-wider">Đặt trước đồ ăn & thức uống</Text>
+              <Text className="text-[14px] text-slate-900 dark:text-white font-bold uppercase tracking-wider">Đặt trước đồ ăn & thức uống</Text>
               <Text className="text-[11px] text-slate-500 font-semibold mt-0.5">Phục vụ trực tiếp tại làn đua khi bạn Check-in.</Text>
             </View>
             {menuItems.length === 0 ? (
@@ -616,26 +617,26 @@ export function CafeDetailScreen({ cafeId }: CafeDetailScreenProps) {
                   const price = typeof item.price === 'number' ? item.price : Number(item.price || 0);
 
                   return (
-                    <View key={item.id} className="flex-row items-center rounded-2xl border border-slate-800 bg-[#0f172a]/40 p-2.5 shadow-md">
+                    <View key={item.id} className="flex-row items-center rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/40 p-2.5 shadow-md">
                       {item.image ? (
                         <Image source={{ uri: item.image }} className="h-16 w-16 rounded-xl object-cover" />
                       ) : (
-                        <View className="h-16 w-16 bg-slate-900 rounded-xl justify-center items-center">
+                        <View className="h-16 w-16 bg-slate-50 dark:bg-slate-900 rounded-xl justify-center items-center">
                           <Coffee color="#475569" size={20} />
                         </View>
                       )}
                       <View className="flex-1 ml-3 pr-2">
-                        <Text className="text-[13px] text-white" weight="700">{item.name}</Text>
+                        <Text className="text-[13px] text-slate-900 dark:text-white" weight="700">{item.name}</Text>
                         <Text className="text-[11px] text-[#f97316] font-bold mt-1">{price.toLocaleString('vi-VN')}đ</Text>
                       </View>
                       
                       {/* +/- counter */}
                       {qty > 0 ? (
-                        <View className="flex-row items-center border border-slate-800 bg-slate-950/80 p-0.5 rounded-lg">
+                        <View className="flex-row items-center border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/80 p-0.5 rounded-lg">
                           <Pressable onPress={() => handleDecrementFnb(item.id)} className="p-1">
                             <Minus color="#94a3b8" size={14} />
                           </Pressable>
-                          <Text className="text-[12px] text-white font-bold min-w-[20px] text-center font-mono">{qty}</Text>
+                          <Text className="text-[12px] text-slate-900 dark:text-white font-bold min-w-[20px] text-center font-mono">{qty}</Text>
                           <Pressable onPress={() => handleIncrementFnb(item.id)} className="p-1">
                             <Plus color="#94a3b8" size={14} />
                           </Pressable>
@@ -643,9 +644,9 @@ export function CafeDetailScreen({ cafeId }: CafeDetailScreenProps) {
                       ) : (
                         <Pressable
                           onPress={() => handleIncrementFnb(item.id)}
-                          className="h-8 px-3.5 border border-slate-850 bg-slate-900 rounded-lg justify-center items-center active:bg-slate-850"
+                          className="h-8 px-3.5 border border-slate-200 dark:border-slate-850 bg-slate-100 dark:bg-slate-900 rounded-lg justify-center items-center active:bg-slate-200 dark:active:bg-slate-850"
                         >
-                          <Text className="text-[10px] text-slate-300 font-bold">Thêm</Text>
+                          <Text className="text-[10px] text-slate-600 dark:text-slate-300 font-bold">Thêm</Text>
                         </Pressable>
                       )}
                     </View>
@@ -656,19 +657,19 @@ export function CafeDetailScreen({ cafeId }: CafeDetailScreenProps) {
           </View>
 
           {/* Divider */}
-          <View className="h-[1px] bg-slate-800/80" />
+          <View className="h-[1px] bg-slate-200 dark:bg-slate-800/80" />
 
           {/* 9. Amenities & Rules */}
           <View className="gap-4">
             {/* Amenities */}
             {cafe.amenities && cafe.amenities.length > 0 ? (
               <View className="gap-2.5">
-                <Text className="text-[14px] text-white font-bold uppercase tracking-wider">Tiện ích cơ sở</Text>
+                <Text className="text-[14px] text-slate-900 dark:text-white font-bold uppercase tracking-wider">Tiện ích cơ sở</Text>
                 <View className="flex-row flex-wrap gap-2.5">
                   {cafe.amenities.map((item: any) => (
-                    <View key={item.id} className="flex-row items-center gap-2 border border-slate-800 bg-slate-900/20 px-3 py-1.5 rounded-xl">
+                    <View key={item.id} className="flex-row items-center gap-2 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/20 px-3 py-1.5 rounded-xl">
                       <Wrench color="#3b82f6" size={12} />
-                      <Text className="text-[10px] text-slate-300 font-bold">{item.title}</Text>
+                      <Text className="text-[10px] text-slate-600 dark:text-slate-300 font-bold">{item.title}</Text>
                     </View>
                   ))}
                 </View>
@@ -678,14 +679,14 @@ export function CafeDetailScreen({ cafeId }: CafeDetailScreenProps) {
             {/* Rules */}
             {cafe.rules && cafe.rules.length > 0 ? (
               <View className="gap-2.5 mt-2">
-                <Text className="text-[14px] text-white font-bold uppercase tracking-wider">Nội quy đường đua</Text>
+                <Text className="text-[14px] text-slate-900 dark:text-white font-bold uppercase tracking-wider">Nội quy đường đua</Text>
                 <View className="gap-2">
                   {cafe.rules.map((rule: string, idx: number) => (
                     <View key={idx} className="flex-row items-start gap-2.5">
-                      <View className="size-4 rounded-full border border-slate-800 bg-slate-900 justify-center items-center mt-0.5">
-                        <Text className="text-[8px] text-slate-400 font-black">{idx + 1}</Text>
+                      <View className="size-4 rounded-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 justify-center items-center mt-0.5">
+                        <Text className="text-[8px] text-slate-500 dark:text-slate-400 font-black">{idx + 1}</Text>
                       </View>
-                      <Text className="text-[10.5px] text-slate-400 flex-1 leading-4 font-semibold">{rule}</Text>
+                      <Text className="text-[10.5px] text-slate-500 dark:text-slate-400 flex-1 leading-4 font-semibold">{rule}</Text>
                     </View>
                   ))}
                 </View>
@@ -694,19 +695,19 @@ export function CafeDetailScreen({ cafeId }: CafeDetailScreenProps) {
           </View>
 
           {/* Divider */}
-          <View className="h-[1px] bg-slate-800/80" />
+          <View className="h-[1px] bg-slate-200 dark:bg-slate-800/80" />
 
           {/* 10. Reviews List */}
           <View className="gap-3">
-            <Text className="text-[14px] text-white font-bold uppercase tracking-wider">Đánh giá khách hàng</Text>
+            <Text className="text-[14px] text-slate-900 dark:text-white font-bold uppercase tracking-wider">Đánh giá khách hàng</Text>
             {reviews.length === 0 ? (
               <Text className="text-[11px] text-slate-500 font-medium">Chưa có lượt đánh giá nào cho chi nhánh này.</Text>
             ) : (
               <View className="gap-3.5">
                 {reviews.map((rev) => (
-                  <View key={rev.id} className="border border-slate-850 bg-[#0f172a]/20 p-3 rounded-2xl gap-2 shadow-sm">
+                  <View key={rev.id} className="border border-slate-200 dark:border-slate-850 bg-white dark:bg-[#0f172a]/20 p-3 rounded-2xl gap-2 shadow-sm">
                     <View className="flex-row justify-between items-center">
-                      <Text className="text-[12px] text-white font-extrabold">{rev.user?.fullName || 'Khách hàng'}</Text>
+                      <Text className="text-[12px] text-slate-900 dark:text-white font-extrabold">{rev.user?.fullName || 'Khách hàng'}</Text>
                       <View className="flex-row items-center gap-0.5">
                         {Array.from({ length: 5 }).map((_, i) => (
                           <Star
@@ -718,11 +719,11 @@ export function CafeDetailScreen({ cafeId }: CafeDetailScreenProps) {
                         ))}
                       </View>
                     </View>
-                    <Text className="text-[11px] text-slate-300 leading-4 font-medium">{rev.comment}</Text>
+                    <Text className="text-[11px] text-slate-600 dark:text-slate-300 leading-4 font-medium">{rev.comment}</Text>
                     {rev.ownerResponse ? (
                       <View className="border-l-2 border-orange-500/80 pl-2.5 py-0.5 mt-1 bg-orange-500/5">
                         <Text className="text-[9px] text-[#f97316] font-bold">Phản hồi từ chủ sân:</Text>
-                        <Text className="text-[10px] text-slate-400 leading-4 mt-0.5 font-medium">{rev.ownerResponse}</Text>
+                        <Text className="text-[10px] text-slate-500 dark:text-slate-400 leading-4 mt-0.5 font-medium">{rev.ownerResponse}</Text>
                       </View>
                     ) : null}
                   </View>
@@ -736,7 +737,7 @@ export function CafeDetailScreen({ cafeId }: CafeDetailScreenProps) {
       {/* 11. Sticky Bottom CTA */}
       <View
         style={{ paddingBottom: Math.max(insets.bottom, 16), paddingTop: 16 }}
-        className="absolute bottom-0 left-0 right-0 border-t border-slate-900 bg-[#0f172a]/95 px-5 flex-row justify-between items-center shadow-2xl"
+        className="absolute bottom-0 left-0 right-0 border-t border-slate-200 dark:border-slate-900 bg-white/95 dark:bg-[#0f172a]/95 px-5 flex-row justify-between items-center shadow-2xl"
       >
         <View>
           <Text className="text-[9px] text-slate-500 font-bold uppercase">Tạm tính (1 slot)</Text>
@@ -748,10 +749,10 @@ export function CafeDetailScreen({ cafeId }: CafeDetailScreenProps) {
         <View className="flex-row gap-2">
           <Pressable
             onPress={handleOpenMapDirection}
-            className="flex-row items-center justify-center border border-slate-800 bg-[#0f172a] active:bg-slate-900 py-3 px-4 rounded-xl gap-1.5"
+            className="flex-row items-center justify-center border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a] active:bg-slate-100 dark:active:bg-slate-900 py-3 px-4 rounded-xl gap-1.5"
           >
             <MapPin color="#f97316" size={16} />
-            <Text className="text-[13px] text-slate-200 font-bold">Bản đồ</Text>
+            <Text className="text-[13px] text-slate-700 dark:text-slate-200 font-bold">Bản đồ</Text>
           </Pressable>
 
           <Pressable

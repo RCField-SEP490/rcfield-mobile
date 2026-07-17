@@ -135,12 +135,20 @@ export async function registerPushNotificationsAsync() {
   }
 
   const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-  await api.post('/notifications/push-tokens', {
-    token,
-    platform: Platform.OS,
-    device_name: Constants.deviceName ?? null,
-    app_version: Constants.expoConfig?.version ?? null,
-  });
+  try {
+    await api.post('/provider/notifications/push-tokens', {
+      token,
+      platform: Platform.OS,
+      device_name: Constants.deviceName ?? null,
+      app_version: Constants.expoConfig?.version ?? null,
+    });
+  } catch (err: any) {
+    if (err?.response?.status === 404) {
+      console.log('[Push] Backend does not support push tokens registration yet (404). Skipping...');
+    } else {
+      throw err;
+    }
+  }
 
   registeredToken = token;
   return token;
@@ -151,7 +159,15 @@ export async function unregisterCurrentPushTokenAsync() {
 
   const token = registeredToken;
   registeredToken = null;
-  await api.delete('/notifications/push-tokens', { data: { token } });
+  try {
+    await api.delete('/provider/notifications/push-tokens', { data: { token } });
+  } catch (err: any) {
+    if (err?.response?.status === 404) {
+      console.log('[Push] Backend does not support push tokens unregistration yet (404). Skipping...');
+    } else {
+      throw err;
+    }
+  }
 }
 
 export function startNotificationResponseListener() {
