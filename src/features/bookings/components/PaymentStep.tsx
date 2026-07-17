@@ -31,6 +31,7 @@ interface PaymentStepProps {
   cafeImage: string | null;
   trackConfigName: string;
   vehicleCatalogs: VehicleCatalog[];
+  slotDurationMinutes?: number;
 }
 
 export function PaymentStep({
@@ -56,6 +57,7 @@ export function PaymentStep({
   cafeImage,
   trackConfigName,
   vehicleCatalogs,
+  slotDurationMinutes,
 }: PaymentStepProps) {
   const [packages, setPackages] = useState<MyPackageResponse[]>([]);
   const [loadingPackages, setLoadingPackages] = useState(false);
@@ -284,7 +286,7 @@ export function PaymentStep({
               <View className="flex-row items-start gap-2 bg-[#ea580c]/10 border border-[#ea580c]/20 rounded-xl p-3 mt-1">
                 <Info color="#f97316" size={14} className="mt-0.5" />
                 <Text className="text-[10px] text-slate-800 dark:text-slate-300 leading-4 font-semibold flex-1">
-                  Đã áp dụng gói: Miễn phí tiền sân cho bản thân trong suốt {durationHours} giờ chơi. Người đi cùng (nếu có) vẫn tính phí bình thường.
+                  Đã áp dụng gói: Miễn phí tiền sân cho bản thân trong suốt {(durationHours * (slotDurationMinutes || 60)) / 60} giờ chơi. Người đi cùng (nếu có) vẫn tính phí bình thường.
                 </Text>
               </View>
             )}

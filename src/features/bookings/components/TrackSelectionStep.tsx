@@ -4,6 +4,7 @@ import { Calendar, Clock, Layers, ShieldCheck, AlertCircle, ChevronLeft, Chevron
 import { useColorScheme } from 'nativewind';
 import { Text } from '@/shared/ui/Text';
 import { bookingWizardApi, type TrackConfig, type VehicleCatalog } from '../api/booking-wizard.api';
+import type { Cafe } from '@/features/explore/types/explore.types';
 
 const TRACK_PLACEHOLDER_IMAGE =
   'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?q=80&w=600&auto=format&fit=crop';
@@ -21,6 +22,7 @@ interface TrackSelectionStepProps {
   selectedVehicleIds: string[];
   setSelectedVehicleIds: (ids: string[]) => void;
   catalogs: VehicleCatalog[];
+  cafe: Cafe | null;
 }
 
 interface SlotDetails {
@@ -76,12 +78,6 @@ const getNext7Days = () => {
   return list;
 };
 
-// Generate time slots from 08:00 to 21:00 (every 1 hour)
-const TIME_SLOTS = [
-  '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00',
-  '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00',
-];
-
 export function TrackSelectionStep({
   cafeId,
   selectedTrackConfig,
@@ -95,12 +91,72 @@ export function TrackSelectionStep({
   selectedVehicleIds,
   setSelectedVehicleIds,
   catalogs,
+  cafe,
 }: TrackSelectionStepProps) {
   const { colorScheme } = useColorScheme();
   const [tracks, setTracks] = useState<TrackConfig[]>([]);
   const [loadingTracks, setLoadingTracks] = useState(true);
   const [slotDetails, setSlotDetails] = useState<Record<string, SlotDetails>>({});
   const [loadingSlots, setLoadingSlots] = useState(false);
+
+  // Generate dynamic time slots based on Cafe's operatingHours and slotDurationMinutes
+  const timeSlots = React.useMemo(() => {
+    const defaultSlots = [
+      '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00',
+      '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00',
+    ];
+
+    if (!cafe) {
+      return defaultSlots;
+    }
+
+    let parsedHours: Record<string, any> = {};
+    if (typeof cafe.operatingHours === 'string') {
+      try {
+        parsedHours = JSON.parse(cafe.operatingHours);
+      } catch (e) {
+        console.error('[TrackSelectionStep] Error parsing operatingHours string:', e);
+      }
+    } else if (cafe.operatingHours) {
+      parsedHours = cafe.operatingHours;
+    }
+
+    // Get day of the week
+    const dateObj = new Date(selectedDate);
+    const dayIndex = dateObj.getDay();
+    const days = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+    const dayKey = days[dayIndex];
+
+    const schedule = parsedHours[dayKey];
+    if (!schedule || schedule.is_closed || !schedule.open || !schedule.close) {
+      return [];
+    }
+
+    const duration = cafe.slotDurationMinutes || 60;
+
+    const timeToMinutes = (t: string) => {
+      const [h, m] = t.split(':').map(Number);
+      return h * 60 + m;
+    };
+
+    const minutesToTime = (min: number) => {
+      const h = Math.floor(min / 60) % 24;
+      const m = min % 60;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    };
+
+    const start = timeToMinutes(schedule.open);
+    let end = timeToMinutes(schedule.close);
+    if (end <= start) {
+      end += 24 * 60;
+    }
+
+    const list: string[] = [];
+    for (let current = start; current + duration <= end; current += duration) {
+      list.push(minutesToTime(current));
+    }
+    return list.length > 0 ? list : defaultSlots;
+  }, [cafe, selectedDate]);
 
   // Popup warning when switching playMode from RENTAL to BYOC with selected vehicles
   const handleSelectByoc = () => {
@@ -161,7 +217,7 @@ export function TrackSelectionStep({
 
       try {
         await Promise.all(
-          TIME_SLOTS.map(async (slot) => {
+          timeSlots.map(async (slot) => {
             // Optimization: If slot is in the past, disable immediately without calling API
             if (isSlotPast(slot, selectedDate)) {
               updatedDetails[slot] = {
@@ -172,12 +228,27 @@ export function TrackSelectionStep({
               return;
             }
 
+            const duration = cafe?.slotDurationMinutes || 60;
             const [h, m] = slot.split(':').map(Number);
-            const slotStart = `${selectedDate}T${slot}:00+07:00`;
+            const startMinutes = h * 60 + m;
+            const endMinutes = startMinutes + duration;
 
-            // End time is +1 hour
-            const endH = String(h + 1).padStart(2, '0');
-            const slotEnd = `${selectedDate}T${endH}:${String(m).padStart(2, '0')}:00+07:00`;
+            const endH = String(Math.floor(endMinutes / 60) % 24).padStart(2, '0');
+            const endM = String(endMinutes % 60).padStart(2, '0');
+
+            // Handle date overflow when booking crosses midnight
+            let endDateStr = selectedDate;
+            if (endMinutes >= 24 * 60) {
+              const d = new Date(selectedDate);
+              d.setDate(d.getDate() + 1);
+              const y = d.getFullYear();
+              const mo = String(d.getMonth() + 1).padStart(2, '0');
+              const da = String(d.getDate()).padStart(2, '0');
+              endDateStr = `${y}-${mo}-${da}`;
+            }
+
+            const slotStart = `${selectedDate}T${slot}:00+07:00`;
+            const slotEnd = `${endDateStr}T${endH}:${endM}:00+07:00`;
 
             try {
               const res = await bookingWizardApi.checkAvailability(cafeId, {
@@ -214,7 +285,7 @@ export function TrackSelectionStep({
     };
 
     checkAllSlots();
-  }, [cafeId, selectedTrackConfig, selectedDate, playMode]);
+  }, [cafeId, selectedTrackConfig, selectedDate, playMode, timeSlots, cafe]);
 
   // Month-Year Label formatting
   const formattedMonthYear = React.useMemo(() => {
@@ -482,7 +553,7 @@ export function TrackSelectionStep({
           </View>
         ) : (
           <View className="flex-row flex-wrap gap-2">
-            {TIME_SLOTS.map((slot) => {
+            {timeSlots.map((slot) => {
               const isSelected = selectedSlots.includes(slot);
               const detail = slotDetails[slot];
               const isPast = isSlotPast(slot, selectedDate);
