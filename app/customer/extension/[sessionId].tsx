@@ -201,6 +201,11 @@ export default function CustomerExtensionResponseScreen() {
                 label="Hết hạn sau"
                 value={expiresInText || '10 phút'}
               />
+              <View className="mt-3 border-t border-slate-800/80 pt-2.5">
+                <Text className="text-[11px] leading-4 text-slate-400 font-medium">
+                  💡 Phí gia hạn giờ sẽ được ghi nhận vào mục quyết toán. Bạn có thể thanh toán qua VNPAY trực tuyến hoặc tại quầy sau khi kết thúc phiên.
+                </Text>
+              </View>
             </View>
 
             {canRespond ? (

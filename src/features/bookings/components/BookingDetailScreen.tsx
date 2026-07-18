@@ -426,6 +426,22 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
   const damageComponent = onsiteComponents.find((c: any) => c.type === 'DAMAGE_CHARGE');
   const damageCharge = Number(damageComponent?.amount ?? 0);
 
+  const damageLineItems = useMemo(() => {
+    if (booking?.damage_breakdown?.lineItems?.length) {
+      return booking.damage_breakdown.lineItems;
+    }
+    if (sessionDetail?.damageClaim?.damageLineItems?.length) {
+      return sessionDetail.damageClaim.damageLineItems;
+    }
+    const checkoutInsp = sessionDetail?.inspections?.find(
+      (i: any) => i.type === 'CHECK_OUT' && i.damageLineItems?.length
+    );
+    if (checkoutInsp?.damageLineItems?.length) {
+      return checkoutInsp.damageLineItems;
+    }
+    return [];
+  }, [booking, sessionDetail]);
+
   const depositConsumedByDamage = Math.min(depositAmount, damageCharge);
   const depositRefundAmount = depositAmount - depositConsumedByDamage;
   const damageExceedingDeposit = Math.max(0, damageCharge - depositAmount);
@@ -902,8 +918,8 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
             </View>
           </View>
 
-          {/* Block 2: Quyết toán cuối phiên chơi (Active hoặc Completed) */}
-          {(isSessionActive || booking.status === 'COMPLETED') && (depositAmount > 0 || totalCounterBill > 0) && (
+          {/* Block 2: Quyết toán cuối phiên chơi (Active, Awaiting payment hoặc Completed) */}
+          {(isSessionActive || booking.status === 'COMPLETED' || booking.status === 'AWAITING_PAYMENT') && (depositAmount > 0 || totalCounterBill > 0 || damageCharge > 0) && (
             <View className="mt-5 pt-4 border-t border-slate-200 dark:border-slate-800/80 space-y-3">
               <View className="flex-row items-center gap-2">
                 <Clock color="#94a3b8" size={15} />
@@ -943,6 +959,56 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                   </View>
                 )}
               </View>
+
+              {/* Thẻ Chi Tiết Đền Bù Hư Hỏng Xe (Giống Hình 1 trên Web) */}
+              {damageCharge > 0 && (
+                <View className="mt-3 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-3.5 space-y-2">
+                  <View className="flex-row justify-between items-center">
+                    <Text className="text-rose-600 dark:text-rose-400 text-xs font-bold uppercase tracking-wider">
+                      Phí đền bù hư hỏng xe
+                    </Text>
+                    <Text className="text-rose-600 dark:text-rose-400 text-xs font-bold">
+                      +{damageCharge.toLocaleString('vi-VN')}đ
+                    </Text>
+                  </View>
+                  {damageLineItems.length > 0 ? (
+                    <View className="space-y-2 pt-1">
+                      {damageLineItems.map((item: any, idx: number) => {
+                        const name = item.customPartName || item.partType || 'Hạng mục hư hỏng';
+                        const partsPrice = Number(item.partsPrice || 0);
+                        const laborPrice = Number(item.laborPrice || 0);
+                        const lineTotal = Number(item.subtotal ?? item.lineTotal ?? (partsPrice + laborPrice));
+                        return (
+                          <View key={item.id || idx} className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-2.5">
+                            <View className="flex-row justify-between items-center">
+                              <Text className="text-rose-900 dark:text-rose-200 text-xs font-bold flex-1 pr-2">
+                                {name}
+                              </Text>
+                              <Text className="text-rose-700 dark:text-rose-300 text-xs font-bold">
+                                {lineTotal.toLocaleString('vi-VN')}đ
+                              </Text>
+                            </View>
+                            <View className="flex-row items-center gap-3 mt-1">
+                              <Text className="text-rose-600/80 dark:text-rose-300/70 text-[10px] font-semibold">
+                                Linh kiện: {partsPrice.toLocaleString('vi-VN')}đ
+                              </Text>
+                              {laborPrice > 0 && (
+                                <Text className="text-rose-600/80 dark:text-rose-300/70 text-[10px] font-semibold">
+                                  Công: {laborPrice.toLocaleString('vi-VN')}đ
+                                </Text>
+                              )}
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  ) : (
+                    <Text className="text-rose-600/80 dark:text-rose-300/70 text-[11px] font-medium pt-1">
+                      Ghi nhận hư hại từ nhân viên trực ca
+                    </Text>
+                  )}
+                </View>
+              )}
             </View>
           )}
 
