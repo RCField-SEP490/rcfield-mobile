@@ -55,6 +55,27 @@ const INSPECTION_PHOTO_LABELS: Record<string, string> = {
   DETAIL: 'Cận cảnh',
 };
 
+export const PART_TYPE_NAMES: Record<string, string> = {
+  TIRE_WHEEL: 'Bánh xe / Lốp',
+  WHEEL_TIRE: 'Bánh xe / Lốp',
+  MOTOR: 'Động cơ (Motor)',
+  BATTERY: 'Pin / Ắc quy',
+  SERVO: 'Bộ bẻ lái (Servo)',
+  ESC: 'Bộ điều tốc (ESC)',
+  CHASSIS: 'Khung gầm (Chassis)',
+  BODY_SHELL: 'Vỏ xe (Body Shell)',
+  SUSPENSION: 'Phuộc / Giảm xóc',
+  TRANSMISSION: 'Hộp số / Truyền động',
+  REMOTE_CONTROL: 'Tay điều khiển (Remote)',
+  OTHER: 'Hạng mục khác',
+};
+
+export function getPartTypeName(partType?: string, customPartName?: string | null): string {
+  if (customPartName && customPartName.trim()) return customPartName;
+  if (!partType) return 'Hạng mục hư hỏng';
+  return PART_TYPE_NAMES[partType.toUpperCase()] || partType;
+}
+
 function getInspectionPhotoLabel(angle?: string, index = 0) {
   return INSPECTION_PHOTO_LABELS[angle || ''] || `Ảnh ${index + 1}`;
 }
@@ -115,7 +136,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
               </View>
             </Pressable>
           ) : (
-            <View className="flex-row flex-wrap gap-1.5 justify-between">
+            <View className="flex-row flex-wrap gap-1.5 justify-start">
               {photos.map((p: any, idx: number) => (
                 <Pressable
                   key={idx}
@@ -135,11 +156,6 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                   </View>
                 </Pressable>
               ))}
-              {Array.from({ length: Math.max(0, 4 - photos.length) }).map((_, idx) => (
-                <View key={`placeholder-${idx}`} className="w-[48%] aspect-square rounded-lg bg-slate-950 border border-slate-900/60 justify-center items-center">
-                  <Camera color="#1e293b" size={14} />
-                </View>
-              ))}
             </View>
           )
         ) : (
@@ -153,7 +169,6 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
   };
 
   const loadBookingDetail = useCallback(async () => {
-    setLoading(true);
     try {
       const data = await bookingWizardApi.getBooking(bookingId);
       setBooking(data);
@@ -322,6 +337,22 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
     };
   }, [booking]);
 
+  const damageLineItems = useMemo(() => {
+    if (booking?.damage_breakdown?.lineItems?.length) {
+      return booking.damage_breakdown.lineItems;
+    }
+    if (sessionDetail?.damageClaim?.damageLineItems?.length) {
+      return sessionDetail.damageClaim.damageLineItems;
+    }
+    const checkoutInsp = sessionDetail?.inspections?.find(
+      (i: any) => i.type === 'CHECK_OUT' && i.damageLineItems?.length
+    );
+    if (checkoutInsp?.damageLineItems?.length) {
+      return checkoutInsp.damageLineItems;
+    }
+    return [];
+  }, [booking, sessionDetail]);
+
   if (loading) {
     return (
       <SafeAreaView className="flex-grow flex-1 bg-[#f8fafc] dark:bg-[#0b0f19] justify-center items-center">
@@ -442,11 +473,10 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
 
   const prepaidTx = transactions.find((t: any) => t.type === 'PAYMENT' && t.gateway !== 'DIRECT' && t.status === 'SUCCESS');
   const counterTx = transactions.find((t: any) => t.type === 'PAYMENT' && t.gateway === 'DIRECT' && t.status === 'SUCCESS');
-  const additionalVnpayTx = transactions.filter(
+  const successfulVnpayTxs = transactions.filter(
     (t: any) => t.type === 'PAYMENT' && t.gateway !== 'DIRECT' && t.status === 'SUCCESS'
-  ).length > 1
-    ? transactions.filter((t: any) => t.type === 'PAYMENT' && t.gateway !== 'DIRECT' && t.status === 'SUCCESS').at(-1)
-    : undefined;
+  );
+  const additionalVnpayTx = successfulVnpayTxs.length > 1 ? successfulVnpayTxs[successfulVnpayTxs.length - 1] : undefined;
 
   return (
     <SafeAreaView className="flex-grow flex-1 bg-[#f8fafc] dark:bg-[#0b0f19]" edges={['top', 'left', 'right']}>
@@ -685,10 +715,10 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                   {checkInExpired
                     ? 'Đã quá thời hạn check-in, phiên không được mở.'
                     : session?.status === 'COMPLETED'
-                    ? 'Đã hoàn thành phiên chơi và checkout xe đua.'
-                    : isSessionActive
-                      ? 'Ca chơi đang hoạt động trên track.'
-                      : 'Chưa bắt đầu ca chơi.'}
+                      ? 'Đã hoàn thành phiên chơi và checkout xe đua.'
+                      : isSessionActive
+                        ? 'Ca chơi đang hoạt động trên track.'
+                        : 'Chưa bắt đầu ca chơi.'}
                 </Text>
               </View>
             </View>
@@ -902,8 +932,8 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
             </View>
           </View>
 
-          {/* Block 2: Quyết toán cuối phiên chơi (Active hoặc Completed) */}
-          {(isSessionActive || booking.status === 'COMPLETED') && (depositAmount > 0 || totalCounterBill > 0) && (
+          {/* Block 2: Quyết toán cuối phiên chơi (Active, Awaiting payment hoặc Completed) */}
+          {(isSessionActive || booking.status === 'COMPLETED' || booking.status === 'AWAITING_PAYMENT') && (depositAmount > 0 || totalCounterBill > 0 || damageCharge > 0) && (
             <View className="mt-5 pt-4 border-t border-slate-200 dark:border-slate-800/80 space-y-3">
               <View className="flex-row items-center gap-2">
                 <Clock color="#94a3b8" size={15} />
@@ -927,7 +957,10 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                 )}
                 {counterComponents.map((c: any, idx: number) => {
                   let label = c.label || 'Phí phát sinh';
-                  if (c.type === 'EXTENSION_FEE') label = 'Phí gia hạn giờ';
+                  if (c.type === 'EXTENSION_FEE') {
+                    const extraMins = c.extraMinutes || sessionDetail?.extensionProposal?.extraMinutes || c.durationMinutes || sessionDetail?.extensionProposal?.extra_minutes;
+                    label = extraMins ? `Phí gia hạn giờ (+${extraMins} phút)` : 'Phí gia hạn giờ';
+                  }
                   if (c.type === 'FB_PREORDER' || c.type === 'FNB_PREORDER') label = 'F&B gọi thêm tại quầy';
                   return (
                     <View key={c.id || idx} className="flex-row justify-between">
@@ -938,11 +971,62 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                 })}
                 {damageExceedingDeposit > 0 && (
                   <View className="flex-row justify-between">
-                    <Text className="text-slate-500 dark:text-slate-400 text-xs font-semibold">Hư hỏng vượt cọc</Text>
+                    <Text className="text-slate-500 dark:text-slate-400 text-xs font-semibold">Phí đền bù hư hỏng xe</Text>
                     <Text className="text-rose-400 text-xs font-bold">+{damageExceedingDeposit.toLocaleString('vi-VN')}đ</Text>
                   </View>
                 )}
               </View>
+
+              {/* Thẻ Chi Tiết Đền Bù Hư Hỏng Xe */}
+              {damageCharge > 0 && (
+                <View className="mt-3 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-3.5 space-y-2">
+                  <View className="flex-row justify-between items-center mb-1">
+                    <Text className="text-rose-600 dark:text-rose-400 text-xs font-bold uppercase tracking-wider">
+                      Phí đền bù hư hỏng xe
+                    </Text>
+                  </View>
+                  {damageLineItems.length > 0 ? (
+                    <View className="space-y-2 pt-1">
+                      {damageLineItems.map((item: any, idx: number) => {
+                        const name = getPartTypeName(item.partType, item.customPartName);
+                        const partsPrice = Number(item.partsPrice || 0);
+                        const laborPrice = Number(item.laborPrice || 0);
+                        const lineTotal = Number(item.subtotal ?? item.lineTotal ?? (partsPrice + laborPrice));
+                        return (
+                          <View key={item.id || idx} className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-2.5">
+                            <View className="flex-row justify-between items-center">
+                              <Text className="text-rose-900 dark:text-rose-200 text-xs font-bold flex-1 pr-2">
+                                {name}
+                              </Text>
+                            </View>
+                            <View className="flex-row items-center gap-3 mt-1">
+                              {partsPrice > 0 && (
+                                <Text className="text-rose-600/80 dark:text-rose-300/70 text-[10.5px] font-semibold">
+                                  Linh kiện: {partsPrice.toLocaleString('vi-VN')}đ
+                                </Text>
+                              )}
+                              {laborPrice > 0 && (
+                                <Text className="text-rose-600/80 dark:text-rose-300/70 text-[10.5px] font-semibold">
+                                  Công: {laborPrice.toLocaleString('vi-VN')}đ
+                                </Text>
+                              )}
+                              {partsPrice === 0 && laborPrice === 0 && lineTotal > 0 && (
+                                <Text className="text-rose-600/80 dark:text-rose-300/70 text-[10.5px] font-semibold">
+                                  Chi phí: {lineTotal.toLocaleString('vi-VN')}đ
+                                </Text>
+                              )}
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  ) : (
+                    <Text className="text-rose-600/80 dark:text-rose-300/70 text-[11px] font-medium pt-1">
+                      Ghi nhận hư hại từ nhân viên trực ca
+                    </Text>
+                  )}
+                </View>
+              )}
             </View>
           )}
 

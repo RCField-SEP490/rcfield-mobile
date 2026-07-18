@@ -157,7 +157,7 @@ class WebSocketClient {
               text: 'OK',
               onPress: () => {
                 if (bookingId) {
-                  router.push(`/booking/${bookingId}` as any);
+                  router.navigate(`/booking/${bookingId}` as any);
                 }
               },
             },
@@ -174,7 +174,7 @@ class WebSocketClient {
               text: 'Kiểm tra ngay',
               onPress: () => {
                 if (data?.sessionId) {
-                  router.push({
+                  router.navigate({
                     pathname: '/customer/inspections/[sessionId]',
                     params: { sessionId: data.sessionId, inspectionId: data.inspectionId },
                   } as any);
@@ -220,7 +220,7 @@ class WebSocketClient {
               text: 'Phản hồi',
               onPress: () => {
                 if (data?.sessionId) {
-                  router.push({
+                  router.navigate({
                     pathname: '/customer/extension/[sessionId]',
                     params: { sessionId: data.sessionId },
                   } as any);

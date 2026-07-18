@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, CheckCircle2, Clock3, CreditCard, XCircle } from 'lucide-react-native';
+import { useColorScheme } from 'nativewind';
 
 import { bookingWizardApi } from '@/features/bookings/api/booking-wizard.api';
 import { getStatusLabel } from '@/features/bookings/lib/status-label';
@@ -36,6 +37,7 @@ function shortId(value?: string) {
 
 export default function CustomerExtensionResponseScreen() {
   const router = useRouter();
+  const { colorScheme } = useColorScheme();
   const { sessionId } = useLocalSearchParams<{ sessionId?: string | string[] }>();
   const normalizedSessionId = Array.isArray(sessionId) ? sessionId[0] : sessionId;
 
@@ -120,27 +122,28 @@ export default function CustomerExtensionResponseScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-[#0b0f19]">
+      <SafeAreaView className="flex-1 items-center justify-center bg-[#f8fafc] dark:bg-[#0b0f19]">
         <ActivityIndicator size="large" color="#f97316" />
-        <Text className="mt-3 text-[12px] text-slate-500">Đang tải yêu cầu gia hạn...</Text>
+        <Text className="mt-3 text-[12px] text-slate-500 dark:text-slate-400 font-semibold">Đang tải yêu cầu gia hạn...</Text>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-[#0b0f19]" edges={['top', 'left', 'right']}>
-      <View className="flex-row items-center gap-3 border-b border-slate-900 px-5 py-4">
+    <SafeAreaView className="flex-1 bg-[#f8fafc] dark:bg-[#0b0f19]" edges={['top', 'left', 'right']}>
+      {/* Header */}
+      <View className="flex-row items-center gap-3 border-b border-slate-200 dark:border-slate-900 bg-white dark:bg-[#0b0f19] px-5 py-4">
         <Pressable
           onPress={() => router.back()}
-          className="h-10 w-10 items-center justify-center rounded-xl border border-slate-800 bg-[#0f172a]"
+          className="h-10 w-10 items-center justify-center rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0f172a] active:bg-slate-100 dark:active:bg-slate-800"
         >
-          <ArrowLeft color="#e2e8f0" size={19} />
+          <ArrowLeft color={colorScheme === 'dark' ? '#ffffff' : '#1e293b'} size={19} />
         </Pressable>
         <View className="flex-1">
-          <Text className="text-[12px] uppercase tracking-wider text-slate-500" weight="700">
+          <Text className="text-[12px] uppercase tracking-wider text-slate-500 dark:text-slate-400" weight="700">
             Gia hạn phiên
           </Text>
-          <Text className="mt-1 text-[19px] text-white" weight="700" numberOfLines={1}>
+          <Text className="mt-0.5 text-[18px] text-slate-900 dark:text-white font-bold" numberOfLines={1}>
             Phiên #{shortId(normalizedSessionId)}
           </Text>
         </View>
@@ -159,33 +162,33 @@ export default function CustomerExtensionResponseScreen() {
         showsVerticalScrollIndicator={false}
       >
         {!extensionProposal ? (
-          <View className="rounded-2xl border border-dashed border-slate-800 bg-[#0f172a]/60 p-6">
-            <Text className="text-center text-[14px] text-white" weight="700">
+          <View className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-6 shadow-sm">
+            <Text className="text-center text-[14px] text-slate-900 dark:text-white" weight="700">
               Không có yêu cầu gia hạn đang chờ
             </Text>
-            <Text className="mt-2 text-center text-[12px] leading-5 text-slate-500">
+            <Text className="mt-2 text-center text-[12px] leading-5 text-slate-500 dark:text-slate-400 font-medium">
               Yêu cầu có thể đã được xử lý hoặc đã hết hạn.
             </Text>
           </View>
         ) : (
           <View className="gap-4">
-            <View className="rounded-2xl border border-orange-500/20 bg-orange-500/10 p-4">
+            <View className="rounded-2xl border border-orange-500/20 bg-orange-500/10 p-4 shadow-sm">
               <View className="flex-row items-start gap-3">
                 <View className="h-11 w-11 items-center justify-center rounded-xl bg-orange-500/15">
                   <Clock3 color="#fb923c" size={21} />
                 </View>
                 <View className="flex-1">
-                  <Text className="text-[16px] text-white" weight="700">
+                  <Text className="text-[16px] text-slate-900 dark:text-white" weight="700">
                     Nhân viên đề xuất gia hạn +{extensionProposal.extraMinutes} phút
                   </Text>
-                  <Text className="mt-1 text-[12px] leading-5 text-orange-100/80">
+                  <Text className="mt-1 text-[12px] leading-5 text-orange-700 dark:text-orange-100/80 font-semibold">
                     Kết thúc mới: {formatDateTime(extensionProposal.newPlannedEnd)}
                   </Text>
                 </View>
               </View>
             </View>
 
-            <View className="rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-4">
+            <View className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-4 shadow-sm">
               <InfoRow
                 icon={<Clock3 color="#94a3b8" size={15} />}
                 label="Thời lượng"
@@ -201,6 +204,11 @@ export default function CustomerExtensionResponseScreen() {
                 label="Hết hạn sau"
                 value={expiresInText || '10 phút'}
               />
+              <View className="mt-3 border-t border-slate-200 dark:border-slate-800/80 pt-2.5">
+                <Text className="text-[11px] leading-4 text-slate-600 dark:text-slate-400 font-medium">
+                  💡 Phí gia hạn giờ sẽ được ghi nhận vào mục quyết toán. Bạn có thể thanh toán qua VNPAY trực tuyến hoặc tại quầy sau khi kết thúc phiên.
+                </Text>
+              </View>
             </View>
 
             {canRespond ? (
@@ -208,7 +216,7 @@ export default function CustomerExtensionResponseScreen() {
                 <Pressable
                   disabled={!!submitting}
                   onPress={() => handleRespond(true)}
-                  className={`h-12 flex-row items-center justify-center gap-2 rounded-xl bg-emerald-600 ${
+                  className={`h-12 flex-row items-center justify-center gap-2 rounded-xl bg-emerald-600 active:bg-emerald-500 shadow-md ${
                     submitting ? 'opacity-70' : ''
                   }`}
                 >
@@ -225,7 +233,7 @@ export default function CustomerExtensionResponseScreen() {
                 <Pressable
                   disabled={!!submitting}
                   onPress={() => handleRespond(false)}
-                  className={`h-12 flex-row items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 ${
+                  className={`h-12 flex-row items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 active:bg-red-500/20 ${
                     submitting ? 'opacity-70' : ''
                   }`}
                 >
@@ -234,14 +242,14 @@ export default function CustomerExtensionResponseScreen() {
                   ) : (
                     <XCircle color="#ef4444" size={17} />
                   )}
-                  <Text className="text-[13px] text-red-400" weight="700">
+                  <Text className="text-[13px] text-red-600 dark:text-red-400" weight="700">
                     Từ chối gia hạn
                   </Text>
                 </Pressable>
               </View>
             ) : (
               <View className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4">
-                <Text className="text-[12px] text-emerald-300" weight="700">
+                <Text className="text-[12px] text-emerald-600 dark:text-emerald-300" weight="700">
                   Yêu cầu đã được xử lý: {getStatusLabel(extensionProposal.status)}
                 </Text>
               </View>
@@ -255,10 +263,10 @@ export default function CustomerExtensionResponseScreen() {
 
 function InfoRow({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
-    <View className="flex-row items-center gap-2 border-b border-slate-800 py-3 last:border-b-0">
+    <View className="flex-row items-center gap-2 border-b border-slate-100 dark:border-slate-800 py-3 last:border-b-0">
       {icon}
-      <Text className="flex-1 text-[12px] text-slate-500">{label}</Text>
-      <Text className="text-[12px] text-white" weight="700">
+      <Text className="flex-1 text-[12px] text-slate-600 dark:text-slate-400 font-semibold">{label}</Text>
+      <Text className="text-[12px] text-slate-900 dark:text-white font-bold">
         {value}
       </Text>
     </View>

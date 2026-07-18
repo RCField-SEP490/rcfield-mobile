@@ -1,9 +1,14 @@
-import React, { useEffect, useState } from 'react';
-import { View, TextInput, Pressable, Image, ActivityIndicator } from 'react-native';
-import { User, Plus, Minus, AlertTriangle, Car, Smartphone } from 'lucide-react-native';
+import React, { useEffect, useState, useMemo } from 'react';
+import { View, TextInput, Pressable, Image, ActivityIndicator, LayoutAnimation, UIManager, Platform } from 'react-native';
+import { User, Plus, Minus, AlertTriangle, Car, Smartphone, ChevronDown, ChevronUp, CheckCircle2 } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
 import { Text } from '@/shared/ui/Text';
+import { cn } from '@/shared/lib/utils';
 import { bookingWizardApi, type Companion, type RentalVehicleUnit } from '../api/booking-wizard.api';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 interface ParticipantsStepProps {
   cafeId: string;
@@ -39,6 +44,69 @@ export function ParticipantsStep({
   const [availableVehicleIds, setAvailableVehicleIds] = useState<string[]>([]);
   const [byocRemaining, setByocRemaining] = useState<number | null>(null);
   const [checkingByoc, setCheckingByoc] = useState(false);
+
+  // Group available vehicles by Catalog (Category)
+  const categoryGroups = useMemo(() => {
+    const availableUnits = vehicleUnits.filter((v) => availableVehicleIds.includes(v.id));
+    const map = new Map<
+      string,
+      {
+        catalogId: string;
+        catalogName: string;
+        tier: string;
+        hourlyRate: number;
+        coverImageUrl?: string | null;
+        units: RentalVehicleUnit[];
+      }
+    >();
+
+    for (const unit of availableUnits) {
+      const catalogId = unit.catalogId || unit.catalog?.id || 'default_catalog';
+      if (!map.has(catalogId)) {
+        map.set(catalogId, {
+          catalogId,
+          catalogName: unit.catalog?.name || 'Dòng xe đua',
+          tier: unit.catalog?.tier || 'STANDARD',
+          hourlyRate: Number(unit.catalog?.hourlyRate || 0),
+          coverImageUrl: unit.catalog?.cover_image_url || unit.distinctive_image_url,
+          units: [],
+        });
+      }
+      map.get(catalogId)!.units.push(unit);
+    }
+
+    return Array.from(map.values());
+  }, [vehicleUnits, availableVehicleIds]);
+
+  // Expanded category IDs state
+  const [expandedCatalogIds, setExpandedCatalogIds] = useState<string[]>([]);
+
+  // Auto-expand category containing preselected or selected vehicle when loaded
+  useEffect(() => {
+    if (categoryGroups.length > 0) {
+      const autoExpand: string[] = [];
+      categoryGroups.forEach((group) => {
+        const hasSelected = group.units.some((u) => selectedVehicleIds.includes(u.id));
+        if (hasSelected) {
+          autoExpand.push(group.catalogId);
+        }
+      });
+      if (autoExpand.length === 0) {
+        autoExpand.push(categoryGroups[0].catalogId);
+      }
+      setExpandedCatalogIds((prev) => Array.from(new Set([...prev, ...autoExpand])));
+    }
+  }, [categoryGroups, selectedVehicleIds]);
+
+  const toggleCategoryExpand = (catalogId: string) => {
+    if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+      UIManager.setLayoutAnimationEnabledExperimental(true);
+    }
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpandedCatalogIds((prev) =>
+      prev.includes(catalogId) ? prev.filter((id) => id !== catalogId) : [...prev, catalogId]
+    );
+  };
 
   // 1. Resolve actual vehicle units that remain available for the whole selected range.
   useEffect(() => {
@@ -232,7 +300,7 @@ export function ParticipantsStep({
         </View>
       )}
 
-      {/* 3. Chọn xe / Validate */}
+      {/* 3. Chọn xe theo Category Dropdown / Validate */}
       {playMode === 'RENTAL' ? (
         <View className="mt-5">
           <View className="flex-row items-center justify-between mb-3">
@@ -249,54 +317,149 @@ export function ParticipantsStep({
 
           {loadingVehicles ? (
             <ActivityIndicator size="small" color="#f97316" className="py-4" />
-          ) : vehicleUnits.filter((vehicle) => availableVehicleIds.includes(vehicle.id)).length > 0 ? (
-            <View className="gap-2.5">
-              {vehicleUnits.filter((vehicle) => availableVehicleIds.includes(vehicle.id)).map((vehicle) => {
-                const isSelected = selectedVehicleIds.includes(vehicle.id);
+          ) : categoryGroups.length > 0 ? (
+            <View className="gap-3">
+              {categoryGroups.map((group) => {
+                const isExpanded = expandedCatalogIds.includes(group.catalogId);
+                const selectedInGroup = group.units.filter((u) => selectedVehicleIds.includes(u.id)).length;
+                const isGroupSelected = selectedInGroup > 0;
+
                 return (
-                  <Pressable
-                    key={vehicle.id}
-                    onPress={() => toggleVehicle(vehicle.id)}
-                    className={`p-3 rounded-xl border flex-row gap-3.5 transition-all duration-200 ${
-                      isSelected
-                        ? 'bg-[#ea580c]/10 border-[#f97316]'
+                  <View
+                    key={group.catalogId}
+                    className={`rounded-xl border overflow-hidden transition-all duration-200 ${
+                      isGroupSelected
+                        ? 'bg-[#ea580c]/5 border-[#f97316]/60'
                         : 'bg-white dark:bg-[#0f172a]/50 border-slate-200 dark:border-slate-800'
                     }`}
                   >
-                    {vehicle.distinctive_image_url || vehicle.catalog?.cover_image_url ? (
-                      <Image
-                        source={{ uri: vehicle.distinctive_image_url || vehicle.catalog?.cover_image_url || undefined }}
-                        className="h-16 w-16 rounded-lg bg-slate-100 dark:bg-slate-900 object-cover"
-                      />
-                    ) : (
-                      <View className="h-16 w-16 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 items-center justify-center">
-                        <Car color="#475569" size={24} />
-                      </View>
-                    )}
-                    <View className="flex-1 justify-center">
-                      <View className="flex-row items-center justify-between">
-                        <Text className="text-[13px] text-slate-900 dark:text-white" weight="700">
-                          {vehicle.catalog?.name || 'Xe thuê'}
-                        </Text>
-                        <View className="bg-slate-50 dark:bg-slate-900 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-800">
-                          <Text className="text-[8px] text-slate-500 dark:text-slate-400 font-bold uppercase">
-                            {vehicle.catalog?.tier || 'Tiêu chuẩn'}
+                    {/* Category Dropdown Header */}
+                    <Pressable
+                      onPress={() => toggleCategoryExpand(group.catalogId)}
+                      className="p-3.5 flex-row items-center gap-3.5 active:bg-slate-100/50 dark:active:bg-slate-850/50"
+                    >
+                      {group.coverImageUrl ? (
+                        <Image
+                          source={{ uri: group.coverImageUrl }}
+                          className="h-14 w-14 rounded-lg bg-slate-100 dark:bg-slate-900 object-cover"
+                        />
+                      ) : (
+                        <View className="h-14 w-14 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 items-center justify-center">
+                          <Car color="#475569" size={22} />
+                        </View>
+                      )}
+
+                      <View className="flex-1 justify-center">
+                        <View className="flex-row items-center justify-between">
+                          <Text className="text-[13.5px] text-slate-900 dark:text-white" weight="700">
+                            {group.catalogName}
+                          </Text>
+                          <View
+                            className={cn(
+                              'px-2 py-0.5 rounded border',
+                              group.tier === 'PREMIUM'
+                                ? 'bg-yellow-500/10 border-yellow-500/20'
+                                : 'bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800'
+                            )}
+                          >
+                            <Text
+                              className={cn(
+                                'text-[8.5px] font-bold uppercase',
+                                group.tier === 'PREMIUM'
+                                  ? 'text-yellow-500'
+                                  : 'text-slate-500 dark:text-slate-400'
+                              )}
+                            >
+                              {group.tier}
+                            </Text>
+                          </View>
+                        </View>
+
+                        <View className="flex-row items-center justify-between mt-1">
+                          <Text className="text-[12px] text-[#f97316]" weight="700">
+                            {group.hourlyRate.toLocaleString('vi-VN')}đ/giờ
+                          </Text>
+                          <Text className="text-[10px] text-emerald-500 font-bold">
+                            Còn {group.units.length} xe
+                            {selectedInGroup > 0 ? ` • Đã chọn ${selectedInGroup}` : ''}
                           </Text>
                         </View>
                       </View>
-                      <Text className="text-[10px] text-slate-550 dark:text-slate-400 mt-0.5 font-semibold" numberOfLines={1}>
-                        Mã xe: {vehicle.identifier || vehicle.id.slice(0, 8).toUpperCase()}{vehicle.color ? ` • ${vehicle.color}` : ''}
-                      </Text>
-                      <View className="flex-row items-center justify-between mt-1.5">
-                        <Text className="text-[12px] text-[#f97316] font-bold">
-                          {Number(vehicle.catalog?.hourlyRate || 0).toLocaleString('vi-VN')}đ/giờ
-                        </Text>
-                        <Text className="text-[9px] text-[#10b981] font-bold">
-                          Sẵn sàng
-                        </Text>
+
+                      <View className="p-1 rounded-full bg-slate-100 dark:bg-slate-900">
+                        {isExpanded ? (
+                          <ChevronUp color={colorScheme === 'dark' ? '#f97316' : '#ea580c'} size={18} />
+                        ) : (
+                          <ChevronDown color={colorScheme === 'dark' ? '#94a3b8' : '#64748b'} size={18} />
+                        )}
                       </View>
-                    </View>
-                  </Pressable>
+                    </Pressable>
+
+                    {/* Dropdown Content - Vehicles list under this category */}
+                    {isExpanded && (
+                      <View className="px-3 pb-3 pt-1 gap-2 border-t border-slate-200/60 dark:border-slate-850/80 bg-slate-50/50 dark:bg-slate-950/40">
+                        <Text className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold mb-0.5">
+                          Danh sách xe mã số thuộc dòng {group.catalogName}:
+                        </Text>
+                        {group.units.map((vehicle) => {
+                          const isSelected = selectedVehicleIds.includes(vehicle.id);
+                          return (
+                            <Pressable
+                              key={vehicle.id}
+                              onPress={() => toggleVehicle(vehicle.id)}
+                              className={`p-2.5 rounded-xl border flex-row items-center gap-3 transition-all duration-150 ${
+                                isSelected
+                                  ? 'bg-[#ea580c]/15 border-[#f97316]'
+                                  : 'bg-white dark:bg-[#0f172a] border-slate-200/80 dark:border-slate-800'
+                              }`}
+                            >
+                              <View
+                                className={cn(
+                                  'size-5 rounded-md border justify-center items-center',
+                                  isSelected
+                                    ? 'bg-[#f97316] border-[#f97316]'
+                                    : 'border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900'
+                                )}
+                              >
+                                {isSelected && <CheckCircle2 color="#ffffff" size={13} strokeWidth={3} />}
+                              </View>
+
+                              {vehicle.distinctive_image_url ? (
+                                <Image
+                                  source={{ uri: vehicle.distinctive_image_url }}
+                                  className="size-10 rounded-lg bg-slate-100 dark:bg-slate-900 object-cover"
+                                />
+                              ) : (
+                                <View className="size-10 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 items-center justify-center">
+                                  <Car color="#475569" size={16} />
+                                </View>
+                              )}
+
+                              <View className="flex-1">
+                                <Text className="text-[12px] text-slate-900 dark:text-white" weight="700">
+                                  Mã xe: {vehicle.identifier || vehicle.id.slice(0, 8).toUpperCase()}
+                                </Text>
+                                <Text className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
+                                  Màu: {vehicle.color || 'Tiêu chuẩn'} • {group.hourlyRate.toLocaleString('vi-VN')}đ/giờ
+                                </Text>
+                              </View>
+
+                              <Text
+                                className={cn(
+                                  'text-[10px] font-bold px-2 py-1 rounded-md',
+                                  isSelected
+                                    ? 'bg-[#f97316] text-white'
+                                    : 'bg-slate-100 dark:bg-slate-850 text-slate-600 dark:text-slate-400'
+                                )}
+                              >
+                                {isSelected ? 'Đã chọn' : 'Chọn xe'}
+                              </Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    )}
+                  </View>
                 );
               })}
             </View>
