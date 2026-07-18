@@ -12,13 +12,28 @@ export type StaffFnbOrderStatus = 'PENDING' | 'CONFIRMED' | 'DELIVERED' | 'CANCE
 export type StaffInspectionType = 'CHECK_IN' | 'CHECK_OUT';
 export type StaffBookingSource = 'APP' | 'STAFF_MANUAL';
 export type StaffPlayMode = 'RENTAL' | 'BYOC' | 'MIXED';
-export type StaffInspectionItemStatus =
-  | 'OK'
-  | 'SCRATCHED'
-  | 'BROKEN'
-  | 'MISSING'
-  | 'DIRTY'
-  | 'NEEDS_REVIEW';
+export type StaffInspectionItemStatus = 'OK' | 'BROKEN';
+export type DamagePartType =
+  | 'TIRE_WHEEL'
+  | 'SPOILER'
+  | 'CHASSIS'
+  | 'MOTOR'
+  | 'SHELL'
+  | 'SERVO'
+  | 'REMOTE'
+  | 'OTHER';
+
+export interface DamageLineItemInput {
+  partType: DamagePartType;
+  customPartName?: string;
+  partsPrice: number;
+  laborPrice?: number;
+}
+
+export interface DamageLineItemDetail extends DamageLineItemInput {
+  id?: string;
+  lineTotal: number;
+}
 
 export interface TodayBookingItem {
   bookingId: string;
@@ -79,7 +94,7 @@ export interface StaffSessionDetail {
   actualStart?: string;
   actualEnd?: string;
   plannedEnd: string;
-  participants: { name: string; type: string }[];
+  participants: { name: string; type: string; avatarUrl?: string }[];
   vehicles: {
     vehicleId: string;
     name: string;
@@ -96,10 +111,8 @@ export interface StaffSessionDetail {
     customerConfirmed?: boolean;
     customerConfirmedAt?: string;
     damageFlagged?: boolean;
-    damageDescription?: string;
-    estimatedCost?: number;
-    damageMultiplier?: number;
-    finalCharge?: number;
+    damageLineItems?: DamageLineItemDetail[];
+    totalDamageCharge?: number;
   }[];
   extensionProposal?: {
     proposalId: string;
@@ -131,6 +144,13 @@ export interface StaffSessionDetail {
     items: { name: string; qty: number; price: number }[];
     total: number;
   }[];
+  paymentSummary?: {
+    outstandingAmount: number;
+    pendingRefundAmount: number;
+    pendingPaymentCount: number;
+    pendingRefundCount: number;
+    requiresSettlement: boolean;
+  };
 }
 
 export interface SubmitInspectionPayload {
@@ -144,12 +164,7 @@ export interface SubmitInspectionPayload {
   }[];
   staffNotes?: string;
   damageFlagged?: boolean;
-  damageDetails?: {
-    description: string;
-    estimatedCost: number;
-    damageMultiplier?: number;
-    finalCharge?: number;
-  };
+  damageLineItems?: DamageLineItemInput[];
 }
 
 export interface StaffMenuItem {
@@ -186,6 +201,13 @@ export const staffApi = {
     return response.data.data || [];
   },
 
+  async getBookings(date: string): Promise<TodayBookingItem[]> {
+    const response = await api.get<{ success: boolean; data: TodayBookingItem[] }>('/staff/bookings', {
+      params: { date },
+    });
+    return response.data.data || [];
+  },
+
   async checkIn(bookingId: string): Promise<any> {
     const response = await api.post<{ success: boolean; data: any }>(
       `/staff/bookings/${bookingId}/check-in`
@@ -216,6 +238,26 @@ export const staffApi = {
       `/staff/sessions/${sessionId}/inspections`,
       payload
     );
+    return response.data.data;
+  },
+
+  async confirmCheckout(sessionId: string, inspectionId: string): Promise<any> {
+    const response = await api.post<{ success: boolean; data: any }>(
+      `/staff/sessions/${sessionId}/confirm-checkout`,
+      { inspectionId }
+    );
+    return response.data.data;
+  },
+
+  async updateDamageItems(
+    sessionId: string,
+    inspectionId: string,
+    damageLineItems: DamageLineItemInput[]
+  ): Promise<{ inspectionId: string; damageLineItems: DamageLineItemDetail[]; totalDamageCharge: number }> {
+    const response = await api.put<{
+      success: boolean;
+      data: { inspectionId: string; damageLineItems: DamageLineItemDetail[]; totalDamageCharge: number };
+    }>(`/staff/sessions/${sessionId}/inspections/${inspectionId}/damage-items`, { damageLineItems });
     return response.data.data;
   },
 

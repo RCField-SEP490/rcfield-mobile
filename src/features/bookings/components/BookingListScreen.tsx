@@ -20,6 +20,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useColorScheme } from 'nativewind';
 
 import { getMyBookings, type BookingListItem, type BookingStatus } from '@/features/bookings/api/booking.api';
+import { getDisplayBookingStatus, isCheckInWindowExpired } from '@/features/bookings/lib/check-in-window';
 import { NotificationBellButton } from '@/features/notifications/components/NotificationBellButton';
 import { Text } from '@/shared/ui/Text';
 import { cn } from '@/shared/lib/utils';
@@ -27,6 +28,7 @@ import { useAuthStore } from '@/shared/store/auth-store';
 
 // ── 6 category filter theo yêu cầu ──────────────────────────────────────────
 type FilterKey = 'ALL' | BookingStatus;
+type PlayModeFilter = 'ALL' | 'RENTAL' | 'BYOC';
 
 interface TabConfig {
   key: FilterKey;
@@ -42,6 +44,7 @@ const TAB_CONFIG: TabConfig[] = [
   { key: 'ALL',       label: 'Tất cả',        activeBg: '#334155',          activeBorderColor: '#64748b', activeTextColor: '#ffffff',  activeBadgeBg: 'rgba(255,255,255,0.15)' },
   { key: 'PENDING',   label: 'Chờ thanh toán', activeBg: 'rgba(245,158,11,0.2)', activeBorderColor: '#f59e0b', activeTextColor: '#fbbf24',  activeBadgeBg: 'rgba(255,255,255,0.15)' },
   { key: 'CONFIRMED', label: 'Đã xác nhận',    activeBg: 'rgba(16,185,129,0.2)', activeBorderColor: '#10b981', activeTextColor: '#34d399',  activeBadgeBg: 'rgba(255,255,255,0.15)' },
+  { key: 'AWAITING_PAYMENT', label: 'Chờ trả thêm', activeBg: 'rgba(14,165,233,0.15)', activeBorderColor: '#38bdf8', activeTextColor: '#38bdf8', activeBadgeBg: 'rgba(255,255,255,0.15)' },
   { key: 'NO_SHOW',   label: 'Không đến',      activeBg: 'rgba(51,65,85,0.5)',   activeBorderColor: '#64748b', activeTextColor: '#cbd5e1',  activeBadgeBg: 'rgba(255,255,255,0.15)' },
   { key: 'COMPLETED', label: 'Hoàn thành',     activeBg: 'rgba(99,102,241,0.2)', activeBorderColor: '#6366f1', activeTextColor: '#818cf8',  activeBadgeBg: 'rgba(255,255,255,0.15)' },
   { key: 'CANCELLED', label: 'Đã hủy',         activeBg: 'rgba(239,68,68,0.2)',  activeBorderColor: '#ef4444', activeTextColor: '#f87171',  activeBadgeBg: 'rgba(255,255,255,0.15)' },
@@ -51,14 +54,15 @@ const TAB_CONFIG: TabConfig[] = [
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; icon: any }> = {
   PENDING:      { label: 'Chờ thanh toán', bg: 'bg-amber-500/10 border-amber-500/20',    text: 'text-amber-500',   icon: Clock },
   CONFIRMED:    { label: 'Đã xác nhận',    bg: 'bg-emerald-500/10 border-emerald-500/20', text: 'text-emerald-500', icon: Calendar },
+  AWAITING_PAYMENT: { label: 'Chờ thanh toán thêm', bg: 'bg-blue-500/10 border-blue-500/20', text: 'text-blue-400', icon: Clock },
   NO_SHOW:      { label: 'Không đến',      bg: 'bg-slate-500/10 border-slate-500/20',    text: 'text-slate-400',   icon: HelpCircle },
   COMPLETED:    { label: 'Hoàn thành',     bg: 'bg-indigo-500/10 border-indigo-500/20',  text: 'text-indigo-400',  icon: Gamepad2 },
   CANCELLED:    { label: 'Đã hủy',         bg: 'bg-red-500/10 border-red-500/20',        text: 'text-red-400',     icon: RotateCcw },
   // Trạng thái Session thực tế
-  CHECKED_IN:   { label: 'Đang check-in',  bg: 'bg-amber-500/10 border-amber-500/20',    text: 'text-amber-400',   icon: Clock },
+  CHECKED_IN:   { label: 'Đang nhận xe',   bg: 'bg-amber-500/10 border-amber-500/20',    text: 'text-amber-400',   icon: Clock },
   ACTIVE:       { label: 'Đang chơi',      bg: 'bg-orange-500/10 border-orange-500/20',  text: 'text-orange-500',  icon: Gamepad2 },
   EXTENDING:    { label: 'Đang gia hạn',   bg: 'bg-orange-500/10 border-orange-500/20',  text: 'text-orange-500',  icon: Gamepad2 },
-  CHECKING_OUT: { label: 'Đang checkout',  bg: 'bg-blue-500/10 border-blue-500/20',      text: 'text-blue-400',    icon: Clock },
+  CHECKING_OUT: { label: 'Đang trả xe',    bg: 'bg-blue-500/10 border-blue-500/20',      text: 'text-blue-400',    icon: Clock },
 };
 
 // Chuyển Tailwind text class → hex color để truyền vào icon component
@@ -82,6 +86,7 @@ export function BookingListScreen() {
   const role = useAuthStore((state) => state.role);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const [activeTab, setActiveTab] = useState<FilterKey>('ALL');
+  const [playModeFilter, setPlayModeFilter] = useState<PlayModeFilter>('ALL');
   const [bookings, setBookings] = useState<BookingListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -107,6 +112,7 @@ export function BookingListScreen() {
         undefined,       // ALL — lấy toàn bộ theo limit 50
         'PENDING',
         'CONFIRMED',
+        'AWAITING_PAYMENT',
         'NO_SHOW',
         'COMPLETED',
         'CANCELLED',
@@ -152,13 +158,15 @@ export function BookingListScreen() {
       ALL: bookings.length,
       PENDING: 0,
       CONFIRMED: 0,
+      AWAITING_PAYMENT: 0,
       NO_SHOW: 0,
       COMPLETED: 0,
       CANCELLED: 0,
     };
     bookings.forEach((b) => {
-      if (b.status in counts) {
-        (counts as Record<string, number>)[b.status]++;
+      const displayStatus = getDisplayBookingStatus(b.status, b.slotStart, b.session);
+      if (displayStatus in counts) {
+        (counts as Record<string, number>)[displayStatus]++;
       }
     });
     return counts;
@@ -166,9 +174,13 @@ export function BookingListScreen() {
 
   // Filter bookings theo tab — trực tiếp theo BookingStatus từ BE
   const filteredBookings = useMemo(() => {
-    if (activeTab === 'ALL') return bookings;
-    return bookings.filter((b) => b.status === activeTab);
-  }, [bookings, activeTab]);
+    return bookings.filter((booking) => {
+      const displayStatus = getDisplayBookingStatus(booking.status, booking.slotStart, booking.session);
+      const matchesStatus = activeTab === 'ALL' || displayStatus === activeTab;
+      const matchesPlayMode = playModeFilter === 'ALL' || booking.playMode === playModeFilter;
+      return matchesStatus && matchesPlayMode;
+    });
+  }, [bookings, activeTab, playModeFilter]);
 
   const handleCardPress = (id: string) => {
     router.push(`/booking/${id}` as any);
@@ -177,9 +189,14 @@ export function BookingListScreen() {
   const renderBookingItem = ({ item }: { item: BookingListItem }) => {
     // Ưu tiên hiển thị trạng thái Session thực tế nếu đang active
     const sessStatus = item.session?.status;
+    const checkInExpired = isCheckInWindowExpired(item.status, item.slotStart, item.session);
     const isSessionActive =
       sessStatus && ['ACTIVE', 'EXTENDING', 'CHECKED_IN', 'CHECKING_OUT'].includes(sessStatus);
-    const displayStatus = isSessionActive ? sessStatus! : item.status;
+    const displayStatus = checkInExpired
+      ? 'NO_SHOW'
+      : isSessionActive
+        ? sessStatus!
+        : item.status;
     const status = STATUS_CONFIG[displayStatus] ?? STATUS_CONFIG.PENDING;
     const StatusIcon = status.icon;
 
@@ -411,6 +428,30 @@ export function BookingListScreen() {
         })}
       </ScrollView>
 
+      <View className="mb-3 flex-row gap-2 px-5">
+        {([
+          ['ALL', 'Tất cả hình thức'],
+          ['RENTAL', 'Thuê xe'],
+          ['BYOC', 'Mang xe riêng'],
+        ] as const).map(([mode, label]) => {
+          const active = playModeFilter === mode;
+          return (
+            <Pressable
+              key={mode}
+              onPress={() => setPlayModeFilter(mode)}
+              className={`rounded-lg border px-3 py-2 ${
+                active
+                  ? 'border-orange-500 bg-orange-500/10'
+                  : 'border-slate-200 bg-white dark:border-slate-800 dark:bg-[#0f172a]/60'
+              }`}
+            >
+              <Text className={`text-[10px] ${active ? 'text-[#f97316]' : 'text-slate-500'}`} weight="700">
+                {label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
 
       {/* Bookings List */}
       {loading ? (

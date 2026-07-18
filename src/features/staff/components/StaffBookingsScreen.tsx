@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { CalendarDays, Car, Clock, LogIn, UserRound, type LucideIcon } from 'lucide-react-native';
+import { CalendarDays, Car, ChevronLeft, ChevronRight, Eye, LogIn, UserRound, type LucideIcon } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useColorScheme } from 'nativewind';
 
@@ -18,15 +18,21 @@ import {
   type StaffBookingStatus,
   type TodayBookingItem,
 } from '@/features/staff/api/staff.api';
+import { getDisplayBookingStatus, isCheckInWindowExpired } from '@/features/bookings/lib/check-in-window';
+import { getStatusLabel } from '@/features/bookings/lib/status-label';
+import { wsClient } from '@/shared/lib/websocket';
 import { Text } from '@/shared/ui/Text';
 
 type FilterKey = 'ALL' | StaffBookingStatus | 'CHECKED_IN';
+type PlayModeFilter = 'ALL' | 'RENTAL' | 'BYOC';
 
 const FILTERS: { key: FilterKey; label: string }[] = [
   { key: 'ALL', label: 'Tất cả' },
   { key: 'CONFIRMED', label: 'Đã xác nhận' },
-  { key: 'CHECKED_IN', label: 'Đã check-in' },
-  { key: 'PENDING', label: 'Chờ TT' },
+  { key: 'AWAITING_PAYMENT', label: 'Chờ trả thêm' },
+  { key: 'NO_SHOW', label: 'Không đến' },
+  { key: 'CHECKED_IN', label: 'Đã nhận xe' },
+  { key: 'PENDING', label: 'Chờ thanh toán' },
   { key: 'COMPLETED', label: 'Hoàn tất' },
   { key: 'CANCELLED', label: 'Đã hủy' },
 ];
@@ -48,10 +54,29 @@ function getCustomerName(booking: TodayBookingItem) {
   return booking.participantDetails?.[0]?.name || booking.plannedParticipants?.[0] || 'Khách hàng';
 }
 
+function vietnamDateString(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const value = (type: string) => parts.find((part) => part.type === type)?.value || '';
+  return `${value('year')}-${value('month')}-${value('day')}`;
+}
+
+function shiftDate(date: string, offset: number) {
+  const value = new Date(`${date}T12:00:00+07:00`);
+  value.setDate(value.getDate() + offset);
+  return value.toISOString().slice(0, 10);
+}
+
 export function StaffBookingsScreen() {
   const router = useRouter();
   const [bookings, setBookings] = useState<TodayBookingItem[]>([]);
+  const [selectedDate, setSelectedDate] = useState(vietnamDateString);
   const [activeFilter, setActiveFilter] = useState<FilterKey>('ALL');
+  const [playModeFilter, setPlayModeFilter] = useState<PlayModeFilter>('ALL');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [checkingInId, setCheckingInId] = useState<string | null>(null);
@@ -64,7 +89,7 @@ export function StaffBookingsScreen() {
     }
 
     try {
-      const data = await staffApi.getTodayBookings();
+      const data = await staffApi.getBookings(selectedDate);
       setBookings(data);
     } catch (error: any) {
       const message = error?.response?.data?.message || 'Không thể tải lịch hôm nay.';
@@ -73,10 +98,19 @@ export function StaffBookingsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [selectedDate]);
 
   useEffect(() => {
     loadBookings();
+  }, [loadBookings]);
+
+  useEffect(() => {
+    const unsubscribe = wsClient.subscribe((event) => {
+      if (['NEW_BOOKING', 'CUSTOMER_PAYMENT_CONFIRMED', 'CUSTOMER_CHECKOUT_CONFIRMED'].includes(event)) {
+        loadBookings(true);
+      }
+    });
+    return unsubscribe;
   }, [loadBookings]);
 
   const filteredBookings = useMemo(() => {
@@ -84,10 +118,19 @@ export function StaffBookingsScreen() {
       (a, b) => new Date(a.slotStart).getTime() - new Date(b.slotStart).getTime()
     );
 
-    if (activeFilter === 'ALL') return sorted;
-    if (activeFilter === 'CHECKED_IN') return sorted.filter((booking) => !!getSessionId(booking));
-    return sorted.filter((booking) => booking.status === activeFilter && !getSessionId(booking));
-  }, [activeFilter, bookings]);
+    return sorted.filter((booking) => {
+      const session = booking.sessions?.[0];
+      const displayStatus = getDisplayBookingStatus(booking.status, booking.slotStart, session);
+      const matchesStatus =
+        activeFilter === 'ALL'
+          ? true
+          : activeFilter === 'CHECKED_IN'
+            ? !!getSessionId(booking) && !isCheckInWindowExpired(booking.status, booking.slotStart, session)
+            : displayStatus === activeFilter || session?.status === activeFilter;
+      const matchesPlayMode = playModeFilter === 'ALL' || booking.playMode === playModeFilter;
+      return matchesStatus && matchesPlayMode;
+    });
+  }, [activeFilter, bookings, playModeFilter]);
 
   const handleOpenBooking = (booking: TodayBookingItem) => {
     const sessionId = getSessionId(booking);
@@ -105,6 +148,11 @@ export function StaffBookingsScreen() {
 
     if (booking.status !== 'CONFIRMED') {
       Alert.alert('Không thể check-in', 'Lịch này chưa ở trạng thái đã xác nhận.');
+      return;
+    }
+
+    if (isCheckInWindowExpired(booking.status, booking.slotStart, booking.sessions?.[0])) {
+      Alert.alert('Đã quá giờ check-in', 'Khách chỉ có thể check-in trong 30 phút sau giờ bắt đầu.');
       return;
     }
 
@@ -130,11 +178,27 @@ export function StaffBookingsScreen() {
     <SafeAreaView className="flex-1 bg-[#f8fafc] dark:bg-[#0b0f19]" edges={['top', 'left', 'right']}>
       <View className="border-b border-slate-200 dark:border-slate-900 px-5 py-4">
         <Text className="text-[12px] uppercase tracking-wider text-slate-500 dark:text-slate-400" weight="700">
-          Staff
+          Nhân viên trực ca
         </Text>
         <Text className="mt-1 text-[22px] text-slate-900 dark:text-white" weight="700">
-          Lịch hôm nay
+          Lịch đặt sân
         </Text>
+        <View className="mt-3 flex-row items-center justify-between rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-1">
+          <Pressable onPress={() => setSelectedDate((date) => shiftDate(date, -1))} className="h-9 w-9 items-center justify-center rounded-lg">
+            <ChevronLeft color="#f97316" size={18} />
+          </Pressable>
+          <Pressable onPress={() => setSelectedDate(vietnamDateString())} className="flex-1 items-center py-1">
+            <Text className="text-[12px] text-slate-900 dark:text-white" weight="700">
+              {selectedDate === vietnamDateString()
+                ? 'Hôm nay'
+                : new Date(`${selectedDate}T12:00:00+07:00`).toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}
+            </Text>
+            {selectedDate !== vietnamDateString() ? <Text className="mt-0.5 text-[9px] text-[#f97316]">Chạm để về hôm nay</Text> : null}
+          </Pressable>
+          <Pressable onPress={() => setSelectedDate((date) => shiftDate(date, 1))} className="h-9 w-9 items-center justify-center rounded-lg">
+            <ChevronRight color="#f97316" size={18} />
+          </Pressable>
+        </View>
       </View>
 
       <View className="py-3">
@@ -162,6 +226,31 @@ export function StaffBookingsScreen() {
             );
           })}
         </ScrollView>
+      </View>
+
+      <View className="mb-3 flex-row gap-2 px-5">
+        {([
+          ['ALL', 'Tất cả hình thức'],
+          ['RENTAL', 'Thuê xe'],
+          ['BYOC', 'Mang xe riêng'],
+        ] as const).map(([mode, label]) => {
+          const active = playModeFilter === mode;
+          return (
+            <Pressable
+              key={mode}
+              onPress={() => setPlayModeFilter(mode)}
+              className={`rounded-lg border px-3 py-2 ${
+                active
+                  ? 'border-orange-500 bg-orange-500/10'
+                  : 'border-slate-200 bg-white dark:border-slate-800 dark:bg-[#0f172a]/60'
+              }`}
+            >
+              <Text className={`text-[10px] ${active ? 'text-[#f97316]' : 'text-slate-500'}`} weight="700">
+                {label}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
 
       {loading ? (
@@ -220,12 +309,33 @@ function BookingCard({
   const start = formatDateTime(booking.slotStart);
   const end = formatDateTime(booking.slotEnd);
   const sessionId = getSessionId(booking);
+  const session = booking.sessions?.[0];
+  const checkInExpired = isCheckInWindowExpired(booking.status, booking.slotStart, session);
+  const displayStatus =
+    booking.status === 'CANCELLED'
+      ? 'CANCELLED'
+      : checkInExpired
+        ? 'NO_SHOW'
+        : sessionId
+          ? session?.status || 'CHECKED_IN'
+          : booking.status;
   const customerName = getCustomerName(booking);
-  const canCheckIn = booking.status === 'CONFIRMED' || !!sessionId;
+  const canOpenSession = !!sessionId;
+  const canCheckIn = !sessionId && !checkInExpired && booking.status === 'CONFIRMED';
+  const actionLabel = canOpenSession
+    ? 'Xem chi tiết'
+    : checkInExpired
+      ? 'Quá giờ'
+      : booking.status === 'CANCELLED'
+        ? 'Đã hủy'
+        : booking.status === 'COMPLETED'
+          ? 'Đã hoàn tất'
+          : 'Nhận xe';
+  const canAct = canOpenSession || canCheckIn;
 
   return (
     <Pressable
-      onPress={sessionId ? onOpen : undefined}
+      onPress={canOpenSession ? onOpen : undefined}
       className="mb-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-4 active:bg-slate-50 dark:active:bg-slate-900 shadow-sm"
     >
       <View className="mb-3 flex-row items-start justify-between gap-3">
@@ -239,14 +349,14 @@ function BookingCard({
         </View>
         <View className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-900 px-2 py-1">
           <Text className="text-[9px] uppercase text-slate-600 dark:text-slate-300" weight="700">
-            {sessionId ? 'CHECKED_IN' : booking.status}
+            {getStatusLabel(displayStatus)}
           </Text>
         </View>
       </View>
 
       <View className="gap-2">
         <InfoRow Icon={CalendarDays} text={`${start.date} • ${start.time} - ${end.time}`} colorScheme={colorScheme} />
-        <InfoRow Icon={Car} text={`${booking.playMode} • ${booking.trackName || booking.trackType || 'Track'}`} colorScheme={colorScheme} />
+        <InfoRow Icon={Car} text={`${booking.playMode === 'RENTAL' ? 'Thuê xe' : 'Mang xe riêng'} • ${booking.trackName || booking.trackType || 'Đường đua'}`} colorScheme={colorScheme} />
         <InfoRow Icon={UserRound} text={`${booking.plannedParticipants?.length || 1} người chơi`} colorScheme={colorScheme} />
       </View>
 
@@ -255,21 +365,21 @@ function BookingCard({
           {Number(booking.totalAmount || 0).toLocaleString('vi-VN')}đ
         </Text>
         <Pressable
-          disabled={!canCheckIn || checkingIn}
-          onPress={onCheckIn}
+          disabled={!canAct || checkingIn}
+          onPress={canOpenSession ? onOpen : onCheckIn}
           className={`flex-row items-center gap-1 rounded-xl px-3 py-2 ${
-            canCheckIn ? 'bg-[#ea580c] active:bg-[#f97316]' : 'bg-slate-200 dark:bg-slate-800 opacity-50'
+            canAct ? 'bg-[#ea580c] active:bg-[#f97316]' : 'bg-slate-200 dark:bg-slate-800 opacity-50'
           }`}
         >
           {checkingIn ? (
             <ActivityIndicator size="small" color="#ffffff" />
           ) : sessionId ? (
-            <Clock color="#ffffff" size={14} />
+            <Eye color="#ffffff" size={14} />
           ) : (
             <LogIn color="#ffffff" size={14} />
           )}
           <Text className="text-[11px] text-white" weight="700">
-            {sessionId ? 'Mở phiên' : 'Check-in'}
+            {actionLabel}
           </Text>
         </Pressable>
       </View>

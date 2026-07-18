@@ -21,8 +21,10 @@ import {
   Car,
   CheckCircle2,
   ImagePlus,
+  Plus,
   ReceiptText,
   ShieldCheck,
+  Trash2,
   UploadCloud,
   XCircle,
 } from 'lucide-react-native';
@@ -31,10 +33,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { uploadImage } from '@/features/auth/api/auth.api';
 import {
   staffApi,
+  type DamageLineItemInput,
+  type DamagePartType,
   type StaffInspectionItemStatus,
   type StaffInspectionType,
   type StaffSessionDetail,
 } from '@/features/staff/api/staff.api';
+import { getStatusLabel } from '@/features/bookings/lib/status-label';
+import { ImageZoomModal } from '@/shared/ui/ImageZoomModal';
 import { Text } from '@/shared/ui/Text';
 
 type PhotoSlot = {
@@ -54,38 +60,8 @@ type ChecklistItem = {
   note: string;
 };
 
-const RENTAL_PHOTO_SLOTS: PhotoSlot[] = [
-  {
-    key: 'FRONT',
-    label: 'Góc trước',
-    angle: 'FRONT',
-    notes: 'Ảnh góc trước xe trước khi xác nhận.',
-    uploading: false,
-  },
-  {
-    key: 'BACK',
-    label: 'Góc sau',
-    angle: 'BACK',
-    notes: 'Ảnh góc sau xe trước khi xác nhận.',
-    uploading: false,
-  },
-  {
-    key: 'LEFT',
-    label: 'Bên trái',
-    angle: 'LEFT',
-    notes: 'Ảnh hông trái xe trước khi xác nhận.',
-    uploading: false,
-  },
-  {
-    key: 'RIGHT',
-    label: 'Bên phải',
-    angle: 'RIGHT',
-    notes: 'Ảnh hông phải xe trước khi xác nhận.',
-    uploading: false,
-  },
-];
-
-const BYOC_ANGLES = ['FRONT', 'BACK', 'LEFT', 'RIGHT'];
+const MAX_INSPECTION_PHOTOS = 6;
+const INSPECTION_ANGLES = ['FRONT', 'BACK', 'LEFT', 'RIGHT', 'TOP', 'BOTTOM'] as const;
 const INSPECTION_IMAGE_MAX_EDGE = 1280;
 const INSPECTION_IMAGE_COMPRESS = 0.55;
 const INSPECTION_UPLOAD_TIMEOUT_MS = 90000;
@@ -124,8 +100,15 @@ async function optimizeInspectionImage(asset: ImagePicker.ImagePickerAsset) {
   });
 }
 
-function clonePhotoSlots(slots: PhotoSlot[]) {
-  return slots.map((slot) => ({ ...slot }));
+function createPhotoSlot(index: number): PhotoSlot {
+  const angle = INSPECTION_ANGLES[index] ?? 'OTHER';
+  return {
+    key: `PHOTO_${Date.now()}_${index}_${Math.random().toString(36).slice(2, 7)}`,
+    label: `Ảnh ${index + 1}`,
+    angle,
+    notes: '',
+    uploading: false,
+  };
 }
 
 function shortId(value?: string) {
@@ -218,41 +201,21 @@ function buildChecklist(type: StaffInspectionType, isByoc: boolean): ChecklistIt
   ];
 }
 
-function buildByocPhotoSlots(session: StaffSessionDetail): PhotoSlot[] {
-  const participants = session.participants?.length ? session.participants : [{ name: 'Người chơi BYOC', type: 'BYOC' }];
-
-  return participants.map((participant, index) => {
-    const angle = BYOC_ANGLES[index % BYOC_ANGLES.length];
-    const name = participant.name || `Người chơi ${index + 1}`;
-    return {
-      key: `BYOC_${index}`,
-      label: `Xe BYOC - ${name}`,
-      angle,
-      notes: `Ảnh xe BYOC của ${name}.`,
-      uploading: false,
-    };
-  });
-}
-
 function isByocSession(session?: StaffSessionDetail | null) {
   if (!session?.vehicles?.length) return false;
   return session.vehicles.every((vehicle) => vehicle.type === 'BYOC');
 }
 
-function getDamageMultiplier(session?: StaffSessionDetail | null) {
-  const catalogMultiplier = Math.max(
-    ...((session?.vehicles ?? [])
-      .map((vehicle) => Number(vehicle.damageMultiplier) || 0)
-      .filter((value) => value > 0)),
-    0
-  );
-  if (catalogMultiplier > 0) return catalogMultiplier;
-
-  const hasPremiumVehicle = session?.vehicles?.some((vehicle) =>
-    /premium|pro|gtr|gt-r|limited|carbon/i.test(vehicle.name || '')
-  );
-  return hasPremiumVehicle ? 1.5 : 1;
-}
+const DAMAGE_PART_LABELS: Record<DamagePartType, string> = {
+  TIRE_WHEEL: 'Bánh xe / lốp',
+  SPOILER: 'Cánh gió',
+  CHASSIS: 'Khung gầm',
+  MOTOR: 'Motor / động cơ',
+  SHELL: 'Vỏ xe',
+  SERVO: 'Servo / tay lái',
+  REMOTE: 'Remote / điều khiển',
+  OTHER: 'Khác',
+};
 
 export function StaffInspectionFormScreen({
   sessionId,
@@ -265,23 +228,20 @@ export function StaffInspectionFormScreen({
   const [session, setSession] = useState<StaffSessionDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [closingByoc, setClosingByoc] = useState(false);
   const [photos, setPhotos] = useState<PhotoSlot[]>([]);
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const [staffNotes, setStaffNotes] = useState('');
   const [damageFlagged, setDamageFlagged] = useState(false);
-  const [damageDescription, setDamageDescription] = useState('');
-  const [estimatedCostText, setEstimatedCostText] = useState('0');
+  const [damageLineItems, setDamageLineItems] = useState<DamageLineItemInput[]>([]);
+  const [previewPhoto, setPreviewPhoto] = useState<{ url: string; title: string } | null>(null);
 
   const isByoc = useMemo(() => isByocSession(session), [session]);
-  const damageMultiplier = useMemo(() => getDamageMultiplier(session), [session]);
-  const estimatedCost = useMemo(() => Number(estimatedCostText.replace(/[^\d]/g, '') || 0), [estimatedCostText]);
-  const finalCharge = useMemo(
-    () => Math.round(estimatedCost * damageMultiplier),
-    [estimatedCost, damageMultiplier]
+  const totalDamageCharge = useMemo(
+    () => damageLineItems.reduce((sum, item) => sum + Number(item.partsPrice || 0) + Number(item.laborPrice || 0), 0),
+    [damageLineItems]
   );
   const isCheckIn = type === 'CHECK_IN';
-  const requiresPhotos = !(isByoc && type === 'CHECK_OUT');
+  const requiresPhotos = !isByoc;
 
   const loadSession = useCallback(async () => {
     setLoading(true);
@@ -289,14 +249,12 @@ export function StaffInspectionFormScreen({
       const data = await staffApi.getSessionDetail(sessionId);
       setSession(data);
       const byoc = isByocSession(data);
-      setPhotos(byoc && type === 'CHECK_IN' ? buildByocPhotoSlots(data) : clonePhotoSlots(RENTAL_PHOTO_SLOTS));
+      setPhotos(byoc ? [] : [createPhotoSlot(0)]);
       setChecklist(buildChecklist(type, byoc));
       setStaffNotes(
         type === 'CHECK_IN'
           ? 'Biên bản nhận xe tạo từ staff mobile.'
-          : byoc
-            ? 'Phiên BYOC được đóng từ staff mobile.'
-            : 'Biên bản trả xe tạo từ staff mobile.'
+          : 'Biên bản trả xe tạo từ staff mobile.'
       );
     } catch (error: any) {
       const message = error?.response?.data?.message || 'Không thể tải thông tin phiên.';
@@ -312,6 +270,19 @@ export function StaffInspectionFormScreen({
 
   const updatePhotoSlot = (key: string, patch: Partial<PhotoSlot>) => {
     setPhotos((current) => current.map((slot) => (slot.key === key ? { ...slot, ...patch } : slot)));
+  };
+
+  const addPhotoSlot = () => {
+    setPhotos((current) =>
+      current.length >= MAX_INSPECTION_PHOTOS ? current : [...current, createPhotoSlot(current.length)]
+    );
+  };
+
+  const removePhotoSlot = (key: string) => {
+    setPhotos((current) => {
+      const next = current.filter((slot) => slot.key !== key);
+      return next.length ? next : [createPhotoSlot(0)];
+    });
   };
 
   const requestImagePermission = async (source: 'camera' | 'library') => {
@@ -348,27 +319,51 @@ export function StaffInspectionFormScreen({
               mediaTypes: ImagePicker.MediaTypeOptions.Images,
               quality: 0.55,
               allowsEditing: false,
+              allowsMultipleSelection: true,
+              selectionLimit: MAX_INSPECTION_PHOTOS,
             });
 
-      if (result.canceled || !result.assets?.[0]?.uri) return;
+      if (result.canceled || !result.assets?.length) return;
 
-      const asset = result.assets[0];
-      const uri = asset.uri;
-      updatePhotoSlot(slot.key, { uri, uploading: true });
-      const optimized = await optimizeInspectionImage(asset);
-      updatePhotoSlot(slot.key, { uri: optimized.uri, uploading: true });
-      const uploaded = await uploadImage(optimized.uri, 'inspection-photo', {
-        fileName: `inspection-${slot.key.toLowerCase()}.jpg`,
-        mimeType: 'image/jpeg',
-        timeoutMs: INSPECTION_UPLOAD_TIMEOUT_MS,
+      const availableCount = MAX_INSPECTION_PHOTOS - photos.length + 1;
+      const selectedAssets = result.assets.slice(0, Math.max(1, availableCount));
+      const extraSlots = selectedAssets.slice(1).map((_, index) => createPhotoSlot(photos.length + index));
+      const uploadTargets = [slot, ...extraSlots];
+
+      setPhotos((current) => {
+        const slotIndex = current.findIndex((photo) => photo.key === slot.key);
+        if (slotIndex < 0) return current;
+        const firstAsset = selectedAssets[0];
+        const next = current.map((photo) =>
+          photo.key === slot.key ? { ...photo, uri: firstAsset.uri, url: undefined, uploading: true } : photo
+        );
+        return [...next, ...extraSlots.map((photo, index) => ({
+          ...photo,
+          uri: selectedAssets[index + 1]?.uri,
+          uploading: true,
+        }))].slice(0, MAX_INSPECTION_PHOTOS);
       });
-      updatePhotoSlot(slot.key, {
-        uri: optimized.uri,
-        url: uploaded.url,
-        uploading: false,
-      });
+
+      await Promise.all(
+        selectedAssets.map(async (asset, index) => {
+          const target = uploadTargets[index];
+          try {
+            const optimized = await optimizeInspectionImage(asset);
+            updatePhotoSlot(target.key, { uri: optimized.uri, uploading: true });
+            const uploaded = await uploadImage(optimized.uri, 'inspection-photo', {
+              fileName: `inspection-${target.key.toLowerCase()}.jpg`,
+              mimeType: 'image/jpeg',
+              timeoutMs: INSPECTION_UPLOAD_TIMEOUT_MS,
+            });
+            updatePhotoSlot(target.key, { uri: optimized.uri, url: uploaded.url, uploading: false });
+          } catch (error: any) {
+            updatePhotoSlot(target.key, { uploading: false });
+            throw error;
+          }
+        })
+      );
     } catch (error: any) {
-      updatePhotoSlot(slot.key, { uploading: false });
+      setPhotos((current) => current.map((photo) => ({ ...photo, uploading: false })));
       const message = getInspectionUploadErrorMessage(error);
       Alert.alert('Lỗi upload ảnh', message);
     }
@@ -377,7 +372,7 @@ export function StaffInspectionFormScreen({
   const updateChecklistStatus = (itemKey: string, ok: boolean) => {
     setChecklist((current) =>
       current.map((item) =>
-        item.itemKey === itemKey ? { ...item, status: ok ? 'OK' : 'NEEDS_REVIEW' } : item
+        item.itemKey === itemKey ? { ...item, status: ok ? 'OK' : 'BROKEN' } : item
       )
     );
   };
@@ -388,39 +383,36 @@ export function StaffInspectionFormScreen({
     );
   };
 
-  const handleCloseByoc = () => {
-    Alert.alert(
-      'Đóng phiên BYOC',
-      'Phiên BYOC không cần biên bản trả xe bắt buộc. Xác nhận đóng phiên và hoàn tất checkout?',
-      [
-        { text: 'Hủy', style: 'cancel' },
-        {
-          text: 'Đóng phiên',
-          onPress: async () => {
-            setClosingByoc(true);
-            try {
-              await staffApi.simulateClientCheckOut(sessionId);
-              Alert.alert('Đã hoàn tất', 'Phiên BYOC đã được đóng.');
-              router.replace(`/staff/session/${sessionId}` as any);
-            } catch (error: any) {
-              const message = error?.response?.data?.message || 'Không thể đóng phiên BYOC.';
-              Alert.alert('Lỗi', message);
-            } finally {
-              setClosingByoc(false);
-            }
-          },
-        },
-      ]
+  const addDamageLineItem = () => {
+    setDamageLineItems((current) => [
+      ...current,
+      { partType: 'TIRE_WHEEL', partsPrice: 0, laborPrice: 0 },
+    ]);
+  };
+
+  const updateDamageLineItem = (
+    index: number,
+    field: keyof DamageLineItemInput,
+    value: string | number
+  ) => {
+    setDamageLineItems((current) =>
+      current.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, [field]: value } : item
+      )
     );
+  };
+
+  const removeDamageLineItem = (index: number) => {
+    setDamageLineItems((current) => current.filter((_, itemIndex) => itemIndex !== index));
   };
 
   const validate = () => {
     if (requiresPhotos) {
-      const missing = photos.filter((photo) => !photo.url);
-      if (missing.length > 0) {
+      const uploadedPhotos = photos.filter((photo) => !!photo.url);
+      if (uploadedPhotos.length === 0) {
         Alert.alert(
           'Thiếu ảnh kiểm xe',
-          `Vui lòng chụp hoặc chọn đủ ảnh cho: ${missing.map((photo) => photo.label).join(', ')}.`
+          'Vui lòng thêm ít nhất một ảnh thực tế của xe. Nên chụp đủ các góc để làm căn cứ bàn giao.'
         );
         return false;
       }
@@ -431,8 +423,13 @@ export function StaffInspectionFormScreen({
       return false;
     }
 
-    if (damageFlagged && !damageDescription.trim()) {
-      Alert.alert('Thiếu mô tả hư hỏng', 'Vui lòng ghi rõ tình trạng hư hỏng trước khi gửi biên bản trả xe.');
+    if (damageFlagged && damageLineItems.length === 0) {
+      Alert.alert('Thiếu hạng mục hư hỏng', 'Vui lòng thêm ít nhất một hạng mục bồi thường.');
+      return false;
+    }
+
+    if (damageLineItems.some((item) => item.partType === 'OTHER' && !item.customPartName?.trim())) {
+      Alert.alert('Thiếu tên hư hỏng', 'Vui lòng nhập tên hư hỏng cho hạng mục “Khác”.');
       return false;
     }
 
@@ -447,7 +444,7 @@ export function StaffInspectionFormScreen({
       await staffApi.submitInspection(sessionId, {
         type,
         photos: requiresPhotos
-          ? photos.map((photo) => ({
+          ? photos.filter((photo) => !!photo.url).map((photo) => ({
               angle: photo.angle,
               url: photo.url || '',
               notes: photo.notes,
@@ -459,19 +456,11 @@ export function StaffInspectionFormScreen({
           status: item.status,
           note: item.note.trim(),
         })),
-        staffNotes:
-          type === 'CHECK_OUT' && damageFlagged
-            ? damageDescription.trim()
-            : staffNotes.trim(),
+        staffNotes: staffNotes.trim(),
         damageFlagged: type === 'CHECK_OUT' && damageFlagged,
-        damageDetails:
+        damageLineItems:
           type === 'CHECK_OUT' && damageFlagged
-            ? {
-                description: damageDescription.trim(),
-                estimatedCost,
-                damageMultiplier,
-                finalCharge,
-              }
+            ? damageLineItems
             : undefined,
       });
 
@@ -479,7 +468,7 @@ export function StaffInspectionFormScreen({
         'Đã gửi biên bản',
         isCheckIn
           ? 'Biên bản nhận xe đã được lưu và phiên có thể chuyển sang đang chạy.'
-          : 'Biên bản trả xe đã được gửi. Khách sẽ nhận thông báo để xác nhận checkout.'
+          : 'Biên bản trả xe đã được gửi. Khách sẽ nhận thông báo để xác nhận hoàn tất phiên.'
       );
       router.replace(`/staff/session/${sessionId}` as any);
     } catch (error: any) {
@@ -516,7 +505,7 @@ export function StaffInspectionFormScreen({
           </Pressable>
           <View className="flex-1">
             <Text className="text-[12px] uppercase tracking-wider text-slate-500 dark:text-slate-400" weight="700">
-              Staff inspection
+              Kiểm xe
             </Text>
             <Text className="mt-1 text-[19px] text-slate-900 dark:text-white" weight="700" numberOfLines={1}>
               {title}
@@ -538,18 +527,18 @@ export function StaffInspectionFormScreen({
               </View>
               <View className="rounded-lg border border-orange-500/20 bg-orange-500/10 px-2 py-1">
                 <Text className="text-[9px] uppercase text-[#fb923c]" weight="700">
-                  {type}
+                  {getStatusLabel(type)}
                 </Text>
               </View>
             </View>
 
-            {isByoc && type === 'CHECK_OUT' ? (
-              <View className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3">
-                <Text className="text-[12px] text-emerald-300" weight="700">
-                  Phiên BYOC không cần kiểm xe trả bắt buộc
+            {isByoc ? (
+              <View className="mt-4 rounded-xl border border-blue-500/20 bg-blue-500/10 p-3">
+                <Text className="text-[12px] text-blue-700 dark:text-blue-300" weight="700">
+                  Phiên khách mang xe riêng
                 </Text>
-                <Text className="mt-1 text-[11px] leading-4 text-emerald-100/70">
-                  Nếu không có phát sinh tại quầy, staff có thể đóng phiên để hoàn tất checkout.
+                <Text className="mt-1 text-[11px] leading-4 text-blue-700/80 dark:text-blue-100/70">
+                  Vẫn lập biên bản trả xe để nhân viên xác nhận hoàn tất phiên theo quy trình chính thức.
                 </Text>
               </View>
             ) : null}
@@ -585,26 +574,19 @@ export function StaffInspectionFormScreen({
             </View>
           ) : null}
 
-          {isByoc && type === 'CHECK_OUT' ? (
-            <Pressable
-              disabled={closingByoc}
-              onPress={handleCloseByoc}
-              className={`mb-5 h-12 flex-row items-center justify-center gap-2 rounded-xl bg-emerald-600 ${
-                closingByoc ? 'opacity-70' : ''
-              }`}
-            >
-              {closingByoc ? (
-                <ActivityIndicator color="#ffffff" size="small" />
-              ) : (
-                <CheckCircle2 color="#ffffff" size={17} />
-              )}
-              <Text className="text-[13px] text-white" weight="700">
-                Đóng phiên BYOC
-              </Text>
-            </Pressable>
-          ) : (
+          {!isByoc ? (
             <>
-              <SectionTitle title="Ảnh kiểm xe" />
+              <View className="mb-3 flex-row items-start justify-between gap-3">
+                <View className="flex-1">
+                  <SectionTitle title="Ảnh kiểm xe" />
+                  <Text className="-mt-2 text-[11px] leading-4 text-slate-500">
+                    Thêm từ 1 đến 6 ảnh thực tế. Hãy chụp rõ các góc trước, sau, hai bên và điểm bất thường nếu có.
+                  </Text>
+                </View>
+                <Text className="text-[11px] text-slate-500" weight="700">
+                  {photos.filter((photo) => !!photo.url).length}/{MAX_INSPECTION_PHOTOS}
+                </Text>
+              </View>
               <View className="mb-5 gap-3">
                 {photos.map((slot) => (
                   <PhotoSlotCard
@@ -612,12 +594,29 @@ export function StaffInspectionFormScreen({
                     slot={slot}
                     onPickCamera={() => handlePickPhoto(slot, 'camera')}
                     onPickLibrary={() => handlePickPhoto(slot, 'library')}
+                    onRemove={() => removePhotoSlot(slot.key)}
+                    removable={photos.length > 1 || !!slot.url}
                     onChangeNotes={(notes) => updatePhotoSlot(slot.key, { notes })}
+                    onPreview={() => {
+                      const url = slot.uri || slot.url;
+                      if (url) setPreviewPhoto({ url, title: `${slot.label} · ${slot.angle}` });
+                    }}
                   />
                 ))}
+                {photos.length < MAX_INSPECTION_PHOTOS ? (
+                  <Pressable
+                    onPress={addPhotoSlot}
+                    className="h-11 flex-row items-center justify-center gap-2 rounded-xl border border-dashed border-orange-500/50 bg-orange-500/5"
+                  >
+                    <Plus color="#fb923c" size={16} />
+                    <Text className="text-[12px] text-[#fb923c]" weight="700">
+                      Thêm ảnh
+                    </Text>
+                  </Pressable>
+                ) : null}
               </View>
             </>
-          )}
+          ) : null}
 
           <SectionTitle title="Checklist kiểm tra" />
           <View className="mb-5 gap-3">
@@ -639,12 +638,21 @@ export function StaffInspectionFormScreen({
                     Ghi nhận hư hỏng/phí phát sinh
                   </Text>
                   <Text className="mt-1 text-[11px] leading-4 text-slate-500">
-                    Bật mục này nếu xe có hư hỏng cần khách xác nhận khi checkout.
+                    Bật mục này nếu xe có hư hỏng cần khách xác nhận khi trả xe.
                   </Text>
                 </View>
                 <Switch
                   value={damageFlagged}
-                  onValueChange={setDamageFlagged}
+                  onValueChange={(enabled) => {
+                    setDamageFlagged(enabled);
+                    setDamageLineItems((current) =>
+                      enabled && current.length === 0
+                        ? [{ partType: 'TIRE_WHEEL', partsPrice: 0, laborPrice: 0 }]
+                        : enabled
+                          ? current
+                          : []
+                    );
+                  }}
                   trackColor={{ false: '#1e293b', true: '#f97316' }}
                   thumbColor="#ffffff"
                 />
@@ -652,37 +660,34 @@ export function StaffInspectionFormScreen({
 
               {damageFlagged ? (
                 <View className="gap-3">
-                    <TextInput
-                      value={damageDescription}
-                      onChangeText={setDamageDescription}
-                      multiline
-                      placeholder="Mô tả hư hỏng, vị trí, mức độ..."
-                      placeholderTextColor="#64748b"
-                      className="min-h-[92px] rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 py-3 text-[12px] text-slate-900 dark:text-white"
-                      style={{ textAlignVertical: 'top' }}
+                  <Text className="text-[11px] leading-4 text-slate-500">
+                    Ghi từng hạng mục để khách xem rõ tiền linh kiện và công sửa. Không áp dụng hệ số giá tự động.
+                  </Text>
+                  {damageLineItems.map((item, index) => (
+                    <DamageLineItemCard
+                      key={`${item.partType}-${index}`}
+                      item={item}
+                      index={index}
+                      onChange={updateDamageLineItem}
+                      onRemove={() => removeDamageLineItem(index)}
                     />
-                    <View className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-3">
-                    <Text className="text-[10px] uppercase tracking-wider text-slate-500" weight="700">
-                      Chi phí dự kiến
+                  ))}
+                  <Pressable
+                    onPress={addDamageLineItem}
+                    className="h-10 flex-row items-center justify-center gap-2 rounded-xl border border-orange-500/30 bg-orange-500/10"
+                  >
+                    <Plus color="#fb923c" size={15} />
+                    <Text className="text-[11px] text-[#fb923c]" weight="700">
+                      Thêm hạng mục
                     </Text>
-                      <TextInput
-                        value={estimatedCostText}
-                        onChangeText={(value) => setEstimatedCostText(value.replace(/[^\d]/g, ''))}
-                        keyboardType="number-pad"
-                        placeholder="0"
-                        placeholderTextColor="#475569"
-                        className="mt-2 h-11 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0b0f19] px-3 text-[15px] text-slate-900 dark:text-white"
-                      />
-                    <View className="mt-3 flex-row items-center justify-between gap-3">
-                      <Text className="text-[11px] text-slate-500">Hệ số xe</Text>
-                      <Text className="text-[12px] text-slate-200" weight="700">
-                        x{damageMultiplier}
+                  </Pressable>
+                  <View className="rounded-xl border border-red-500/20 bg-red-500/10 p-3">
+                    <View className="flex-row items-center justify-between gap-3">
+                      <Text className="text-[11px] text-red-200" weight="700">
+                        Tổng phí bồi thường
                       </Text>
-                    </View>
-                    <View className="mt-2 flex-row items-center justify-between gap-3">
-                      <Text className="text-[11px] text-slate-500">Dự kiến tính phí</Text>
-                      <Text className="text-[13px] text-[#fb923c]" weight="700">
-                        {formatCurrency(finalCharge)}
+                      <Text className="text-[14px] text-red-200" weight="700">
+                        {formatCurrency(totalDamageCharge)}
                       </Text>
                     </View>
                   </View>
@@ -706,34 +711,38 @@ export function StaffInspectionFormScreen({
             <View className="flex-row gap-2">
               <AlertTriangle color="#f59e0b" size={16} />
               <Text className="flex-1 text-[11px] leading-4 text-amber-100/80">
-                Sau khi gửi biên bản checkout, khách sẽ nhận thông báo để xem ảnh, checklist và xác nhận
+                Sau khi gửi biên bản trả xe, khách sẽ nhận thông báo để xem ảnh, checklist và xác nhận
                 hoàn tất. Nếu khách từ chối, phiên sẽ quay lại trạng thái cần xử lý.
               </Text>
             </View>
           </View>
         </ScrollView>
 
-        {!(isByoc && type === 'CHECK_OUT') ? (
-          <View className="border-t border-slate-200 dark:border-slate-900 bg-[#f8fafc] dark:bg-[#0b0f19] px-5 py-4">
-            <Pressable
-              disabled={submitting}
-              onPress={handleSubmit}
-              className={`h-12 flex-row items-center justify-center gap-2 rounded-xl bg-[#ea580c] ${
-                submitting ? 'opacity-70' : ''
-              }`}
-            >
-              {submitting ? (
-                <ActivityIndicator color="#ffffff" size="small" />
-              ) : (
-                <ReceiptText color="#ffffff" size={17} />
-              )}
-              <Text className="text-[13px] text-white" weight="700">
-                Gửi {title.toLowerCase()}
-              </Text>
-            </Pressable>
-          </View>
-        ) : null}
+        <View className="border-t border-slate-200 dark:border-slate-900 bg-[#f8fafc] dark:bg-[#0b0f19] px-5 py-4">
+          <Pressable
+            disabled={submitting}
+            onPress={handleSubmit}
+            className={`h-12 flex-row items-center justify-center gap-2 rounded-xl bg-[#ea580c] ${
+              submitting ? 'opacity-70' : ''
+            }`}
+          >
+            {submitting ? (
+              <ActivityIndicator color="#ffffff" size="small" />
+            ) : (
+              <ReceiptText color="#ffffff" size={17} />
+            )}
+            <Text className="text-[13px] text-white" weight="700">
+              Gửi {title.toLowerCase()}
+            </Text>
+          </Pressable>
+        </View>
       </KeyboardAvoidingView>
+      <ImageZoomModal
+        visible={!!previewPhoto}
+        imageUrl={previewPhoto?.url}
+        title={previewPhoto?.title}
+        onClose={() => setPreviewPhoto(null)}
+      />
     </SafeAreaView>
   );
 }
@@ -750,12 +759,18 @@ function PhotoSlotCard({
   slot,
   onPickCamera,
   onPickLibrary,
+  onRemove,
+  removable,
   onChangeNotes,
+  onPreview,
 }: {
   slot: PhotoSlot;
   onPickCamera: () => void;
   onPickLibrary: () => void;
+  onRemove: () => void;
+  removable: boolean;
   onChangeNotes: (notes: string) => void;
+  onPreview: () => void;
 }) {
   const hasPhoto = !!slot.uri || !!slot.url;
 
@@ -768,19 +783,35 @@ function PhotoSlotCard({
           </Text>
           <Text className="mt-1 text-[10px] uppercase tracking-wider text-slate-500">{slot.angle}</Text>
         </View>
-        {slot.url ? (
-          <View className="flex-row items-center gap-1 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-2 py-1">
-            <CheckCircle2 color="#34d399" size={12} />
-            <Text className="text-[9px] text-emerald-300" weight="700">
-              Đã upload
-            </Text>
-          </View>
-        ) : null}
+        <View className="flex-row items-center gap-2">
+          {slot.url ? (
+            <View className="flex-row items-center gap-1 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-2 py-1">
+              <CheckCircle2 color="#34d399" size={12} />
+              <Text className="text-[9px] text-emerald-300" weight="700">
+                Đã upload
+              </Text>
+            </View>
+          ) : null}
+          {removable ? (
+            <Pressable
+              disabled={slot.uploading}
+              onPress={onRemove}
+              className="h-7 w-7 items-center justify-center rounded-lg border border-red-500/20 bg-red-500/10"
+            >
+              <Trash2 color="#f87171" size={13} />
+            </Pressable>
+          ) : null}
+        </View>
       </View>
 
       <View className="aspect-[4/3] overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-950">
         {hasPhoto ? (
-          <View className="h-full w-full">
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Phóng to ${slot.label}`}
+            onPress={onPreview}
+            className="h-full w-full"
+          >
             <Image source={{ uri: slot.uri || slot.url }} className="h-full w-full" resizeMode="cover" />
             {slot.uploading ? (
               <View className="absolute inset-0 items-center justify-center bg-black/60">
@@ -790,7 +821,7 @@ function PhotoSlotCard({
                 </Text>
               </View>
             ) : null}
-          </View>
+          </Pressable>
         ) : (
           <View className="h-full w-full items-center justify-center gap-2">
             <ImagePlus color="#475569" size={30} />
@@ -832,6 +863,100 @@ function PhotoSlotCard({
         className="mt-3 min-h-[44px] rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-[11px] text-white"
         style={{ textAlignVertical: 'top' }}
       />
+    </View>
+  );
+}
+
+function DamageLineItemCard({
+  item,
+  index,
+  onChange,
+  onRemove,
+}: {
+  item: DamageLineItemInput;
+  index: number;
+  onChange: (index: number, field: keyof DamageLineItemInput, value: string | number) => void;
+  onRemove: () => void;
+}) {
+  const lineTotal = Number(item.partsPrice || 0) + Number(item.laborPrice || 0);
+
+  return (
+    <View className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-3">
+      <View className="mb-3 flex-row items-center justify-between gap-3">
+        <Text className="text-[11px] text-slate-900 dark:text-white" weight="700">
+          Hạng mục {index + 1}
+        </Text>
+        <Pressable onPress={onRemove} className="h-8 w-8 items-center justify-center rounded-lg bg-red-500/10">
+          <Trash2 color="#f87171" size={14} />
+        </Pressable>
+      </View>
+
+      <View className="mb-3 flex-row flex-wrap gap-2">
+        {(Object.keys(DAMAGE_PART_LABELS) as DamagePartType[]).map((partType) => {
+          const selected = item.partType === partType;
+          return (
+            <Pressable
+              key={partType}
+              onPress={() => onChange(index, 'partType', partType)}
+              className={`rounded-lg border px-2.5 py-2 ${
+                selected
+                  ? 'border-orange-500 bg-orange-500/10'
+                  : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0b0f19]'
+              }`}
+            >
+              <Text className={`text-[10px] ${selected ? 'text-[#fb923c]' : 'text-slate-500'}`} weight="700">
+                {DAMAGE_PART_LABELS[partType]}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {item.partType === 'OTHER' ? (
+        <TextInput
+          value={item.customPartName || ''}
+          onChangeText={(value) => onChange(index, 'customPartName', value)}
+          placeholder="Tên hư hỏng cụ thể"
+          placeholderTextColor="#64748b"
+          className="mb-3 h-11 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0b0f19] px-3 text-[12px] text-slate-900 dark:text-white"
+        />
+      ) : null}
+
+      <View className="flex-row gap-3">
+        <View className="flex-1">
+          <Text className="mb-1 text-[10px] text-slate-500" weight="700">
+            Linh kiện (đ)
+          </Text>
+          <TextInput
+            value={item.partsPrice ? String(item.partsPrice) : ''}
+            onChangeText={(value) => onChange(index, 'partsPrice', Number(value.replace(/[^\d]/g, '') || 0))}
+            keyboardType="number-pad"
+            placeholder="0"
+            placeholderTextColor="#64748b"
+            className="h-11 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0b0f19] px-3 text-[12px] text-slate-900 dark:text-white"
+          />
+        </View>
+        <View className="flex-1">
+          <Text className="mb-1 text-[10px] text-slate-500" weight="700">
+            Công sửa (đ)
+          </Text>
+          <TextInput
+            value={item.laborPrice ? String(item.laborPrice) : ''}
+            onChangeText={(value) => onChange(index, 'laborPrice', Number(value.replace(/[^\d]/g, '') || 0))}
+            keyboardType="number-pad"
+            placeholder="0"
+            placeholderTextColor="#64748b"
+            className="h-11 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0b0f19] px-3 text-[12px] text-slate-900 dark:text-white"
+          />
+        </View>
+      </View>
+
+      <View className="mt-3 flex-row justify-between">
+        <Text className="text-[10px] text-slate-500">Tổng hạng mục</Text>
+        <Text className="text-[11px] text-slate-900 dark:text-white" weight="700">
+          {formatCurrency(lineTotal)}
+        </Text>
+      </View>
     </View>
   );
 }

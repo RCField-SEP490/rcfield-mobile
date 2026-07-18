@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, CheckCircle2, Clock3, CreditCard, XCircle } from 'lucide-react-native';
 
 import { bookingWizardApi } from '@/features/bookings/api/booking-wizard.api';
+import { getStatusLabel } from '@/features/bookings/lib/status-label';
 import { Text } from '@/shared/ui/Text';
 
 function formatCurrency(value?: number | string) {
@@ -175,7 +176,7 @@ export default function CustomerExtensionResponseScreen() {
                 </View>
                 <View className="flex-1">
                   <Text className="text-[16px] text-white" weight="700">
-                    Staff đề xuất gia hạn +{extensionProposal.extraMinutes} phút
+                    Nhân viên đề xuất gia hạn +{extensionProposal.extraMinutes} phút
                   </Text>
                   <Text className="mt-1 text-[12px] leading-5 text-orange-100/80">
                     Kết thúc mới: {formatDateTime(extensionProposal.newPlannedEnd)}
@@ -241,7 +242,7 @@ export default function CustomerExtensionResponseScreen() {
             ) : (
               <View className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4">
                 <Text className="text-[12px] text-emerald-300" weight="700">
-                  Yêu cầu đã được xử lý: {extensionProposal.status}
+                  Yêu cầu đã được xử lý: {getStatusLabel(extensionProposal.status)}
                 </Text>
               </View>
             )}

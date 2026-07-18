@@ -73,7 +73,7 @@ export function StaffFnbOrdersScreen() {
       const data = await staffApi.getFnbOrders();
       setOrders(data);
     } catch (error: any) {
-      const message = error?.response?.data?.message || 'Không thể tải đơn F&B hôm nay.';
+      const message = error?.response?.data?.message || 'Không thể tải đơn đồ ăn, thức uống hôm nay.';
       Alert.alert('Lỗi', message);
     } finally {
       setLoading(false);
@@ -99,7 +99,7 @@ export function StaffFnbOrdersScreen() {
       await staffApi.updateFnbOrder(orderId, status);
       await loadOrders(true);
     } catch (error: any) {
-      const message = error?.response?.data?.message || 'Không thể cập nhật đơn F&B.';
+      const message = error?.response?.data?.message || 'Không thể cập nhật đơn đồ ăn, thức uống.';
       Alert.alert('Lỗi', message);
     } finally {
       setUpdatingId(null);
@@ -110,10 +110,10 @@ export function StaffFnbOrdersScreen() {
     <SafeAreaView className="flex-1 bg-[#f8fafc] dark:bg-[#0b0f19]" edges={['top', 'left', 'right']}>
       <View className="border-b border-slate-200 dark:border-slate-900 px-5 py-4">
         <Text className="text-[12px] uppercase tracking-wider text-slate-500 dark:text-slate-400" weight="700">
-          Staff
+          Nhân viên trực ca
         </Text>
         <Text className="mt-1 text-[22px] text-slate-900 dark:text-white" weight="700">
-          Đơn F&B hôm nay
+          Đơn đồ ăn, thức uống hôm nay
         </Text>
       </View>
 
@@ -171,7 +171,7 @@ export function StaffFnbOrdersScreen() {
           ListEmptyComponent={
             <View className="mt-10 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/40 p-6">
               <Text className="text-center text-[14px] text-slate-800 dark:text-slate-300" weight="700">
-                Không có đơn F&B phù hợp
+                Không có đơn đồ ăn, thức uống phù hợp
               </Text>
               <Text className="mt-1 text-center text-[11px] text-slate-500">
                 Đơn đặt trước trong ngày sẽ xuất hiện tại đây.

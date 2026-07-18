@@ -29,38 +29,37 @@ interface SlotDetails {
   available: boolean;
   byocRemaining: number;
   vehiclesAvailable: number;
+  blockedByNotice?: boolean;
 }
 
-// Check if a time slot on a given date is in the past compared to current system time
-const isSlotPast = (slot: string, dateStr: string) => {
-  const today = new Date();
+const VIETNAM_TIME_ZONE = 'Asia/Ho_Chi_Minh';
+const MAX_CONSECUTIVE_SLOTS = 8;
 
-  // Format today as YYYY-MM-DD
-  const y = today.getFullYear();
-  const m = String(today.getMonth() + 1).padStart(2, '0');
-  const d = String(today.getDate()).padStart(2, '0');
-  const todayStr = `${y}-${m}-${d}`;
+function vietnamDateString(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: VIETNAM_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const value = (type: string) => parts.find((part) => part.type === type)?.value || '';
+  return `${value('year')}-${value('month')}-${value('day')}`;
+}
 
-  if (dateStr < todayStr) return true;
-  if (dateStr > todayStr) return false;
+function toVietnamSlotDate(dateStr: string, slot: string) {
+  return new Date(`${dateStr}T${slot}:00+07:00`);
+}
 
-  // Same day, compare hours
-  const [slotH, slotM] = slot.split(':').map(Number);
-  const currentH = today.getHours();
-  const currentM = today.getMinutes();
-
-  if (slotH < currentH) return true;
-  if (slotH === currentH && slotM <= currentM) return true;
-
-  return false;
-};
+function isSlotBlockedByTime(slot: string, dateStr: string, minNoticeMinutes = 0) {
+  return toVietnamSlotDate(dateStr, slot).getTime() < Date.now() + minNoticeMinutes * 60_000;
+}
 
 // Generate 7 days starting from today
 const getNext7Days = () => {
   const list = [];
   const daysOfWeek = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
   for (let i = 0; i < 7; i++) {
-    const d = new Date();
+    const d = new Date(`${vietnamDateString()}T12:00:00+07:00`);
     d.setDate(d.getDate() + i);
 
     const year = d.getFullYear();
@@ -101,13 +100,8 @@ export function TrackSelectionStep({
 
   // Generate dynamic time slots based on Cafe's operatingHours and slotDurationMinutes
   const timeSlots = React.useMemo(() => {
-    const defaultSlots = [
-      '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00',
-      '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00',
-    ];
-
-    if (!cafe) {
-      return defaultSlots;
+    if (!cafe || !Number.isInteger(cafe.slotDurationMinutes) || Number(cafe.slotDurationMinutes) <= 0) {
+      return [];
     }
 
     let parsedHours: Record<string, any> = {};
@@ -122,8 +116,8 @@ export function TrackSelectionStep({
     }
 
     // Get day of the week
-    const dateObj = new Date(selectedDate);
-    const dayIndex = dateObj.getDay();
+    const dateObj = new Date(`${selectedDate}T12:00:00+07:00`);
+    const dayIndex = dateObj.getUTCDay();
     const days = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
     const dayKey = days[dayIndex];
 
@@ -132,7 +126,7 @@ export function TrackSelectionStep({
       return [];
     }
 
-    const duration = cafe.slotDurationMinutes || 60;
+    const duration = Number(cafe.slotDurationMinutes);
 
     const timeToMinutes = (t: string) => {
       const [h, m] = t.split(':').map(Number);
@@ -155,15 +149,23 @@ export function TrackSelectionStep({
     for (let current = start; current + duration <= end; current += duration) {
       list.push(minutesToTime(current));
     }
-    return list.length > 0 ? list : defaultSlots;
+    return list;
   }, [cafe, selectedDate]);
+
+  const scheduleConfigured = timeSlots.length > 0;
+  const minNoticeMinutes = Math.max(0, Number(cafe?.minBookingNoticeMinutes || 0));
+  const maxAdvanceBookingDays = Math.max(1, Number(cafe?.maxAdvanceBookingDays || 30));
+  const latestBookableDate = React.useMemo(() => {
+    const date = new Date(`${vietnamDateString()}T12:00:00+07:00`);
+    date.setDate(date.getDate() + maxAdvanceBookingDays);
+    return date.toISOString().slice(0, 10);
+  }, [maxAdvanceBookingDays]);
 
   // Popup warning when switching playMode from RENTAL to BYOC with selected vehicles
   const handleSelectByoc = () => {
     if (playMode === 'RENTAL' && selectedVehicleIds.length > 0) {
       const selectedNames = selectedVehicleIds
-        .map((id) => catalogs.find((c) => c.id === id)?.name)
-        .filter(Boolean)
+        .map((id) => catalogs.find((c) => c.id === id)?.name || `xe #${id.slice(0, 8).toUpperCase()}`)
         .join(', ');
       Alert.alert(
         'Chuyển sang mang xe riêng?',
@@ -190,7 +192,7 @@ export function TrackSelectionStep({
   const [calendarYear, setCalendarYear] = useState(() => new Date().getFullYear());
   const [calendarMonth, setCalendarMonth] = useState(() => new Date().getMonth()); // 0-indexed
 
-  const daysList = getNext7Days();
+  const daysList = getNext7Days().filter((item) => item.fullDate <= latestBookableDate);
 
   // Load track configs
   useEffect(() => {
@@ -218,17 +220,19 @@ export function TrackSelectionStep({
       try {
         await Promise.all(
           timeSlots.map(async (slot) => {
-            // Optimization: If slot is in the past, disable immediately without calling API
-            if (isSlotPast(slot, selectedDate)) {
+            // Avoid presenting slots that are already past or violate the cafe's minimum notice.
+            if (isSlotBlockedByTime(slot, selectedDate, minNoticeMinutes)) {
               updatedDetails[slot] = {
                 available: false,
                 byocRemaining: 0,
                 vehiclesAvailable: 0,
+                blockedByNotice: minNoticeMinutes > 0,
               };
               return;
             }
 
-            const duration = cafe?.slotDurationMinutes || 60;
+            const duration = Number(cafe?.slotDurationMinutes || 0);
+            if (!duration) return;
             const [h, m] = slot.split(':').map(Number);
             const startMinutes = h * 60 + m;
             const endMinutes = startMinutes + duration;
@@ -285,7 +289,7 @@ export function TrackSelectionStep({
     };
 
     checkAllSlots();
-  }, [cafeId, selectedTrackConfig, selectedDate, playMode, timeSlots, cafe]);
+  }, [cafeId, selectedTrackConfig, selectedDate, playMode, timeSlots, cafe, minNoticeMinutes]);
 
   // Month-Year Label formatting
   const formattedMonthYear = React.useMemo(() => {
@@ -325,6 +329,11 @@ export function TrackSelectionStep({
     const dayStr = String(day).padStart(2, '0');
     const fullDate = `${yearStr}-${monthStr}-${dayStr}`;
 
+    if (fullDate > latestBookableDate) {
+      Alert.alert('Ngoài thời hạn đặt trước', `Cơ sở chỉ nhận lịch trước tối đa ${maxAdvanceBookingDays} ngày.`);
+      return;
+    }
+
     setSelectedDate(fullDate);
     setSelectedSlots([]);
     setShowCalendar(false);
@@ -333,9 +342,26 @@ export function TrackSelectionStep({
   const handleToggleSlot = (slot: string) => {
     if (selectedSlots.includes(slot)) {
       setSelectedSlots(selectedSlots.filter(s => s !== slot));
-    } else {
-      setSelectedSlots([...selectedSlots, slot]);
+      return;
     }
+
+    if (selectedSlots.length >= MAX_CONSECUTIVE_SLOTS) {
+      Alert.alert('Đã đạt giới hạn', `Mỗi đơn chỉ được chọn tối đa ${MAX_CONSECUTIVE_SLOTS} slot liên tiếp.`);
+      return;
+    }
+
+    const candidateIndices = [...selectedSlots, slot]
+      .map((value) => timeSlots.indexOf(value))
+      .sort((a, b) => a - b);
+    const isConsecutive = candidateIndices.every(
+      (index, currentIndex) => currentIndex === 0 || index === candidateIndices[currentIndex - 1] + 1
+    );
+    if (!isConsecutive) {
+      Alert.alert('Khung giờ không liên tiếp', 'Chỉ có thể chọn các slot liền kề trong cùng một phiên chơi.');
+      return;
+    }
+
+    setSelectedSlots([...selectedSlots, slot].sort((a, b) => timeSlots.indexOf(a) - timeSlots.indexOf(b)));
   };
 
   return (
@@ -426,7 +452,7 @@ export function TrackSelectionStep({
         <View className="flex-row items-center gap-1.5 mb-3">
           <Clock color="#f97316" size={15} />
           <Text className="text-[13px] text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold">
-            2. Chế độ chơi (Play Mode)
+            2. Chế độ chơi
           </Text>
         </View>
 
@@ -440,7 +466,7 @@ export function TrackSelectionStep({
             }`}
           >
             <Text className={`text-[13px] ${playMode === 'RENTAL' ? 'text-[#f97316]' : 'text-slate-700 dark:text-slate-300'}`} weight="700">
-              Thuê xe (RENTAL)
+              Thuê xe của quán
             </Text>
             <Text className="text-[9px] text-slate-500 dark:text-slate-400 mt-0.5 text-center font-semibold">
               Sử dụng xe đua của cửa hàng
@@ -456,7 +482,7 @@ export function TrackSelectionStep({
             }`}
           >
             <Text className={`text-[13px] ${playMode === 'BYOC' ? 'text-[#f97316]' : 'text-slate-700 dark:text-slate-300'}`} weight="700">
-              Xe cá nhân (BYOC)
+              Mang xe riêng
             </Text>
             <Text className="text-[9px] text-slate-500 dark:text-slate-400 mt-0.5 text-center font-semibold">
               Tự mang xe đã đăng ký của bạn
@@ -544,7 +570,25 @@ export function TrackSelectionStep({
           {loadingSlots && <ActivityIndicator size="small" color="#f97316" />}
         </View>
 
-        {loadingSlots ? (
+        {minNoticeMinutes > 0 ? (
+          <View className="mb-3 flex-row items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
+            <AlertCircle color="#f59e0b" size={15} />
+            <Text className="flex-1 text-[11px] leading-4 text-amber-700 dark:text-amber-200">
+              Cần đặt trước tối thiểu {minNoticeMinutes} phút. Các slot quá sát giờ bắt đầu sẽ bị khóa.
+            </Text>
+          </View>
+        ) : null}
+
+        {!scheduleConfigured ? (
+          <View className="h-32 items-center justify-center rounded-xl border border-red-500/20 bg-red-500/10 px-5">
+            <Text className="text-center text-[12px] text-red-600 dark:text-red-300" weight="700">
+              Cơ sở chưa cấu hình giờ hoạt động hoặc thời lượng slot hợp lệ.
+            </Text>
+            <Text className="mt-1 text-center text-[10px] leading-4 text-red-600/80 dark:text-red-200/70">
+              Không thể tạo đơn cho đến khi cơ sở hoàn tất cấu hình lịch hoạt động.
+            </Text>
+          </View>
+        ) : loadingSlots ? (
           <View className="h-32 items-center justify-center bg-white dark:bg-[#0f172a]/20 border border-slate-200 dark:border-slate-900 rounded-xl">
             <ActivityIndicator size="small" color="#f97316" />
             <Text className="text-[10px] text-slate-500 mt-2 font-semibold">
@@ -556,8 +600,8 @@ export function TrackSelectionStep({
             {timeSlots.map((slot) => {
               const isSelected = selectedSlots.includes(slot);
               const detail = slotDetails[slot];
-              const isPast = isSlotPast(slot, selectedDate);
-              const isAvailable = !isPast && (detail?.available ?? false);
+              const blockedByTime = isSlotBlockedByTime(slot, selectedDate, minNoticeMinutes);
+              const isAvailable = !blockedByTime && (detail?.available ?? false);
 
               // Dynamic Styling based on slot status
               let btnStyle = "bg-white dark:bg-[#0f172a]/50 border-slate-200 dark:border-slate-800";
@@ -568,7 +612,7 @@ export function TrackSelectionStep({
                 btnStyle = "bg-[#ea580c] border-[#ea580c]";
                 textStyle = "text-white";
                 subTextStyle = "text-orange-200";
-              } else if (isPast || (detail && !isAvailable)) {
+              } else if (blockedByTime || (detail && !isAvailable)) {
                 // Disabled state
                 btnStyle = "bg-slate-100/30 dark:bg-slate-900/10 border-slate-200/40 dark:border-slate-900/40 opacity-30";
                 textStyle = "text-slate-400 dark:text-slate-600 line-through";
@@ -595,9 +639,9 @@ export function TrackSelectionStep({
                       {playMode === 'RENTAL' ? `Còn ${detail.vehiclesAvailable} xe` : `Còn ${detail.byocRemaining} chỗ`}
                     </Text>
                   )}
-                  {!isAvailable && (isPast || (detail && !detail.available)) && (
+                  {!isAvailable && (blockedByTime || (detail && !detail.available)) && (
                     <Text className={`text-[7.5px] font-semibold mt-0.5 ${subTextStyle}`}>
-                      {isPast ? 'Quá giờ' : 'Hết chỗ'}
+                      {blockedByTime ? (minNoticeMinutes > 0 ? 'Chưa đủ thời gian đặt trước' : 'Đã qua') : 'Hết chỗ'}
                     </Text>
                   )}
                 </Pressable>
@@ -614,6 +658,11 @@ export function TrackSelectionStep({
             </Text>
           </View>
         )}
+        {selectedSlots.length > 0 ? (
+          <Text className="mt-3 text-[11px] text-slate-500">
+            Đã chọn {selectedSlots.length}/{MAX_CONSECUTIVE_SLOTS} slot liên tiếp.
+          </Text>
+        ) : null}
       </View>
 
       {/* CUSTOM CALENDAR MODAL */}
@@ -686,16 +735,17 @@ export function TrackSelectionStep({
                 const todayObj = new Date();
                 todayObj.setHours(0, 0, 0, 0);
                 const isPast = checkDateObj < todayObj;
+                const isBeyondAdvanceLimit = checkingDate > latestBookableDate;
 
                 return (
                   <Pressable
                     key={`day-${dayNum}`}
-                    disabled={isPast}
+                    disabled={isPast || isBeyondAdvanceLimit}
                     onPress={() => handleSelectDateFromCalendar(dayNum)}
                     className={`w-[14.28%] aspect-square justify-center items-center rounded-lg border ${
                       isSelected
                         ? 'bg-[#ea580c] border-[#ea580c]'
-                        : isPast
+                        : isPast || isBeyondAdvanceLimit
                         ? 'opacity-25 border-transparent'
                         : 'border-transparent active:bg-slate-100 dark:active:bg-slate-900'
                     }`}

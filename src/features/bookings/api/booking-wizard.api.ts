@@ -57,7 +57,32 @@ export interface AvailabilityResponse {
   play_mode: 'RENTAL' | 'BYOC';
   available: boolean;
   byoc_remaining?: number;
-  vehicles?: { id: string; name: string }[];
+  vehicles?: RentalVehicleAvailability[];
+}
+
+export interface RentalVehicleAvailability {
+  vehicle_id: string;
+  vehicle_identifier: string;
+  catalog_name: string;
+  tier: string;
+  rental_fee_per_hour: number;
+  security_deposit: number;
+}
+
+export interface RentalVehicleUnit {
+  id: string;
+  catalogId: string;
+  status: string;
+  identifier?: string | null;
+  color?: string | null;
+  distinctive_image_url?: string | null;
+  catalog?: {
+    id: string;
+    name: string;
+    tier: string;
+    cover_image_url?: string | null;
+    hourlyRate: number;
+  } | null;
 }
 
 export interface CreateBookingPayload {
@@ -114,6 +139,13 @@ export const bookingWizardApi = {
       console.error('[BookingWizardAPI] Error fetching vehicle catalogs:', error);
       return [];
     }
+  },
+
+  getCafeVehicleUnits: async (cafeId: string): Promise<RentalVehicleUnit[]> => {
+    const response = await api.get(`/cafes/${cafeId}/vehicles`, {
+      params: { status: 'AVAILABLE', exclude_retired: true },
+    });
+    return response.data?.data || [];
   },
 
   getCafeMenu: async (cafeId: string): Promise<MenuItem[]> => {

@@ -33,14 +33,30 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useColorScheme } from 'nativewind';
 
 import { bookingWizardApi } from '@/features/bookings/api/booking-wizard.api';
+import { getDisplayBookingStatus, isCheckInWindowExpired } from '@/features/bookings/lib/check-in-window';
 import { wsClient } from '@/shared/lib/websocket';
 import { Text } from '@/shared/ui/Text';
 import { cn } from '@/shared/lib/utils';
 import { getVnpayReturnUrl } from '@/shared/lib/vnpay-return-url';
 import { openVnpayPaymentSession } from '@/shared/lib/vnpay-browser';
+import { ImageZoomModal } from '@/shared/ui/ImageZoomModal';
 
 interface BookingDetailScreenProps {
   bookingId: string;
+}
+
+const INSPECTION_PHOTO_LABELS: Record<string, string> = {
+  FRONT: 'Phía trước',
+  BACK: 'Phía sau',
+  LEFT: 'Bên trái',
+  RIGHT: 'Bên phải',
+  TOP: 'Từ trên',
+  BOTTOM: 'Phía dưới',
+  DETAIL: 'Cận cảnh',
+};
+
+function getInspectionPhotoLabel(angle?: string, index = 0) {
+  return INSPECTION_PHOTO_LABELS[angle || ''] || `Ảnh ${index + 1}`;
 }
 
 export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
@@ -58,6 +74,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
   const [cancelReason, setCancelReason] = useState('');
 
   const [sessionDetail, setSessionDetail] = useState<any>(null);
+  const [previewPhoto, setPreviewPhoto] = useState<{ url: string; title: string } | null>(null);
 
   const checkInPhotos = useMemo(() => {
     if (!sessionDetail?.inspections) return [];
@@ -81,31 +98,42 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
         </Text>
         {photos.length > 0 ? (
           isByoc ? (
-            <View className="w-full aspect-square rounded-lg bg-slate-900 border border-slate-800 overflow-hidden relative">
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Phóng to ${label}`}
+              onPress={() => setPreviewPhoto({ url: photos[0].url, title: `${label} · ${getInspectionPhotoLabel(photos[0].angle)}` })}
+              className="w-full aspect-square rounded-lg bg-slate-900 border border-slate-800 overflow-hidden relative"
+            >
               <Image
                 source={{ uri: photos[0].url }}
                 className="w-full h-full object-cover"
               />
               <View className="absolute bottom-1 left-1 bg-black/70 px-1 py-0.5 rounded">
                 <Text className="text-[7.5px] text-slate-300 uppercase font-black tracking-wide">
-                  {photos[0].angle || 'PHOTO'}
+                  {getInspectionPhotoLabel(photos[0].angle)}
                 </Text>
               </View>
-            </View>
+            </Pressable>
           ) : (
             <View className="flex-row flex-wrap gap-1.5 justify-between">
               {photos.map((p: any, idx: number) => (
-                <View key={idx} className="w-[48%] aspect-square rounded-lg bg-slate-900 border border-slate-800 overflow-hidden relative">
+                <Pressable
+                  key={idx}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Phóng to ${label} ${idx + 1}`}
+                  onPress={() => setPreviewPhoto({ url: p.url, title: `${label} · ${getInspectionPhotoLabel(p.angle, idx)}` })}
+                  className="w-[48%] aspect-square rounded-lg bg-slate-900 border border-slate-800 overflow-hidden relative"
+                >
                   <Image
                     source={{ uri: p.url }}
                     className="w-full h-full object-cover"
                   />
                   <View className="absolute bottom-1 left-1 bg-black/70 px-1 py-0.5 rounded">
                     <Text className="text-[7.5px] text-slate-300 uppercase font-black tracking-wide">
-                      {p.angle || 'PHOTO'}
+                      {getInspectionPhotoLabel(p.angle, idx)}
                     </Text>
                   </View>
-                </View>
+                </Pressable>
               ))}
               {Array.from({ length: Math.max(0, 4 - photos.length) }).map((_, idx) => (
                 <View key={`placeholder-${idx}`} className="w-[48%] aspect-square rounded-lg bg-slate-950 border border-slate-900/60 justify-center items-center">
@@ -353,7 +381,10 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
 
   // Session thực tế
   const session = booking.session;
-  const isSessionActive = session && ['ACTIVE', 'EXTENDING', 'CHECKED_IN', 'CHECKING_OUT'].includes(session.status);
+  const checkInExpired = isCheckInWindowExpired(booking.status, booking.slotStart, session);
+  const displayBookingStatus = getDisplayBookingStatus(booking.status, booking.slotStart, session);
+  const isSessionActive =
+    !checkInExpired && session && ['ACTIVE', 'EXTENDING', 'CHECKED_IN', 'CHECKING_OUT'].includes(session.status);
   const pendingInspection = sessionDetail?.inspections?.find(
     (inspection: any) => inspection.customerConfirmed !== true && inspection.type === 'CHECK_OUT'
   );
@@ -438,7 +469,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
       <ScrollView contentContainerClassName="px-5 py-5 pb-12" showsVerticalScrollIndicator={false}>
 
         {/* Mã QR Code Check-in — dùng endpoint BE /bookings/:id/qr (Ẩn nếu đã checkout hoặc bị hủy) */}
-        {booking.status !== 'CANCELLED' && booking.status !== 'NO_SHOW' && (!session || session.status !== 'COMPLETED') && (
+        {displayBookingStatus !== 'CANCELLED' && displayBookingStatus !== 'NO_SHOW' && (!session || session.status !== 'COMPLETED') && (
           <View className="items-center mb-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-6 shadow-xl">
             <View className="bg-white p-3 rounded-2xl shadow-lg mb-4">
               <Image
@@ -459,6 +490,18 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
             </Text>
           </View>
         )}
+
+        {checkInExpired ? (
+          <View className="mb-6 flex-row items-start gap-3 rounded-2xl border border-slate-500/20 bg-slate-500/10 p-4">
+            <AlertCircle color="#94a3b8" size={20} style={{ marginTop: 2 }} />
+            <View className="flex-1">
+              <Text className="text-[14px] text-slate-700 dark:text-slate-200" weight="700">Đơn đã quá giờ check-in</Text>
+              <Text className="mt-1 text-[12px] leading-4 text-slate-500">
+                Bạn đã quá thời hạn check-in 30 phút. Đơn được xem là không đến và không thể mở phiên chơi.
+              </Text>
+            </View>
+          </View>
+        ) : null}
 
         {/* Trạng thái / Cảnh báo thanh toán */}
         {booking.status === 'PENDING' && (
@@ -518,7 +561,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
               <Clock color="#34d399" size={20} style={{ marginTop: 2 }} />
               <View className="flex-1">
                 <Text className="text-emerald-300 text-[14px]" weight="700">
-                  Staff đề xuất gia hạn +{pendingExtension.extraMinutes} phút
+                  Nhân viên đề xuất gia hạn +{pendingExtension.extraMinutes} phút
                 </Text>
                 <Text className="mt-1 text-xs leading-4 text-slate-700 dark:text-slate-300 font-semibold">
                   Phí phát sinh {Number(pendingExtension.additionalFee || 0).toLocaleString('vi-VN')}đ. Bạn cần phản hồi để staff cập nhật giờ chơi.
@@ -639,7 +682,9 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
               <View className="flex-1 pt-0.5">
                 <Text className="text-slate-900 dark:text-white text-sm" weight="600">Trạng thái chơi & Kết thúc</Text>
                 <Text className="text-slate-500 dark:text-slate-400 text-xs mt-0.5 font-semibold">
-                  {session?.status === 'COMPLETED'
+                  {checkInExpired
+                    ? 'Đã quá thời hạn check-in, phiên không được mở.'
+                    : session?.status === 'COMPLETED'
                     ? 'Đã hoàn thành phiên chơi và checkout xe đua.'
                     : isSessionActive
                       ? 'Ca chơi đang hoạt động trên track.'
@@ -945,7 +990,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
         </View>
 
         {/* Nút hủy đặt lịch */}
-        {(booking.status === 'CONFIRMED' || booking.status === 'PENDING') && (
+        {(displayBookingStatus === 'CONFIRMED' || displayBookingStatus === 'PENDING') && (
           <Pressable
             className="w-full h-11 flex-row items-center justify-center rounded-xl border border-red-200 dark:border-red-900/20 bg-red-50 dark:bg-red-950/15 active:bg-red-100 dark:active:bg-red-950/30 gap-2 shadow-sm"
             onPress={() => setCancelModalVisible(true)}
@@ -1024,6 +1069,12 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
           </KeyboardAvoidingView>
         </View>
       </Modal>
+      <ImageZoomModal
+        visible={!!previewPhoto}
+        imageUrl={previewPhoto?.url}
+        title={previewPhoto?.title}
+        onClose={() => setPreviewPhoto(null)}
+      />
     </SafeAreaView>
   );
 }

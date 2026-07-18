@@ -24,8 +24,10 @@ import {
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { staffApi, type StaffInspectionType, type StaffSessionDetail } from '@/features/staff/api/staff.api';
+import { getStatusLabel } from '@/features/bookings/lib/status-label';
 import { StaffSessionTools } from '@/features/staff/components/StaffSessionTools';
 import { wsClient } from '@/shared/lib/websocket';
+import { ImageZoomModal } from '@/shared/ui/ImageZoomModal';
 import { Text } from '@/shared/ui/Text';
 
 function formatDateTime(iso?: string) {
@@ -56,12 +58,95 @@ function getStatusColor(status?: string) {
   return '#94a3b8';
 }
 
+const PHOTO_ANGLE_LABELS: Record<string, string> = {
+  FRONT: 'Phía trước',
+  BACK: 'Phía sau',
+  LEFT: 'Bên trái',
+  RIGHT: 'Bên phải',
+  TOP: 'Từ trên',
+  BOTTOM: 'Phía dưới',
+  DETAIL: 'Cận cảnh',
+};
+
+function getPhotoAngleLabel(angle?: string) {
+  return angle ? PHOTO_ANGLE_LABELS[angle] : undefined;
+}
+
+function getFnbOrderStatusLabel(status?: string) {
+  const labels: Record<string, string> = {
+    PENDING: 'Chờ xử lý',
+    CONFIRMED: 'Đang chuẩn bị',
+    DELIVERED: 'Đã giao',
+    CANCELLED: 'Đã hủy',
+  };
+  return labels[status || ''] || getStatusLabel(status);
+}
+
+type FnbSummary = {
+  items: { name: string; quantity: number; total: number }[];
+  total: number;
+  statusLabel: string;
+};
+
+/**
+ * A session may receive several counter orders. The session screen is an
+ * operational summary, so it deliberately combines those orders by dish
+ * rather than making staff reconcile a stack of nearly-identical cards.
+ */
+function summarizeFnbOrders(
+  orders: StaffSessionDetail['fnbOrders'] | undefined,
+  sessionStatus?: string
+): FnbSummary {
+  const activeOrders = (orders || []).filter((order) => order.status !== 'CANCELLED');
+  const itemsByName = new Map<string, { name: string; quantity: number; total: number }>();
+
+  for (const order of activeOrders) {
+    for (const item of order.items || []) {
+      const name = item.name?.trim() || 'Món ăn';
+      const key = name.toLocaleLowerCase('vi-VN');
+      const current = itemsByName.get(key) || { name, quantity: 0, total: 0 };
+      current.quantity += Number(item.qty || 0);
+      current.total += Number(item.price || 0) * Number(item.qty || 0);
+      itemsByName.set(key, current);
+    }
+  }
+
+  const total = activeOrders.reduce((sum, order) => sum + Number(order.total || 0), 0);
+  const statusLabel =
+    sessionStatus === 'COMPLETED'
+      ? 'Đã hoàn tất phiên'
+      : sessionStatus === 'CANCELLED'
+        ? 'Phiên đã hủy'
+        : activeOrders.some((order) => order.status === 'CONFIRMED')
+        ? getFnbOrderStatusLabel('CONFIRMED')
+        : activeOrders.some((order) => order.status === 'PENDING')
+          ? getFnbOrderStatusLabel('PENDING')
+          : activeOrders.length > 0
+            ? getFnbOrderStatusLabel(activeOrders[0].status)
+            : '';
+
+  return { items: [...itemsByName.values()], total, statusLabel };
+}
+
+function getVehicleSourceLabel(type?: string) {
+  return type === 'BYOC' ? 'Khách tự mang xe' : 'Xe thuê của cơ sở';
+}
+
+const FALLBACK_VEHICLE_IMAGE_URL =
+  'https://images.unsplash.com/photo-1594787318286-3d835c1d207f?auto=format&fit=crop&q=80&w=400';
+
+function getVehicleImageUrl(imageUrl?: string) {
+  return imageUrl && !imageUrl.includes('cdn.rcfield.vn') ? imageUrl : FALLBACK_VEHICLE_IMAGE_URL;
+}
+
 export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
   const router = useRouter();
   const [session, setSession] = useState<StaffSessionDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [settling, setSettling] = useState(false);
+  const [confirmingCheckout, setConfirmingCheckout] = useState(false);
+  const [previewPhoto, setPreviewPhoto] = useState<{ url: string; title: string } | null>(null);
 
   const loadSession = useCallback(async (isRefresh = false) => {
     if (!sessionId) {
@@ -118,12 +203,16 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
     return unsubscribe;
   }, [loadSession, sessionId]);
 
+  const fnbSummary = useMemo(
+    () => summarizeFnbOrders(session?.fnbOrders, session?.status),
+    [session?.fnbOrders, session?.status]
+  );
+
   const totals = useMemo(() => {
-    const fnbTotal = session?.fnbOrders?.reduce((sum, order) => sum + Number(order.total || 0), 0) ?? 0;
     const photoTotal =
       session?.inspections?.reduce((sum, inspection) => sum + (inspection.photos?.length || 0), 0) ?? 0;
-    return { fnbTotal, photoTotal };
-  }, [session]);
+    return { fnbTotal: fnbSummary.total, photoTotal };
+  }, [fnbSummary.total, session?.inspections]);
 
   const checkInInspection = useMemo(
     () => session?.inspections?.find((inspection) => inspection.type === 'CHECK_IN') ?? null,
@@ -139,6 +228,13 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
     () => !!session?.vehicles?.length && session.vehicles.every((vehicle) => vehicle.type === 'BYOC'),
     [session?.vehicles]
   );
+  const paymentSummary = session?.paymentSummary;
+  const canSettlePayments = !!paymentSummary?.requiresSettlement;
+  const settlementDescription = paymentSummary?.outstandingAmount
+    ? `Cần thu thêm: ${formatCurrency(paymentSummary.outstandingAmount)}`
+    : paymentSummary?.pendingRefundAmount
+      ? `Cần hoàn cọc: ${formatCurrency(paymentSummary.pendingRefundAmount)}`
+      : 'Không còn khoản cần thu hoặc hoàn tiền.';
 
   const handleStartInspection = (type: StaffInspectionType) => {
     router.push({
@@ -148,7 +244,7 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
   };
 
   const handleSettlePayments = async () => {
-    if (!session?.bookingId) return;
+    if (!session?.bookingId || !canSettlePayments) return;
 
     setSettling(true);
     try {
@@ -161,6 +257,39 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
     } finally {
       setSettling(false);
     }
+  };
+
+  const handleConfirmCheckout = () => {
+    if (!checkOutInspection) return;
+
+    Alert.alert(
+      'Xác nhận checkout',
+      'Xác nhận khách đã xem biên bản và hoàn tất trả xe tại quầy? Nếu còn phí phát sinh, đơn sẽ chuyển sang chờ thanh toán.',
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Xác nhận hoàn tất',
+          onPress: async () => {
+            setConfirmingCheckout(true);
+            try {
+              const result = await staffApi.confirmCheckout(sessionId, checkOutInspection.inspectionId);
+              Alert.alert(
+                'Đã xác nhận',
+                result?.alreadyCompleted
+                  ? 'Khách đã xác nhận trước đó. Phiên đã hoàn tất.'
+                  : 'Checkout đã hoàn tất. Kiểm tra thanh toán tồn đọng nếu có phí phát sinh.'
+              );
+              await loadSession(true);
+            } catch (error: any) {
+              const message = error?.response?.data?.message || 'Không thể xác nhận checkout.';
+              Alert.alert('Lỗi', message);
+            } finally {
+              setConfirmingCheckout(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -215,7 +344,7 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
                   Booking #{shortId(session.bookingId)}
                 </Text>
                 <Text className="mt-1 text-[11px] text-slate-500">
-                  Staff: {session.staffName || 'Nhân viên trực ca'}
+                  Nhân viên: {session.staffName || 'Nhân viên trực ca'}
                 </Text>
               </View>
               <View className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-900 px-2 py-1">
@@ -224,7 +353,7 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
                   weight="700"
                   style={{ color: getStatusColor(session.status) }}
                 >
-                  {session.status}
+                  {getStatusLabel(session.status)}
                 </Text>
               </View>
             </View>
@@ -252,6 +381,8 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
             hasCheckOutInspection={!!checkOutInspection}
             checkOutConfirmed={!!checkOutInspection?.customerConfirmed}
             onStartInspection={handleStartInspection}
+            onConfirmCheckout={handleConfirmCheckout}
+            confirmingCheckout={confirmingCheckout}
           />
 
           <StaffSessionTools session={session} onUpdated={() => loadSession(true)} />
@@ -259,11 +390,10 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
           <SectionTitle title="Người chơi" />
           <View className="mb-5 gap-3">
             {session.participants?.map((participant, index) => (
-              <SimpleRow
+              <ParticipantRow
                 key={`${participant.name}-${index}`}
-                Icon={UserRound}
-                title={participant.name || `Người chơi ${index + 1}`}
-                subtitle={participant.type || 'PLAYER'}
+                participant={participant}
+                index={index}
               />
             ))}
             {session.participants?.length === 0 ? <EmptyText text="Chưa có người chơi trong phiên." /> : null}
@@ -276,20 +406,12 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
                 key={vehicle.vehicleId}
                 className="flex-row items-center gap-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-3 shadow-sm"
               >
-                <View className="h-14 w-14 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-950">
-                  {vehicle.imageUrl ? (
-                    <Image source={{ uri: vehicle.imageUrl }} className="h-full w-full" resizeMode="cover" />
-                  ) : (
-                    <View className="h-full w-full items-center justify-center">
-                      <Car color="#64748b" size={22} />
-                    </View>
-                  )}
-                </View>
+                <VehicleThumbnail imageUrl={vehicle.imageUrl} name={vehicle.name} />
                 <View className="flex-1">
                   <Text className="text-[13px] text-slate-900 dark:text-white" weight="700" numberOfLines={1}>
                     {vehicle.name}
                   </Text>
-                  <Text className="mt-1 text-[11px] text-slate-500">{vehicle.type}</Text>
+                  <Text className="mt-1 text-[11px] text-slate-500">{getVehicleSourceLabel(vehicle.type)}</Text>
                 </View>
               </View>
             ))}
@@ -307,7 +429,7 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
                   <View className="flex-row items-center gap-2">
                     <ShieldCheck color="#f97316" size={16} />
                     <Text className="text-[13px] text-slate-900 dark:text-white" weight="700">
-                      {inspection.type === 'CHECK_IN' ? 'Check-in' : 'Check-out'}
+                      {inspection.type === 'CHECK_IN' ? 'Nhận xe' : 'Trả xe'}
                     </Text>
                   </View>
                   <Text className="text-[10px] text-slate-500" weight="700">
@@ -323,27 +445,22 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
                     <Text className="text-[11px] text-red-300" weight="700">
                       Hư hỏng/phí phát sinh
                     </Text>
-                    {inspection.damageDescription ? (
-                      <Text className="mt-1 text-[10px] leading-4 text-red-100/70">
-                        {inspection.damageDescription}
+                    {inspection.damageLineItems?.map((item, index) => (
+                      <View key={item.id || `${item.partType}-${index}`} className="mt-2 flex-row justify-between gap-3">
+                        <Text className="flex-1 text-[10px] text-red-100/60" numberOfLines={1}>
+                          {item.customPartName || item.partType}
+                        </Text>
+                        <Text className="text-[10px] text-red-100" weight="700">
+                          {formatCurrency(item.lineTotal)}
+                        </Text>
+                      </View>
+                    ))}
+                    <View className="mt-2 flex-row justify-between gap-3 border-t border-red-500/20 pt-2">
+                      <Text className="text-[10px] text-red-100/60">Tổng phí bồi thường</Text>
+                      <Text className="text-[10px] text-red-100" weight="700">
+                        {formatCurrency(inspection.totalDamageCharge)}
                       </Text>
-                    ) : null}
-                    {inspection.estimatedCost !== undefined ? (
-                      <View className="mt-2 flex-row justify-between gap-3">
-                        <Text className="text-[10px] text-red-100/60">Chi phí dự kiến</Text>
-                        <Text className="text-[10px] text-red-100" weight="700">
-                          {formatCurrency(inspection.estimatedCost)}
-                        </Text>
-                      </View>
-                    ) : null}
-                    {inspection.finalCharge !== undefined ? (
-                      <View className="mt-1 flex-row justify-between gap-3">
-                        <Text className="text-[10px] text-red-100/60">Tính phí sau hệ số</Text>
-                        <Text className="text-[10px] text-red-100" weight="700">
-                          {formatCurrency(inspection.finalCharge)}
-                        </Text>
-                      </View>
-                    ) : null}
+                    </View>
                   </View>
                 ) : null}
                 {inspection.type === 'CHECK_OUT' ? (
@@ -375,17 +492,27 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-3">
                     <View className="flex-row gap-2">
                       {inspection.photos.map((photo, index) => (
-                        <View
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel={`Phóng to ảnh ${getPhotoAngleLabel(photo.angle) || index + 1}`}
+                          onPress={() =>
+                            setPreviewPhoto({
+                              url: photo.url,
+                              title: `${inspection.type === 'CHECK_IN' ? 'Ảnh nhận xe' : 'Ảnh trả xe'} · ${getPhotoAngleLabel(photo.angle) || `Ảnh ${index + 1}`}`,
+                            })
+                          }
                           key={`${inspection.inspectionId}-${photo.url}-${index}`}
                           className="h-20 w-20 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-950"
                         >
                           <Image source={{ uri: photo.url }} className="h-full w-full" resizeMode="cover" />
-                          <View className="absolute bottom-1 left-1 rounded bg-black/70 px-1 py-0.5">
-                            <Text className="text-[7px] uppercase text-white" weight="700">
-                              {photo.angle || 'PHOTO'}
-                            </Text>
-                          </View>
-                        </View>
+                          {getPhotoAngleLabel(photo.angle) ? (
+                            <View className="absolute bottom-1 left-1 rounded bg-black/70 px-1 py-0.5">
+                              <Text className="text-[7px] uppercase text-white" weight="700">
+                                {getPhotoAngleLabel(photo.angle)}
+                              </Text>
+                            </View>
+                          ) : null}
+                        </Pressable>
                       ))}
                     </View>
                   </ScrollView>
@@ -413,7 +540,7 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
                           className={`text-[9px] ${item.status === 'OK' ? 'text-emerald-300' : 'text-amber-300'}`}
                           weight="700"
                         >
-                          {item.status}
+                          {getStatusLabel(item.status)}
                         </Text>
                       </View>
                     ))}
@@ -429,51 +556,58 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
             {session.inspections?.length === 0 ? <EmptyText text="Chưa có biên bản kiểm tra xe." /> : null}
           </View>
 
-          <SectionTitle title="F&B của phiên" />
+          <SectionTitle title="Đồ ăn, thức uống của phiên" />
           <View className="mb-5 gap-3">
-            {session.fnbOrders?.map((order) => (
-              <View key={order.orderId} className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-4 shadow-sm">
+            {fnbSummary.items.length > 0 ? (
+              <View className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-4 shadow-sm">
                 <View className="mb-3 flex-row items-center justify-between gap-3">
-                  <View>
+                  <View className="flex-1">
                     <Text className="text-[13px] text-slate-900 dark:text-white" weight="700">
-                      {order.orderType}
+                      Đồ ăn, thức uống đã gọi
                     </Text>
-                    <Text className="mt-1 text-[10px] text-slate-500">{order.status}</Text>
+                    <Text className="mt-1 text-[10px] text-slate-500">
+                      {fnbSummary.statusLabel}
+                    </Text>
                   </View>
                   <Text className="text-[12px] text-[#f97316]" weight="700">
-                    {formatCurrency(order.total)}
+                    {formatCurrency(fnbSummary.total)}
                   </Text>
                 </View>
-                {order.items?.map((item, index) => (
-                  <View key={`${order.orderId}-${index}`} className="flex-row justify-between gap-3">
-                    <Text className="flex-1 text-[11px] text-slate-400" numberOfLines={1}>
-                      {item.qty}x {item.name}
-                    </Text>
-                    <Text className="text-[11px] text-slate-500">{formatCurrency(item.price * item.qty)}</Text>
-                  </View>
-                ))}
+                <View className="gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+                  {fnbSummary.items.map((item) => (
+                    <View key={item.name} className="flex-row justify-between gap-3">
+                      <Text className="flex-1 text-[11px] text-slate-400" numberOfLines={1}>
+                        {item.quantity}x {item.name}
+                      </Text>
+                      <Text className="text-[11px] text-slate-500">{formatCurrency(item.total)}</Text>
+                    </View>
+                  ))}
+                </View>
               </View>
-            ))}
-            {session.fnbOrders?.length === 0 ? <EmptyText text="Phiên chưa có đơn F&B." /> : null}
+            ) : (
+              <EmptyText text="Phiên chưa có đơn đồ ăn, thức uống." />
+            )}
           </View>
 
           <View className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-4 shadow-sm">
             <View className="mb-3 flex-row items-center justify-between gap-3">
               <View className="flex-1">
                 <Text className="text-[13px] text-slate-900 dark:text-white" weight="700">
-                  Thanh toán tồn đọng
+                  {canSettlePayments ? 'Thanh toán tồn đọng' : 'Thanh toán đã hoàn tất'}
                 </Text>
                 <Text className="mt-1 text-[11px] text-slate-500">
-                  Tổng F&B ghi nhận: {formatCurrency(totals.fnbTotal)}
+                  {settlementDescription}
                 </Text>
               </View>
-              <Coffee color="#f97316" size={20} />
+              {canSettlePayments ? <Coffee color="#f97316" size={20} /> : <CheckCircle2 color="#10b981" size={20} />}
             </View>
             <Pressable
-              disabled={settling}
+              disabled={!canSettlePayments || settling}
               onPress={handleSettlePayments}
-              className={`h-11 flex-row items-center justify-center gap-2 rounded-xl bg-[#ea580c] ${
-                settling ? 'opacity-70' : ''
+              className={`h-11 flex-row items-center justify-center gap-2 rounded-xl ${
+                canSettlePayments ? 'bg-[#ea580c]' : 'bg-slate-200 dark:bg-slate-800'
+              } ${
+                settling || !canSettlePayments ? 'opacity-70' : ''
               }`}
             >
               {settling ? (
@@ -482,12 +616,18 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
                 <WalletCards color="#ffffff" size={16} />
               )}
               <Text className="text-[12px] text-white" weight="700">
-                Xử lý thanh toán
+                {canSettlePayments ? 'Xử lý thanh toán' : 'Đã thanh toán đầy đủ'}
               </Text>
             </Pressable>
           </View>
         </ScrollView>
       )}
+      <ImageZoomModal
+        visible={!!previewPhoto}
+        imageUrl={previewPhoto?.url}
+        title={previewPhoto?.title}
+        onClose={() => setPreviewPhoto(null)}
+      />
     </SafeAreaView>
   );
 }
@@ -523,6 +663,8 @@ function SessionOperations({
   hasCheckOutInspection,
   checkOutConfirmed,
   onStartInspection,
+  onConfirmCheckout,
+  confirmingCheckout,
 }: {
   status: string;
   isByoc: boolean;
@@ -530,6 +672,8 @@ function SessionOperations({
   hasCheckOutInspection: boolean;
   checkOutConfirmed: boolean;
   onStartInspection: (type: StaffInspectionType) => void;
+  onConfirmCheckout: () => void;
+  confirmingCheckout: boolean;
 }) {
   const canSubmitCheckIn = status === 'CHECKED_IN' && !hasCheckInInspection;
   const canSubmitCheckOut = ['ACTIVE', 'EXTENDING'].includes(status) && !hasCheckOutInspection;
@@ -542,7 +686,7 @@ function SessionOperations({
             Thao tác phiên
           </Text>
           <Text className="mt-1 text-[11px] leading-4 text-slate-500">
-            Tạo biên bản kiểm xe để đi tiếp qua nhận xe, trả xe và hoàn tất checkout.
+            Tạo biên bản kiểm xe để đi tiếp qua nhận xe, trả xe và hoàn tất phiên.
           </Text>
         </View>
         <ShieldCheck color="#f97316" size={20} />
@@ -568,7 +712,7 @@ function SessionOperations({
           >
             <ReceiptText color="#ffffff" size={16} />
             <Text className="text-[12px] text-white" weight="700">
-              {isByoc ? 'Đóng phiên BYOC' : 'Tạo biên bản trả xe'}
+              {isByoc ? 'Tạo biên bản trả xe khách tự mang' : 'Tạo biên bản trả xe'}
             </Text>
           </Pressable>
         ) : null}
@@ -576,11 +720,23 @@ function SessionOperations({
         {status === 'CHECKING_OUT' && hasCheckOutInspection && !checkOutConfirmed ? (
           <View className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-3">
             <Text className="text-[12px] text-amber-300" weight="700">
-              Đang chờ khách xác nhận biên bản trả xe
+              Đang chờ xác nhận trả xe
             </Text>
             <Text className="mt-1 text-[11px] leading-4 text-amber-200/70">
-              Khi khách đồng ý trên mobile, phiên sẽ chuyển sang hoàn tất.
+              Chờ khách xác nhận trên ứng dụng, hoặc xác nhận trực tiếp tại quầy sau khi khách đã xem biên bản.
             </Text>
+            <Pressable
+              disabled={confirmingCheckout}
+              onPress={onConfirmCheckout}
+              className={`mt-3 h-10 flex-row items-center justify-center gap-2 rounded-xl bg-[#ea580c] ${
+                confirmingCheckout ? 'opacity-70' : ''
+              }`}
+            >
+              {confirmingCheckout ? <ActivityIndicator color="#ffffff" size="small" /> : <CheckCircle2 color="#ffffff" size={15} />}
+              <Text className="text-[11px] text-white" weight="700">
+                Xác nhận trả xe tại quầy
+              </Text>
+            </Pressable>
           </View>
         ) : null}
 
@@ -602,26 +758,83 @@ function SectionTitle({ title }: { title: string }) {
   );
 }
 
-function SimpleRow({
-  Icon,
-  title,
-  subtitle,
+function ParticipantRow({
+  participant,
+  index,
 }: {
-  Icon: LucideIcon;
-  title: string;
-  subtitle: string;
+  participant: { name: string; type: string; avatarUrl?: string };
+  index: number;
 }) {
+  const initials = participant.name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(-2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase();
+  const [avatarFailed, setAvatarFailed] = useState(false);
+
+  useEffect(() => {
+    setAvatarFailed(false);
+  }, [participant.avatarUrl]);
+
   return (
     <View className="flex-row items-center gap-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-4 shadow-sm">
-      <View className="h-10 w-10 items-center justify-center rounded-xl border border-orange-500/20 bg-orange-500/10">
-        <Icon color="#f97316" size={18} />
+      <View className="h-10 w-10 overflow-hidden rounded-full border border-orange-500/20 bg-orange-500/10">
+        {participant.avatarUrl && !avatarFailed ? (
+          <Image
+            source={{ uri: participant.avatarUrl }}
+            className="h-full w-full"
+            resizeMode="cover"
+            accessibilityLabel={`Ảnh ${participant.name}`}
+            onError={() => setAvatarFailed(true)}
+          />
+        ) : (
+          <View className="h-full w-full items-center justify-center">
+            <Text className="text-[11px] text-[#f97316]" weight="700">
+              {initials || String(index + 1)}
+            </Text>
+          </View>
+        )}
       </View>
       <View className="flex-1">
         <Text className="text-[13px] text-slate-900 dark:text-white" weight="700" numberOfLines={1}>
-          {title}
+          {participant.name || `Người chơi ${index + 1}`}
         </Text>
-        <Text className="mt-1 text-[11px] text-slate-500">{subtitle}</Text>
+        <Text className="mt-1 text-[11px] text-slate-500">Người chơi</Text>
       </View>
+    </View>
+  );
+}
+
+function VehicleThumbnail({ imageUrl, name }: { imageUrl?: string; name: string }) {
+  const [source, setSource] = useState(() => getVehicleImageUrl(imageUrl));
+
+  useEffect(() => {
+    setSource(getVehicleImageUrl(imageUrl));
+  }, [imageUrl]);
+
+  return (
+    <View className="h-14 w-14 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-950">
+      {source ? (
+        <Image
+          source={{ uri: source }}
+          className="h-full w-full"
+          resizeMode="cover"
+          accessibilityLabel={`Ảnh ${name}`}
+          onError={() => {
+            if (source !== FALLBACK_VEHICLE_IMAGE_URL) {
+              setSource(FALLBACK_VEHICLE_IMAGE_URL);
+            } else {
+              setSource('');
+            }
+          }}
+        />
+      ) : (
+        <View className="h-full w-full items-center justify-center">
+          <Car color="#64748b" size={22} />
+        </View>
+      )}
     </View>
   );
 }

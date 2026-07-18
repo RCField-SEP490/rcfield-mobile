@@ -3,7 +3,7 @@ import { View, TextInput, Pressable, Image, ActivityIndicator } from 'react-nati
 import { User, Plus, Minus, AlertTriangle, Car, Smartphone } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
 import { Text } from '@/shared/ui/Text';
-import { bookingWizardApi, type Companion, type VehicleCatalog } from '../api/booking-wizard.api';
+import { bookingWizardApi, type Companion, type RentalVehicleUnit } from '../api/booking-wizard.api';
 
 interface ParticipantsStepProps {
   cafeId: string;
@@ -13,10 +13,11 @@ interface ParticipantsStepProps {
   companions: Companion[];
   setCompanions: (list: Companion[]) => void;
   selectedVehicleIds: string[];
-  setSelectedVehicleIds: (ids: string[]) => void;
+  setSelectedVehicleIds: React.Dispatch<React.SetStateAction<string[]>>;
   slotStart: string;
   slotEnd: string;
   trackConfigId?: string;
+  vehicleUnits: RentalVehicleUnit[];
 }
 
 export function ParticipantsStep({
@@ -31,24 +32,38 @@ export function ParticipantsStep({
   slotStart,
   slotEnd,
   trackConfigId,
+  vehicleUnits,
 }: ParticipantsStepProps) {
   const { colorScheme } = useColorScheme();
-  const [catalogs, setCatalogs] = useState<VehicleCatalog[]>([]);
   const [loadingVehicles, setLoadingVehicles] = useState(false);
+  const [availableVehicleIds, setAvailableVehicleIds] = useState<string[]>([]);
   const [byocRemaining, setByocRemaining] = useState<number | null>(null);
   const [checkingByoc, setCheckingByoc] = useState(false);
 
-  // 1. Load vehicle catalogs (only if RENTAL)
+  // 1. Resolve actual vehicle units that remain available for the whole selected range.
   useEffect(() => {
-    if (playMode !== 'RENTAL') return;
+    if (playMode !== 'RENTAL' || !slotStart || !slotEnd) return;
     const fetchVehicles = async () => {
       setLoadingVehicles(true);
-      const data = await bookingWizardApi.getCafeCatalogs(cafeId);
-      setCatalogs(data);
-      setLoadingVehicles(false);
+      try {
+        const result = await bookingWizardApi.checkAvailability(cafeId, {
+          slot_start: slotStart,
+          slot_end: slotEnd,
+          play_mode: 'RENTAL',
+          track_config_id: trackConfigId,
+        });
+        const ids = result.vehicles?.map((vehicle) => vehicle.vehicle_id) ?? [];
+        setAvailableVehicleIds(ids);
+        setSelectedVehicleIds((current) => current.filter((id) => ids.includes(id)));
+      } catch (error) {
+        console.error('[ParticipantsStep] Error checking rental availability:', error);
+        setAvailableVehicleIds([]);
+      } finally {
+        setLoadingVehicles(false);
+      }
     };
     fetchVehicles();
-  }, [cafeId, playMode]);
+  }, [cafeId, playMode, slotStart, slotEnd, trackConfigId, setSelectedVehicleIds]);
 
   // 2. Check BYOC remaining spots (only if BYOC)
   useEffect(() => {
@@ -109,7 +124,7 @@ export function ParticipantsStep({
   const phoneRegex = /^(0|84)(3|5|7|8|9)[0-9]{8}$/;
 
   const isRentalVehicleError =
-    playMode === 'RENTAL' && selectedVehicleIds.length < participants;
+    playMode === 'RENTAL' && selectedVehicleIds.length === 0;
     
   const isByocCapacityError =
     playMode === 'BYOC' && byocRemaining !== null && participants > byocRemaining;
@@ -234,9 +249,9 @@ export function ParticipantsStep({
 
           {loadingVehicles ? (
             <ActivityIndicator size="small" color="#f97316" className="py-4" />
-          ) : catalogs.length > 0 ? (
+          ) : vehicleUnits.filter((vehicle) => availableVehicleIds.includes(vehicle.id)).length > 0 ? (
             <View className="gap-2.5">
-              {catalogs.map((vehicle) => {
+              {vehicleUnits.filter((vehicle) => availableVehicleIds.includes(vehicle.id)).map((vehicle) => {
                 const isSelected = selectedVehicleIds.includes(vehicle.id);
                 return (
                   <Pressable
@@ -248,9 +263,9 @@ export function ParticipantsStep({
                         : 'bg-white dark:bg-[#0f172a]/50 border-slate-200 dark:border-slate-800'
                     }`}
                   >
-                    {vehicle.coverImageUrl ? (
+                    {vehicle.distinctive_image_url || vehicle.catalog?.cover_image_url ? (
                       <Image
-                        source={{ uri: vehicle.coverImageUrl }}
+                        source={{ uri: vehicle.distinctive_image_url || vehicle.catalog?.cover_image_url || undefined }}
                         className="h-16 w-16 rounded-lg bg-slate-100 dark:bg-slate-900 object-cover"
                       />
                     ) : (
@@ -261,36 +276,23 @@ export function ParticipantsStep({
                     <View className="flex-1 justify-center">
                       <View className="flex-row items-center justify-between">
                         <Text className="text-[13px] text-slate-900 dark:text-white" weight="700">
-                          {vehicle.name}
+                          {vehicle.catalog?.name || 'Xe thuê'}
                         </Text>
                         <View className="bg-slate-50 dark:bg-slate-900 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-800">
                           <Text className="text-[8px] text-slate-500 dark:text-slate-400 font-bold uppercase">
-                            {vehicle.tier}
+                            {vehicle.catalog?.tier || 'Tiêu chuẩn'}
                           </Text>
                         </View>
                       </View>
-                      {vehicle.description && (
-                        <Text className="text-[10px] text-slate-550 dark:text-slate-400 mt-0.5 font-semibold" numberOfLines={1}>
-                          {vehicle.description}
-                        </Text>
-                      )}
-                      {vehicle.compatibleTrackTypes && vehicle.compatibleTrackTypes.length > 0 && (
-                        <View className="flex-row flex-wrap gap-1 mt-1">
-                          {vehicle.compatibleTrackTypes.map((type) => (
-                            <View key={type.id} className="bg-slate-100 dark:bg-[#0b0f19] px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-800">
-                              <Text className="text-[7.5px] text-slate-500 dark:text-slate-400 font-bold">
-                                Sân: {type.name}
-                              </Text>
-                            </View>
-                          ))}
-                        </View>
-                      )}
+                      <Text className="text-[10px] text-slate-550 dark:text-slate-400 mt-0.5 font-semibold" numberOfLines={1}>
+                        Mã xe: {vehicle.identifier || vehicle.id.slice(0, 8).toUpperCase()}{vehicle.color ? ` • ${vehicle.color}` : ''}
+                      </Text>
                       <View className="flex-row items-center justify-between mt-1.5">
                         <Text className="text-[12px] text-[#f97316] font-bold">
-                          {Number(vehicle.hourlyRate).toLocaleString('vi-VN')}đ/giờ
+                          {Number(vehicle.catalog?.hourlyRate || 0).toLocaleString('vi-VN')}đ/giờ
                         </Text>
                         <Text className="text-[9px] text-[#10b981] font-bold">
-                          Còn {vehicle.available_units ?? 0} xe trống
+                          Sẵn sàng
                         </Text>
                       </View>
                     </View>
@@ -310,7 +312,7 @@ export function ParticipantsStep({
             <View className="flex-row items-center gap-2 bg-[#ef4444]/10 border border-[#ef4444]/20 rounded-xl p-3 mt-3">
               <AlertTriangle color="#ef4444" size={15} />
               <Text className="text-[11px] text-[#ef4444] font-semibold flex-1 font-medium">
-                Bạn cần thuê ít nhất {participants} xe cho {participants} người chơi (mỗi người 1 xe)!
+                Vui lòng chọn ít nhất một xe thuê còn trống cho phiên này.
               </Text>
             </View>
           )}

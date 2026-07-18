@@ -2,27 +2,35 @@ import { useRouter } from 'expo-router';
 import {
   Alert,
   ActivityIndicator,
+  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import {
   CalendarClock,
   ClipboardCheck,
   Coffee,
   LogIn,
+  Eye,
   PlayCircle,
   QrCode,
   RotateCcw,
+  ScanLine,
   type LucideIcon,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 
 import { staffApi, type TodayBookingItem, type TodayFnbOrderItem } from '@/features/staff/api/staff.api';
+import { isCheckInWindowExpired } from '@/features/bookings/lib/check-in-window';
+import { getStatusLabel } from '@/features/bookings/lib/status-label';
 import { useAuthStore } from '@/shared/store/auth-store';
+import { wsClient } from '@/shared/lib/websocket';
 import { Text } from '@/shared/ui/Text';
 import { requestMainTab } from '@/shared/ui/main-tab-events';
 
@@ -42,6 +50,7 @@ function getSessionId(booking: TodayBookingItem) {
 
 export function StaffHomeScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const user = useAuthStore((state) => state.user);
   const assignedCafeId = useAuthStore((state) => state.assignedCafeId);
 
@@ -51,6 +60,12 @@ export function StaffHomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [scanCode, setScanCode] = useState('');
   const [checkingInId, setCheckingInId] = useState<string | null>(null);
+  const [scannerVisible, setScannerVisible] = useState(false);
+  const [hasScanned, setHasScanned] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [cameraInstanceKey, setCameraInstanceKey] = useState(0);
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
 
   const loadData = useCallback(async (isRefresh = false) => {
     if (isRefresh) {
@@ -79,6 +94,15 @@ export function StaffHomeScreen() {
     loadData();
   }, [loadData]);
 
+  useEffect(() => {
+    const unsubscribe = wsClient.subscribe((event) => {
+      if (['NEW_BOOKING', 'CUSTOMER_PAYMENT_CONFIRMED', 'CUSTOMER_CHECKOUT_CONFIRMED'].includes(event)) {
+        loadData(true);
+      }
+    });
+    return unsubscribe;
+  }, [loadData]);
+
   const stats = useMemo(() => {
     const activeSessions = bookings.filter((booking) =>
       booking.sessions?.some((session) =>
@@ -86,7 +110,10 @@ export function StaffHomeScreen() {
       )
     ).length;
     const checkInReady = bookings.filter(
-      (booking) => booking.status === 'CONFIRMED' && !getSessionId(booking)
+      (booking) =>
+        booking.status === 'CONFIRMED' &&
+        !getSessionId(booking) &&
+        !isCheckInWindowExpired(booking.status, booking.slotStart, booking.sessions?.[0])
     ).length;
     const pendingFnb = fnbOrders.filter((order) =>
       order.status === 'PENDING' || order.status === 'CONFIRMED'
@@ -112,6 +139,11 @@ export function StaffHomeScreen() {
       return;
     }
 
+    if (isCheckInWindowExpired(booking.status, booking.slotStart, booking.sessions?.[0])) {
+      Alert.alert('Đã quá giờ check-in', 'Khách chỉ có thể check-in trong 30 phút sau giờ bắt đầu.');
+      return;
+    }
+
     setCheckingInId(booking.bookingId);
     try {
       const session = await staffApi.checkIn(booking.bookingId);
@@ -129,8 +161,8 @@ export function StaffHomeScreen() {
     }
   };
 
-  const handleScanSubmit = () => {
-    const normalized = scanCode.trim().toUpperCase();
+  const handleBookingCode = (rawCode: string) => {
+    const normalized = rawCode.trim().replace(/^#/, '').toUpperCase();
     if (!normalized) return;
 
     const matched = bookings.find(
@@ -141,11 +173,37 @@ export function StaffHomeScreen() {
     );
 
     if (!matched) {
-      Alert.alert('Không tìm thấy', `Không có lịch hôm nay khớp mã "${scanCode}".`);
+      Alert.alert('Không tìm thấy', `Không có lịch hôm nay khớp mã "${rawCode}".`);
       return;
     }
 
     void handleCheckIn(matched);
+  };
+
+  const handleScanSubmit = () => handleBookingCode(scanCode);
+
+  const openQrScanner = async () => {
+    const permission = cameraPermission?.granted ? cameraPermission : await requestCameraPermission();
+    if (!permission.granted) {
+      Alert.alert(
+        'Cần quyền camera',
+        'Hãy cấp quyền camera để quét mã QR check-in. Bạn vẫn có thể nhập mã đặt lịch bằng tay.'
+      );
+      return;
+    }
+    setHasScanned(false);
+    setCameraReady(false);
+    setCameraError(null);
+    setCameraInstanceKey((key) => key + 1);
+    setScannerVisible(true);
+  };
+
+  const handleQrScanned = ({ data }: { data: string }) => {
+    if (hasScanned || !data) return;
+    setHasScanned(true);
+    setScannerVisible(false);
+    setScanCode(data);
+    handleBookingCode(data);
   };
 
   if (!assignedCafeId) {
@@ -188,7 +246,7 @@ export function StaffHomeScreen() {
           <View className="mb-5 flex-row items-center justify-between">
             <View>
               <Text className="text-[12px] uppercase tracking-wider text-slate-500 dark:text-slate-400" weight="700">
-                Trực ca mobile
+                Nhân viên trực ca
               </Text>
               <Text className="mt-1 text-[22px] text-slate-900 dark:text-white" weight="700">
                 {user?.fullName ?? 'Nhân viên'}
@@ -204,16 +262,16 @@ export function StaffHomeScreen() {
 
           <View className="mb-5 flex-row flex-wrap gap-3">
             <StatCard label="Lịch hôm nay" value={stats.totalBookings} Icon={CalendarClock} />
-            <StatCard label="Sẵn sàng check-in" value={stats.checkInReady} Icon={ClipboardCheck} />
+            <StatCard label="Sẵn sàng nhận xe" value={stats.checkInReady} Icon={ClipboardCheck} />
             <StatCard label="Đang chạy" value={stats.activeSessions} Icon={PlayCircle} />
-            <StatCard label="F&B chờ" value={stats.pendingFnb} Icon={Coffee} />
+            <StatCard label="Đồ ăn chờ" value={stats.pendingFnb} Icon={Coffee} />
           </View>
 
           <View className="mb-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/70 p-4 shadow-sm">
             <View className="mb-3 flex-row items-center gap-2">
               <QrCode color="#f97316" size={18} />
               <Text className="text-[14px] text-slate-900 dark:text-white" weight="700">
-                Check-in bằng mã đặt lịch
+                Nhận xe bằng mã đặt lịch
               </Text>
             </View>
             <View className="flex-row gap-2">
@@ -226,6 +284,15 @@ export function StaffHomeScreen() {
                 className="h-11 flex-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0b0f19] px-3 text-[13px] text-slate-900 dark:text-white"
               />
               <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Quét mã QR nhận xe"
+                onPress={openQrScanner}
+                className="h-11 w-11 items-center justify-center rounded-xl border border-orange-500/30 bg-orange-500/10 active:bg-orange-500/20"
+              >
+                <ScanLine color="#f97316" size={19} />
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
                 onPress={handleScanSubmit}
                 className="h-11 items-center justify-center rounded-xl bg-[#ea580c] px-4 active:bg-[#f97316]"
               >
@@ -262,13 +329,111 @@ export function StaffHomeScreen() {
                   Hôm nay chưa có lịch
                 </Text>
                 <Text className="mt-1 text-center text-[11px] text-slate-500 dark:text-slate-400">
-                  Khi có khách đặt sân hoặc walk-in, lịch sẽ hiển thị tại đây.
+                  Khi có khách đặt sân hoặc đăng ký tại quầy, lịch sẽ hiển thị tại đây.
                 </Text>
               </View>
             )}
           </View>
         </ScrollView>
       )}
+
+      <Modal
+        visible={scannerVisible}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        statusBarTranslucent
+        onRequestClose={() => setScannerVisible(false)}
+      >
+        <StatusBar style="light" backgroundColor="#020617" translucent />
+        <View
+          className="flex-1 bg-[#020617]"
+          style={{ paddingTop: Math.max(insets.top, 20), paddingBottom: Math.max(insets.bottom, 16) }}
+        >
+          <View className="flex-row items-center justify-between px-5 pb-4 pt-3">
+            <View className="flex-1 pr-4">
+              <Text className="text-[20px] text-white" weight="700">
+                Quét mã QR nhận xe
+              </Text>
+              <Text className="mt-1 text-[11px] leading-4 text-slate-300">
+                Đưa mã QR trên đơn đặt lịch vào trong khung để bắt đầu nhận xe cho khách.
+              </Text>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Đóng camera quét QR"
+              onPress={() => setScannerVisible(false)}
+              className="rounded-xl border border-white/20 bg-white/10 px-3 py-2"
+            >
+              <Text className="text-[12px] text-white" weight="700">
+                Đóng
+              </Text>
+            </Pressable>
+          </View>
+
+          <View className="flex-1 justify-center px-5">
+            <View
+              className="overflow-hidden rounded-3xl border border-white/20 bg-slate-950"
+              style={{ aspectRatio: 1 }}
+            >
+              {cameraPermission?.granted ? (
+                <CameraView
+                  key={cameraInstanceKey}
+                  style={{ flex: 1 }}
+                  facing="back"
+                  onCameraReady={() => setCameraReady(true)}
+                  onMountError={(event) =>
+                    setCameraError(event.message || 'Không thể khởi động camera trên thiết bị này.')
+                  }
+                  onBarcodeScanned={hasScanned ? undefined : handleQrScanned}
+                  barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+                />
+              ) : null}
+
+              <View
+                pointerEvents="none"
+                className="absolute inset-7 rounded-3xl border-2 border-orange-400"
+              />
+
+              {!cameraPermission?.granted || cameraError ? (
+                <View className="absolute inset-0 items-center justify-center bg-slate-950 px-8">
+                  <QrCode color="#f97316" size={34} />
+                  <Text className="mt-3 text-center text-[13px] text-white" weight="700">
+                    {!cameraPermission?.granted ? 'Không có quyền dùng camera' : 'Không thể mở camera'}
+                  </Text>
+                  <Text className="mt-1 text-center text-[11px] leading-4 text-slate-400">
+                    {cameraError || 'Hãy cấp quyền camera trong cài đặt thiết bị, sau đó thử lại.'}
+                  </Text>
+                  {cameraError ? (
+                    <Pressable
+                      onPress={() => {
+                        setCameraError(null);
+                        setCameraReady(false);
+                        setCameraInstanceKey((key) => key + 1);
+                      }}
+                      className="mt-4 rounded-xl border border-orange-400/50 bg-orange-500/10 px-4 py-2"
+                    >
+                      <Text className="text-[11px] text-orange-300" weight="700">
+                        Thử lại
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              ) : !cameraReady ? (
+                <View pointerEvents="none" className="absolute inset-0 items-center justify-center bg-slate-950/60">
+                  <ActivityIndicator color="#fb923c" />
+                  <Text className="mt-3 text-[11px] text-slate-200">Đang bật camera…</Text>
+                </View>
+              ) : null}
+            </View>
+          </View>
+
+          <View className="px-8 pt-4">
+            <Text className="text-center text-[11px] leading-4 text-slate-300">
+              Đặt mã trong khung cam. Mỗi mã chỉ được xử lý một lần; nếu quét nhầm, đóng camera và quét lại.
+            </Text>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -305,12 +470,37 @@ function BookingRow({
   onPress: () => void;
 }) {
   const sessionId = getSessionId(booking);
+  const session = booking.sessions?.[0];
+  const checkInExpired = isCheckInWindowExpired(booking.status, booking.slotStart, session);
+  const displayStatus =
+    booking.status === 'CANCELLED'
+      ? 'CANCELLED'
+      : checkInExpired
+        ? 'NO_SHOW'
+        : sessionId
+          ? session?.status || 'CHECKED_IN'
+          : booking.status;
+  const canOpenSession = !!sessionId;
+  const canCheckIn = !sessionId && !checkInExpired && booking.status === 'CONFIRMED';
+  const canAct = canOpenSession || canCheckIn;
+  const actionLabel = canOpenSession
+    ? 'Xem chi tiết'
+    : checkInExpired
+      ? 'Quá giờ'
+      : booking.status === 'CANCELLED'
+        ? 'Đã hủy'
+        : booking.status === 'COMPLETED'
+          ? 'Đã hoàn tất'
+          : 'Nhận xe';
   const customer = booking.participantDetails?.[0]?.name || booking.plannedParticipants?.[0] || 'Khách hàng';
 
   return (
     <Pressable
+      disabled={!canAct || checkingIn}
       onPress={onPress}
-      className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-4 active:bg-slate-50 dark:active:bg-slate-900 shadow-sm"
+      className={`rounded-2xl border border-slate-200 dark:border-slate-800 bg-white p-4 shadow-sm dark:bg-[#0f172a]/60 ${
+        canAct ? 'active:bg-slate-50 dark:active:bg-slate-900' : 'opacity-60'
+      }`}
     >
       <View className="flex-row items-start justify-between gap-3">
         <View className="flex-1">
@@ -321,23 +511,23 @@ function BookingRow({
             #{booking.shortCode || shortId(booking.bookingId)} • {booking.trackName || booking.trackType}
           </Text>
           <Text className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
-            {formatTime(booking.slotStart)} - {formatTime(booking.slotEnd)} • {booking.playMode}
+            {formatTime(booking.slotStart)} - {formatTime(booking.slotEnd)} • {booking.playMode === 'RENTAL' ? 'Thuê xe' : 'Mang xe riêng'}
           </Text>
         </View>
         <View className="items-end">
           <View className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-2 py-1">
             <Text className="text-[9px] uppercase text-emerald-600 dark:text-emerald-400" weight="700">
-              {sessionId ? 'Đã check-in' : booking.status}
+              {getStatusLabel(displayStatus)}
             </Text>
           </View>
           <View className="mt-3 flex-row items-center gap-1">
             {checkingIn ? (
               <ActivityIndicator size="small" color="#f97316" />
             ) : (
-              <LogIn color="#f97316" size={14} />
+              canOpenSession ? <Eye color="#f97316" size={14} /> : <LogIn color="#f97316" size={14} />
             )}
             <Text className="text-[11px] text-[#f97316]" weight="700">
-              {sessionId ? 'Mở phiên' : 'Check-in'}
+              {actionLabel}
             </Text>
           </View>
         </View>
@@ -345,5 +535,3 @@ function BookingRow({
     </Pressable>
   );
 }
-
-
