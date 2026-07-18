@@ -6,6 +6,7 @@ export type BookingStatus =
   | 'PENDING'
   | 'CONFIRMED'
   | 'NO_SHOW'
+  | 'AWAITING_PAYMENT'
   | 'COMPLETED'
   | 'CANCELLED';
 
@@ -33,6 +34,7 @@ export interface BookingListItem {
 
 export interface ListMyBookingsParams {
   status?: BookingStatus;
+  playMode?: BookingPlayMode;
   page?: number;
   limit?: number;
 }
@@ -47,6 +49,7 @@ export async function getMyBookings(params: ListMyBookingsParams = {}): Promise<
         page: params.page ?? 1,
         limit: params.limit ?? 10,
         status: params.status,
+        play_mode: params.playMode,
       },
     });
     

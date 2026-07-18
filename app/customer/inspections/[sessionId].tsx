@@ -17,7 +17,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Camera,
   CheckCircle2,
-  Clock,
   XCircle,
   ArrowLeft,
   AlertTriangle,
@@ -25,10 +24,26 @@ import {
 } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
 import { bookingWizardApi } from '@/features/bookings/api/booking-wizard.api';
+import { getStatusLabel } from '@/features/bookings/lib/status-label';
+import { ImageZoomModal } from '@/shared/ui/ImageZoomModal';
 import { Text } from '@/shared/ui/Text';
 
 function formatCurrency(value?: number) {
   return `${Number(value || 0).toLocaleString('vi-VN')}đ`;
+}
+
+const INSPECTION_PHOTO_LABELS: Record<string, string> = {
+  FRONT: 'Phía trước',
+  BACK: 'Phía sau',
+  LEFT: 'Bên trái',
+  RIGHT: 'Bên phải',
+  TOP: 'Từ trên',
+  BOTTOM: 'Phía dưới',
+  DETAIL: 'Cận cảnh',
+};
+
+function getInspectionPhotoLabel(angle?: string, index = 0) {
+  return INSPECTION_PHOTO_LABELS[angle || ''] || `Ảnh ${index + 1}`;
 }
 
 export default function InspectionReviewScreen() {
@@ -67,9 +82,6 @@ export default function InspectionReviewScreen() {
   // States cho Zoom ảnh
   const [zoomModalVisible, setZoomModalVisible] = useState(false);
 
-  // Countdown timer: 15 phút (900 giây) mặc định
-  const [timeLeft, setTimeLeft] = useState(900);
-
   // Tìm inspection đang hiển thị
   const inspection = useMemo(() => {
     if (!sessionDetail?.inspections) return null;
@@ -100,31 +112,22 @@ export default function InspectionReviewScreen() {
     const claim = sessionDetail?.damageClaim;
     if (!inspection?.damageFlagged && !claim) return null;
 
-    const estimatedCost = Number(claim?.estimatedCost ?? inspection?.estimatedCost ?? 0);
-    const damageMultiplier = Number(claim?.damageMultiplier ?? inspection?.damageMultiplier ?? 1);
-    const finalCharge = Number(claim?.finalCharge ?? inspection?.finalCharge ?? estimatedCost * damageMultiplier);
+    const lineItems = claim?.damageLineItems ?? inspection?.damageLineItems ?? [];
+    const totalDamageCharge = Number(
+      claim?.totalDamageCharge ??
+        inspection?.totalDamageCharge ??
+        lineItems.reduce(
+          (sum: number, item: any) => sum + Number(item.partsPrice || 0) + Number(item.laborPrice || 0),
+          0
+        )
+    );
 
     return {
-      description:
-        claim?.description || inspection?.damageDescription || inspection?.staffNotes || 'Có ghi nhận hư hỏng cần xác nhận.',
-      estimatedCost,
-      damageMultiplier,
-      finalCharge,
+      description: inspection?.staffNotes || claim?.description || 'Có ghi nhận hư hỏng cần xác nhận.',
+      lineItems,
+      totalDamageCharge,
     };
   }, [inspection, sessionDetail]);
-
-  const handleAutoConfirm = useCallback(async () => {
-    if (!inspection || !normalizedSessionId || !canRespond) return;
-    try {
-      await bookingWizardApi.confirmInspection(normalizedSessionId, inspection.inspectionId, {
-        agreed: true,
-      });
-      Alert.alert('Hết giờ', 'Đã tự động xác nhận đồng ý biên bản trả xe.');
-      router.back();
-    } catch (err) {
-      console.error('Auto-confirm inspection failed:', err);
-    }
-  }, [canRespond, inspection, normalizedSessionId, router]);
 
   // Load chi tiết session
   const fetchSessionDetail = useCallback(async () => {
@@ -145,29 +148,6 @@ export default function InspectionReviewScreen() {
   useEffect(() => {
     fetchSessionDetail();
   }, [fetchSessionDetail]);
-
-  // Countdown logic
-  useEffect(() => {
-    if (!canRespond) {
-      return;
-    }
-
-    if (timeLeft <= 0) {
-      // Hết hạn ký nhận, tự động đồng ý
-      handleAutoConfirm();
-      return;
-    }
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => prev - 1);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [canRespond, timeLeft, handleAutoConfirm]);
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
 
   const handleConfirm = async () => {
     if (!inspection || !normalizedSessionId || !canRespond) return;
@@ -274,11 +254,11 @@ export default function InspectionReviewScreen() {
             </View>
 
             {canRespond ? (
-              <View className="bg-red-500/10 border border-red-500/20 px-3 py-2 rounded-xl flex-row items-center gap-1.5">
-                <Clock color="#ef4444" size={14} />
+              <View className="bg-amber-500/10 border border-amber-500/20 px-3 py-2 rounded-xl flex-row items-center gap-1.5">
+                <AlertTriangle color="#f59e0b" size={14} />
                 <View>
-                  <Text className="text-red-400 text-[8px] font-bold uppercase tracking-wider">Hết hạn sau</Text>
-                  <Text className="text-red-400 font-mono text-xs font-black">{formatTime(timeLeft)}</Text>
+                  <Text className="text-amber-600 dark:text-amber-300 text-[8px] font-bold uppercase tracking-wider">Cần phản hồi</Text>
+                  <Text className="text-amber-600 dark:text-amber-300 text-xs font-black">Chờ xác nhận</Text>
                 </View>
               </View>
             ) : (
@@ -315,20 +295,29 @@ export default function InspectionReviewScreen() {
               </View>
             </View>
             <View className="mt-3 rounded-xl border border-red-500/20 bg-slate-100/60 dark:bg-slate-950/50 p-3">
-              <View className="flex-row justify-between gap-3">
-                <Text className="text-slate-600 dark:text-red-100/60 text-[11px]">Chi phí dự kiến</Text>
-                <Text className="text-slate-900 dark:text-red-100 text-[11px] font-bold">
-                  {formatCurrency(damageSummary.estimatedCost)}
+              {damageSummary.lineItems.length ? damageSummary.lineItems.map((item: any, index: number) => (
+                <View key={item.id || `${item.partType}-${index}`} className="mb-2 flex-row justify-between gap-3">
+                  <View className="flex-1">
+                    <Text className="text-slate-700 dark:text-red-100 text-[11px] font-bold">
+                      {item.customPartName || item.partType}
+                    </Text>
+                    <Text className="mt-0.5 text-slate-500 dark:text-red-100/60 text-[10px]">
+                      Linh kiện {formatCurrency(item.partsPrice)}{Number(item.laborPrice || 0) > 0 ? ` • Công ${formatCurrency(item.laborPrice)}` : ''}
+                    </Text>
+                  </View>
+                  <Text className="text-slate-900 dark:text-red-100 text-[11px] font-bold">
+                    {formatCurrency(item.lineTotal ?? Number(item.partsPrice || 0) + Number(item.laborPrice || 0))}
+                  </Text>
+                </View>
+              )) : (
+                <Text className="text-slate-600 dark:text-red-100/60 text-[11px]">
+                  Chi tiết phí chưa được cập nhật. Vui lòng liên hệ nhân viên trước khi xác nhận.
                 </Text>
-              </View>
-              <View className="mt-2 flex-row justify-between gap-3">
-                <Text className="text-slate-600 dark:text-red-100/60 text-[11px]">Hệ số hư hỏng</Text>
-                <Text className="text-slate-900 dark:text-red-100 text-[11px] font-bold">x{damageSummary.damageMultiplier}</Text>
-              </View>
-              <View className="mt-2 flex-row justify-between gap-3">
+              )}
+              <View className="mt-2 flex-row justify-between gap-3 border-t border-red-500/20 pt-2">
                 <Text className="text-slate-650 dark:text-red-100/60 text-[11px]">Tổng tính phí</Text>
                 <Text className="text-red-600 dark:text-red-300 text-[12px] font-black">
-                  {formatCurrency(damageSummary.finalCharge)}
+                  {formatCurrency(damageSummary.totalDamageCharge)}
                 </Text>
               </View>
             </View>
@@ -374,7 +363,7 @@ export default function InspectionReviewScreen() {
                 {/* Angle Tag */}
                 <View className="absolute top-3 left-3 bg-black/70 px-2.5 py-1 rounded-md border border-slate-800">
                   <Text className="text-[10px] text-white uppercase font-black tracking-wider">
-                    Góc: {currentPhoto?.angle || 'PHOTO'}
+                    {getInspectionPhotoLabel(currentPhoto?.angle, currentPhotoIdx)}
                   </Text>
                 </View>
 
@@ -391,7 +380,7 @@ export default function InspectionReviewScreen() {
               <View className="mt-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-900/50">
                 <Text className="text-slate-500 text-[9px] font-black uppercase tracking-wider">Ghi chú ảnh của staff</Text>
                 <Text className="text-slate-700 dark:text-slate-300 text-xs font-semibold mt-0.5">
-                  {currentPhoto?.notes || `Ảnh kiểm xe góc ${currentPhoto?.angle || ''}`}
+                  {currentPhoto?.notes || `Ảnh kiểm xe ${getInspectionPhotoLabel(currentPhoto?.angle, currentPhotoIdx).toLowerCase()}`}
                 </Text>
               </View>
 
@@ -492,7 +481,7 @@ export default function InspectionReviewScreen() {
                   <Text
                     className={`text-[9px] font-bold ${item.status === 'OK' ? 'text-emerald-400' : 'text-amber-400'}`}
                   >
-                    {item.status}
+                    {getStatusLabel(item.status)}
                   </Text>
                 </View>
               ))}
@@ -550,23 +539,12 @@ export default function InspectionReviewScreen() {
         )}
       </ScrollView>
 
-      {/* Modal Zoom ảnh */}
-      <Modal visible={zoomModalVisible} transparent={true} animationType="fade">
-        <View className="flex-1 bg-black justify-center items-center relative">
-          <TouchableOpacity
-            onPress={() => setZoomModalVisible(false)}
-            className="absolute top-12 right-6 p-2 rounded-full bg-slate-900 border border-slate-800 z-50"
-          >
-            <XCircle color="#fff" size={24} />
-          </TouchableOpacity>
-          {currentPhoto?.url && (
-            <Image
-              source={{ uri: currentPhoto.url }}
-              className="w-full h-auto aspect-[4/3] object-contain"
-            />
-          )}
-        </View>
-      </Modal>
+      <ImageZoomModal
+        visible={zoomModalVisible}
+        imageUrl={currentPhoto?.url}
+        title={`Ảnh kiểm xe · ${getInspectionPhotoLabel(currentPhoto?.angle, currentPhotoIdx)}`}
+        onClose={() => setZoomModalVisible(false)}
+      />
 
       {/* Modal từ chối (Disagreement Reason) */}
       <Modal visible={rejectModalVisible} transparent={true} animationType="slide">
