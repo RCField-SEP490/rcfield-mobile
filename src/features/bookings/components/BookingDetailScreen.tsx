@@ -715,10 +715,10 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                   {checkInExpired
                     ? 'Đã quá thời hạn check-in, phiên không được mở.'
                     : session?.status === 'COMPLETED'
-                    ? 'Đã hoàn thành phiên chơi và checkout xe đua.'
-                    : isSessionActive
-                      ? 'Ca chơi đang hoạt động trên track.'
-                      : 'Chưa bắt đầu ca chơi.'}
+                      ? 'Đã hoàn thành phiên chơi và checkout xe đua.'
+                      : isSessionActive
+                        ? 'Ca chơi đang hoạt động trên track.'
+                        : 'Chưa bắt đầu ca chơi.'}
                 </Text>
               </View>
             </View>
@@ -971,21 +971,18 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                 })}
                 {damageExceedingDeposit > 0 && (
                   <View className="flex-row justify-between">
-                    <Text className="text-slate-500 dark:text-slate-400 text-xs font-semibold">Hư hỏng vượt cọc</Text>
+                    <Text className="text-slate-500 dark:text-slate-400 text-xs font-semibold">Phí đền bù hư hỏng xe</Text>
                     <Text className="text-rose-400 text-xs font-bold">+{damageExceedingDeposit.toLocaleString('vi-VN')}đ</Text>
                   </View>
                 )}
               </View>
 
-              {/* Thẻ Chi Tiết Đền Bù Hư Hỏng Xe (Giống Hình 1 trên Web) */}
+              {/* Thẻ Chi Tiết Đền Bù Hư Hỏng Xe */}
               {damageCharge > 0 && (
                 <View className="mt-3 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-3.5 space-y-2">
-                  <View className="flex-row justify-between items-center">
+                  <View className="flex-row justify-between items-center mb-1">
                     <Text className="text-rose-600 dark:text-rose-400 text-xs font-bold uppercase tracking-wider">
                       Phí đền bù hư hỏng xe
-                    </Text>
-                    <Text className="text-rose-600 dark:text-rose-400 text-xs font-bold">
-                      +{damageCharge.toLocaleString('vi-VN')}đ
                     </Text>
                   </View>
                   {damageLineItems.length > 0 ? (
