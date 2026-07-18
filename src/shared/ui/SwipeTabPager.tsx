@@ -37,17 +37,17 @@ type MainTab = {
 };
 
 const CUSTOMER_TABS: MainTab[] = [
-  { key: 'home', title: 'Home', href: '/', Icon: Home, Screen: HomeScreen },
+  { key: 'home', title: 'Trang chủ', href: '/', Icon: Home, Screen: HomeScreen },
   { key: 'explore', title: 'Khám phá', href: '/explore', Icon: Compass, Screen: ExploreScreen },
-  { key: 'bookings', title: 'Bookings', href: '/bookings', Icon: CalendarDays, Screen: BookingListScreen },
-  { key: 'profile', title: 'Profile', href: '/profile', Icon: UserRound, Screen: ProfileScreen },
+  { key: 'bookings', title: 'Lịch đặt', href: '/bookings', Icon: CalendarDays, Screen: BookingListScreen },
+  { key: 'profile', title: 'Cá nhân', href: '/profile', Icon: UserRound, Screen: ProfileScreen },
 ];
 
 const STAFF_TABS: MainTab[] = [
   { key: 'staff-home', title: 'Trực ca', href: '/', Icon: ClipboardCheck, Screen: StaffHomeScreen },
-  { key: 'staff-bookings', title: 'Lịch', href: '/bookings', Icon: CalendarDays, Screen: StaffBookingsScreen },
-  { key: 'staff-fnb', title: 'F&B', href: '/staff/fnb', Icon: Coffee, Screen: StaffFnbOrdersScreen },
-  { key: 'profile', title: 'Profile', href: '/profile', Icon: UserRound, Screen: ProfileScreen },
+  { key: 'staff-bookings', title: 'Lịch sân', href: '/bookings', Icon: CalendarDays, Screen: StaffBookingsScreen },
+  { key: 'staff-fnb', title: 'Đồ ăn', href: '/staff/fnb', Icon: Coffee, Screen: StaffFnbOrdersScreen },
+  { key: 'profile', title: 'Cá nhân', href: '/profile', Icon: UserRound, Screen: ProfileScreen },
 ];
 
 // Biến toàn cục lưu giữ tab đang active để khôi phục chính xác khi Back từ trang con về

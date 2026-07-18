@@ -12,7 +12,7 @@
       "bundleIdentifier": "com.rcfield.mobile",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "RCField cần quyền truy cập vị trí của bạn để định vị và tìm kiếm các chi nhánh sân đua gần nhất.",
-        "NSCameraUsageDescription": "RCField cần quyền camera để nhân viên chụp ảnh kiểm xe khi nhận và trả xe.",
+        "NSCameraUsageDescription": "RCField cần quyền camera để nhân viên quét mã QR nhận xe và chụp ảnh kiểm xe.",
         "NSPhotoLibraryUsageDescription": "RCField cần quyền thư viện ảnh để nhân viên chọn ảnh kiểm xe khi nhận và trả xe."
       }
     },
@@ -47,6 +47,12 @@
         {
           "photosPermission": "RCField cần quyền thư viện ảnh để nhân viên chọn ảnh kiểm xe.",
           "cameraPermission": "RCField cần quyền camera để nhân viên chụp ảnh kiểm xe."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "RCField cần quyền camera để nhân viên quét mã QR check-in và chụp ảnh kiểm xe."
         }
       ],
       "expo-notifications",

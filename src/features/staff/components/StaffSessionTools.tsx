@@ -199,7 +199,7 @@ export function StaffSessionTools({
           },
         ],
       });
-      Alert.alert('Đã thêm F&B', 'Món đã được thêm vào phiên và thông báo tới khách.');
+      Alert.alert('Đã thêm món', 'Món đã được thêm vào phiên và thông báo tới khách.');
       setQtyText('1');
       await onUpdated();
     } catch (error: any) {
@@ -297,7 +297,7 @@ export function StaffSessionTools({
             </View>
             <Text className="text-[10px] leading-4 text-slate-500">
               {directExtension
-                ? 'Đơn walk-in: staff xác nhận gia hạn trực tiếp tại quầy.'
+                ? 'Đơn đăng ký tại quầy: nhân viên xác nhận gia hạn trực tiếp tại quầy.'
                 : 'Đơn đặt trước: khách cần xác nhận yêu cầu gia hạn trên mobile.'}
             </Text>
           </View>
@@ -306,7 +306,7 @@ export function StaffSessionTools({
 
       <ToolCard
         icon={<Coffee color="#f97316" size={18} />}
-        title="Gọi thêm F&B"
+        title="Gọi thêm đồ ăn, thức uống"
         subtitle={loadingResources ? 'Đang tải menu...' : `${menuItems.length} món khả dụng`}
       >
         {loadingResources ? (
