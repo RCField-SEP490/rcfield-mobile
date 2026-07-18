@@ -4,7 +4,7 @@ import { Ticket, CreditCard, Package, Info, CheckCircle2, MapPin, Layers } from 
 
 import { Text } from '@/shared/ui/Text';
 import { getMyPackages, type MyPackageResponse } from '@/features/packages/api/package.api';
-import { bookingWizardApi, type PromoValidationResult, type VehicleCatalog } from '../api/booking-wizard.api';
+import { bookingWizardApi, type PromoValidationResult, type RentalVehicleUnit } from '../api/booking-wizard.api';
 
 interface PaymentStepProps {
   cafeId: string;
@@ -30,7 +30,7 @@ interface PaymentStepProps {
   cafeAddress: string;
   cafeImage: string | null;
   trackConfigName: string;
-  vehicleCatalogs: VehicleCatalog[];
+  vehicleUnits: RentalVehicleUnit[];
   slotDurationMinutes?: number;
 }
 
@@ -56,7 +56,7 @@ export function PaymentStep({
   cafeAddress,
   cafeImage,
   trackConfigName,
-  vehicleCatalogs,
+  vehicleUnits,
   slotDurationMinutes,
 }: PaymentStepProps) {
   const [packages, setPackages] = useState<MyPackageResponse[]>([]);
@@ -148,10 +148,15 @@ export function PaymentStep({
 
   const selectedVehicleNames = React.useMemo(() => {
     return selectedVehicleIds
-      .map(id => vehicleCatalogs.find(c => c.id === id)?.name)
+      .map((id) => {
+        const vehicle = vehicleUnits.find((unit) => unit.id === id);
+        if (!vehicle) return null;
+        const name = vehicle.catalog?.name || 'Xe thuê';
+        return vehicle.identifier ? `${name} (${vehicle.identifier})` : name;
+      })
       .filter(Boolean)
       .join(', ') || 'Không có';
-  }, [selectedVehicleIds, vehicleCatalogs]);
+  }, [selectedVehicleIds, vehicleUnits]);
 
   return (
     <View className="space-y-6">

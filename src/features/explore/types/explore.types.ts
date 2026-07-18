@@ -41,6 +41,7 @@ export interface Cafe {
   slotFeeRate?: number;
   maxConcurrentBookings?: number;
   minBookingNoticeMinutes?: number;
+  maxAdvanceBookingDays?: number;
   byocCapacity?: number;
   trackTypes: string[];
   trackTypeIds?: string[];
@@ -93,4 +94,3 @@ export interface Review {
   } | null;
   ownerResponse?: string | null;
 }
-

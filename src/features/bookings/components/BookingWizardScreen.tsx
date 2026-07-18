@@ -16,7 +16,18 @@ import { TrackSelectionStep } from './TrackSelectionStep';
 import { ParticipantsStep } from './ParticipantsStep';
 import { FnbStep } from './FnbStep';
 import { PaymentStep } from './PaymentStep';
-import { bookingWizardApi, type TrackConfig, type VehicleCatalog, type MenuItem, type PromoValidationResult, type Companion } from '../api/booking-wizard.api';
+import { bookingWizardApi, type TrackConfig, type VehicleCatalog, type RentalVehicleUnit, type MenuItem, type PromoValidationResult, type Companion } from '../api/booking-wizard.api';
+
+function vietnamDateString() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const value = (type: string) => parts.find((part) => part.type === type)?.value || '';
+  return `${value('year')}-${value('month')}-${value('day')}`;
+}
 
 interface BookingWizardScreenProps {
   cafeId: string;
@@ -40,13 +51,7 @@ export function BookingWizardScreen({
 
   // Form states
   const [selectedTrackConfig, setSelectedTrackConfig] = useState<TrackConfig | null>(null);
-  const [selectedDate, setSelectedDate] = useState<string>(() => {
-    const today = new Date();
-    const y = today.getFullYear();
-    const m = String(today.getMonth() + 1).padStart(2, '0');
-    const d = String(today.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-  });
+  const [selectedDate, setSelectedDate] = useState<string>(vietnamDateString);
   const [selectedSlots, setSelectedSlots] = useState<string[]>([]);
   const [playMode, setPlayMode] = useState<'RENTAL' | 'BYOC'>('RENTAL');
   const [participants, setParticipants] = useState<number>(1);
@@ -63,6 +68,7 @@ export function BookingWizardScreen({
 
   // Data details lists (for calculation & labels)
   const [catalogs, setCatalogs] = useState<VehicleCatalog[]>([]);
+  const [vehicleUnits, setVehicleUnits] = useState<RentalVehicleUnit[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
 
   // 1. Fetch Cafe Details & catalogs/menus
@@ -80,15 +86,17 @@ export function BookingWizardScreen({
         }
 
         // Preload vehicle catalogs & menu items for breakdown calculations
-        const [vehiclesData, menuData] = await Promise.all([
+        const [vehiclesData, unitsData, menuData] = await Promise.all([
           bookingWizardApi.getCafeCatalogs(cafeId),
+          bookingWizardApi.getCafeVehicleUnits(cafeId),
           bookingWizardApi.getCafeMenu(cafeId),
         ]);
         setCatalogs(vehiclesData);
+        setVehicleUnits(unitsData);
         setMenuItems(menuData);
 
         // Preselect vehicle if provided
-        if (preselectedVehicleId && vehiclesData.some(v => v.id === preselectedVehicleId)) {
+        if (preselectedVehicleId && unitsData.some((unit) => unit.id === preselectedVehicleId)) {
           setSelectedVehicleIds([preselectedVehicleId]);
         }
       } catch (err) {
@@ -110,11 +118,9 @@ export function BookingWizardScreen({
 
   // 2. Calculations
   const sortedSlots = useMemo(() => {
-    return [...selectedSlots].sort((a, b) => {
-      const [ha, ma] = a.split(':').map(Number);
-      const [hb, mb] = b.split(':').map(Number);
-      return (ha * 60 + ma) - (hb * 60 + mb);
-    });
+    // TrackSelectionStep stores selected slots in the cafe schedule order so
+    // a range crossing midnight (for example 23:00 → 00:00) remains valid.
+    return selectedSlots;
   }, [selectedSlots]);
 
   const durationHours = sortedSlots.length || 1;
@@ -123,12 +129,12 @@ export function BookingWizardScreen({
   // Rental vehicle prices calculation
   const vehiclePriceTotal = useMemo(() => {
     return selectedVehicleIds.reduce((sum, id) => {
-      const match = catalogs.find((c) => c.id === id);
-      const rate = match ? Number(match.hourlyRate) : 0;
-      const durationHoursActual = (durationHours * (cafe?.slotDurationMinutes || 60)) / 60;
+      const match = vehicleUnits.find((unit) => unit.id === id);
+      const rate = Number(match?.catalog?.hourlyRate || 0);
+      const durationHoursActual = (durationHours * Number(cafe?.slotDurationMinutes || 0)) / 60;
       return sum + rate * durationHoursActual;
     }, 0);
-  }, [selectedVehicleIds, catalogs, durationHours, cafe?.slotDurationMinutes]);
+  }, [selectedVehicleIds, vehicleUnits, durationHours, cafe?.slotDurationMinutes]);
 
   // Fnb preorder price total
   const fnbPriceTotal = useMemo(() => {
@@ -181,7 +187,8 @@ export function BookingWizardScreen({
   const slotEndIso = useMemo(() => {
     if (sortedSlots.length === 0) return '';
     const lastSlot = sortedSlots[sortedSlots.length - 1];
-    const duration = cafe?.slotDurationMinutes || 60;
+    const duration = Number(cafe?.slotDurationMinutes || 0);
+    if (!duration) return '';
     const [lastH, lastM] = lastSlot.split(':').map(Number);
     const endMinutes = lastH * 60 + lastM + duration;
 
@@ -203,7 +210,7 @@ export function BookingWizardScreen({
 
   const isNextDisabled = useMemo(() => {
     if (currentStep === 1) {
-      return !selectedTrackConfig || selectedSlots.length === 0;
+      return !selectedTrackConfig || selectedSlots.length === 0 || !cafe?.slotDurationMinutes;
     }
     if (currentStep === 2) {
       // Validation rules
@@ -216,19 +223,23 @@ export function BookingWizardScreen({
       if (companionNameEmpty || companionPhoneInvalid) return true;
 
       if (playMode === 'RENTAL') {
-        return selectedVehicleIds.length < participants;
+        return selectedVehicleIds.length === 0;
       }
       return false; // For BYOC capacity error, screen will show warnings but we check before going next
     }
     return false;
-  }, [currentStep, selectedTrackConfig, selectedSlots.length, playMode, selectedVehicleIds.length, participants, companions]);
+  }, [currentStep, selectedTrackConfig, selectedSlots.length, playMode, selectedVehicleIds.length, companions, cafe?.slotDurationMinutes]);
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (currentStep === 4) return;
 
     // Step 1 Validation: Ensure sequential selected slots
     if (currentStep === 1) {
-      const duration = cafe?.slotDurationMinutes || 60;
+      const duration = Number(cafe?.slotDurationMinutes || 0);
+      if (!duration) {
+        Alert.alert('Thiếu cấu hình', 'Cơ sở chưa cấu hình thời lượng slot hợp lệ.');
+        return;
+      }
       let isSequential = true;
 
       const timeToMinutes = (timeStr: string): number => {
@@ -247,6 +258,39 @@ export function BookingWizardScreen({
       }
       if (!isSequential) {
         Alert.alert('Khung giờ không hợp lệ', 'Các khung giờ được chọn phải liên tiếp nhau!');
+        return;
+      }
+    }
+
+    if (currentStep === 2 && selectedTrackConfig && slotStartIso && slotEndIso) {
+      try {
+        const availability = await bookingWizardApi.checkAvailability(cafeId, {
+          slot_start: slotStartIso,
+          slot_end: slotEndIso,
+          play_mode: playMode,
+          track_config_id: selectedTrackConfig.id,
+        });
+
+        if (playMode === 'BYOC') {
+          const remaining = Number(availability.byoc_remaining || 0);
+          if (participants > remaining) {
+            Alert.alert(
+              'Không đủ chỗ xe cá nhân',
+              `Khung giờ này chỉ còn ${remaining} chỗ cho xe cá nhân. Vui lòng giảm số người chơi hoặc chọn giờ khác.`
+            );
+            return;
+          }
+        } else {
+          const availableIds = new Set(availability.vehicles?.map((vehicle) => vehicle.vehicle_id) ?? []);
+          if (selectedVehicleIds.length === 0 || selectedVehicleIds.some((id) => !availableIds.has(id))) {
+            setSelectedVehicleIds((current) => current.filter((id) => availableIds.has(id)));
+            Alert.alert('Xe không còn khả dụng', 'Một hoặc nhiều xe đã được đặt trong khung giờ đã chọn. Vui lòng chọn lại xe.');
+            return;
+          }
+        }
+      } catch (error: any) {
+        const message = error?.response?.data?.message || 'Không thể kiểm tra availability. Vui lòng thử lại.';
+        Alert.alert('Không thể tiếp tục', message);
         return;
       }
     }
@@ -450,6 +494,7 @@ export function BookingWizardScreen({
                   slotStart={slotStartIso}
                   slotEnd={slotEndIso}
                   trackConfigId={selectedTrackConfig?.id}
+                  vehicleUnits={vehicleUnits}
                 />
               )}
 
@@ -484,7 +529,7 @@ export function BookingWizardScreen({
                   cafeAddress={`${cafe?.district || ''}, ${cafe?.city || ''}`}
                   cafeImage={cafe?.image || null}
                   trackConfigName={selectedTrackConfig?.track_type?.name || 'Sân đua'}
-                  vehicleCatalogs={catalogs}
+                  vehicleUnits={vehicleUnits}
                   slotDurationMinutes={cafe?.slotDurationMinutes}
                 />
               )}
