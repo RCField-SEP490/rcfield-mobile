@@ -55,6 +55,27 @@ const INSPECTION_PHOTO_LABELS: Record<string, string> = {
   DETAIL: 'Cận cảnh',
 };
 
+export const PART_TYPE_NAMES: Record<string, string> = {
+  TIRE_WHEEL: 'Bánh xe / Lốp',
+  WHEEL_TIRE: 'Bánh xe / Lốp',
+  MOTOR: 'Động cơ (Motor)',
+  BATTERY: 'Pin / Ắc quy',
+  SERVO: 'Bộ bẻ lái (Servo)',
+  ESC: 'Bộ điều tốc (ESC)',
+  CHASSIS: 'Khung gầm (Chassis)',
+  BODY_SHELL: 'Vỏ xe (Body Shell)',
+  SUSPENSION: 'Phuộc / Giảm xóc',
+  TRANSMISSION: 'Hộp số / Truyền động',
+  REMOTE_CONTROL: 'Tay điều khiển (Remote)',
+  OTHER: 'Hạng mục khác',
+};
+
+export function getPartTypeName(partType?: string, customPartName?: string | null): string {
+  if (customPartName && customPartName.trim()) return customPartName;
+  if (!partType) return 'Hạng mục hư hỏng';
+  return PART_TYPE_NAMES[partType.toUpperCase()] || partType;
+}
+
 function getInspectionPhotoLabel(angle?: string, index = 0) {
   return INSPECTION_PHOTO_LABELS[angle || ''] || `Ảnh ${index + 1}`;
 }
@@ -115,7 +136,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
               </View>
             </Pressable>
           ) : (
-            <View className="flex-row flex-wrap gap-1.5 justify-between">
+            <View className="flex-row flex-wrap gap-1.5 justify-start">
               {photos.map((p: any, idx: number) => (
                 <Pressable
                   key={idx}
@@ -134,11 +155,6 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                     </Text>
                   </View>
                 </Pressable>
-              ))}
-              {Array.from({ length: Math.max(0, 4 - photos.length) }).map((_, idx) => (
-                <View key={`placeholder-${idx}`} className="w-[48%] aspect-square rounded-lg bg-slate-950 border border-slate-900/60 justify-center items-center">
-                  <Camera color="#1e293b" size={14} />
-                </View>
               ))}
             </View>
           )
@@ -941,7 +957,10 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                 )}
                 {counterComponents.map((c: any, idx: number) => {
                   let label = c.label || 'Phí phát sinh';
-                  if (c.type === 'EXTENSION_FEE') label = 'Phí gia hạn giờ';
+                  if (c.type === 'EXTENSION_FEE') {
+                    const extraMins = c.extraMinutes || sessionDetail?.extensionProposal?.extraMinutes || c.durationMinutes || sessionDetail?.extensionProposal?.extra_minutes;
+                    label = extraMins ? `Phí gia hạn giờ (+${extraMins} phút)` : 'Phí gia hạn giờ';
+                  }
                   if (c.type === 'FB_PREORDER' || c.type === 'FNB_PREORDER') label = 'F&B gọi thêm tại quầy';
                   return (
                     <View key={c.id || idx} className="flex-row justify-between">
@@ -972,7 +991,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                   {damageLineItems.length > 0 ? (
                     <View className="space-y-2 pt-1">
                       {damageLineItems.map((item: any, idx: number) => {
-                        const name = item.customPartName || item.partType || 'Hạng mục hư hỏng';
+                        const name = getPartTypeName(item.partType, item.customPartName);
                         const partsPrice = Number(item.partsPrice || 0);
                         const laborPrice = Number(item.laborPrice || 0);
                         const lineTotal = Number(item.subtotal ?? item.lineTotal ?? (partsPrice + laborPrice));
@@ -982,17 +1001,21 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                               <Text className="text-rose-900 dark:text-rose-200 text-xs font-bold flex-1 pr-2">
                                 {name}
                               </Text>
-                              <Text className="text-rose-700 dark:text-rose-300 text-xs font-bold">
-                                {lineTotal.toLocaleString('vi-VN')}đ
-                              </Text>
                             </View>
                             <View className="flex-row items-center gap-3 mt-1">
-                              <Text className="text-rose-600/80 dark:text-rose-300/70 text-[10px] font-semibold">
-                                Linh kiện: {partsPrice.toLocaleString('vi-VN')}đ
-                              </Text>
+                              {partsPrice > 0 && (
+                                <Text className="text-rose-600/80 dark:text-rose-300/70 text-[10.5px] font-semibold">
+                                  Linh kiện: {partsPrice.toLocaleString('vi-VN')}đ
+                                </Text>
+                              )}
                               {laborPrice > 0 && (
-                                <Text className="text-rose-600/80 dark:text-rose-300/70 text-[10px] font-semibold">
+                                <Text className="text-rose-600/80 dark:text-rose-300/70 text-[10.5px] font-semibold">
                                   Công: {laborPrice.toLocaleString('vi-VN')}đ
+                                </Text>
+                              )}
+                              {partsPrice === 0 && laborPrice === 0 && lineTotal > 0 && (
+                                <Text className="text-rose-600/80 dark:text-rose-300/70 text-[10.5px] font-semibold">
+                                  Chi phí: {lineTotal.toLocaleString('vi-VN')}đ
                                 </Text>
                               )}
                             </View>
