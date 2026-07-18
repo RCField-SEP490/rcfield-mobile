@@ -643,7 +643,7 @@ export function ProfileScreen() {
                 </View>
                 <View className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1">
                   <Text className="text-[10px] uppercase text-emerald-400" weight="700">
-                    {role ?? 'staff'}
+                    {role === 'staff' ? 'Nhân viên' : 'Khách hàng'}
                   </Text>
                 </View>
               </View>
@@ -672,7 +672,7 @@ export function ProfileScreen() {
                     Quyền thao tác
                   </Text>
                   <Text className="mt-1 text-[12px] leading-5 text-slate-700 dark:text-slate-300">
-                    Check-in lịch hôm nay, cập nhật đơn F&B và xem chi tiết phiên chạy.
+                    Nhận xe theo lịch hôm nay, cập nhật đơn đồ ăn, thức uống và xem chi tiết phiên chạy.
                   </Text>
                 </View>
               </View>
@@ -1008,15 +1008,17 @@ export function ProfileScreen() {
               </Text>
             </Pressable>
 
-            <Pressable
-              className="h-12 flex-row items-center justify-center rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 active:bg-slate-100 dark:active:bg-slate-900/60 gap-2.5"
-              onPress={() => router.push('/favorites')}
-            >
-              <Heart color="#ef4444" fill="#ef4444" size={18} />
-              <Text className="text-[14px] text-slate-800 dark:text-slate-200 font-bold">
-                Cơ sở yêu thích (Wishlist)
-              </Text>
-            </Pressable>
+            {isCustomer ? (
+              <Pressable
+                className="h-12 flex-row items-center justify-center rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 active:bg-slate-100 dark:active:bg-slate-900/60 gap-2.5"
+                onPress={() => router.push('/favorites')}
+              >
+                <Heart color="#ef4444" fill="#ef4444" size={18} />
+                <Text className="text-[14px] text-slate-800 dark:text-slate-200 font-bold">
+                  Cơ sở yêu thích
+                </Text>
+              </Pressable>
+            ) : null}
 
             <Pressable
               className="h-12 flex-row items-center justify-center rounded-xl border border-red-200 dark:border-red-900/20 bg-red-50 dark:bg-red-950/10 active:bg-red-100 dark:active:bg-red-950/20 gap-2.5"

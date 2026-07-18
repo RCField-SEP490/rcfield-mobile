@@ -32,6 +32,8 @@ export function FavoritesScreen() {
   const { colorScheme } = useColorScheme();
   const router = useRouter();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const role = useAuthStore((state) => state.role);
+  const isCustomer = role === 'customer';
 
   const [favorites, setFavorites] = useState<Cafe[]>([]);
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
@@ -87,8 +89,34 @@ export function FavoritesScreen() {
   );
 
   useEffect(() => {
+    if (!isCustomer) {
+      setLoading(false);
+      return;
+    }
     fetchFavorites();
-  }, [fetchFavorites]);
+  }, [fetchFavorites, isCustomer]);
+
+  if (!isCustomer) {
+    return (
+      <SafeAreaView className="flex-1 bg-[#f8fafc] dark:bg-[#0b0f19] px-5" edges={['top', 'left', 'right']}>
+        <View className="flex-1 items-center justify-center">
+          <Heart color="#94a3b8" size={30} />
+          <Text className="mt-3 text-center text-[15px] text-slate-900 dark:text-white" weight="700">
+            Danh sách yêu thích dành cho khách hàng
+          </Text>
+          <Text className="mt-2 text-center text-[12px] leading-5 text-slate-500">
+            Tài khoản nhân viên sử dụng chi nhánh được phân công trong hồ sơ.
+          </Text>
+          <Pressable
+            onPress={() => router.replace('/' as any)}
+            className="mt-5 rounded-xl bg-[#ea580c] px-4 py-3"
+          >
+            <Text className="text-[12px] text-white" weight="700">Về trang trực ca</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   const handleRemoveFavorite = async (cafeId: string) => {
     const previousIds = favoriteIds;
