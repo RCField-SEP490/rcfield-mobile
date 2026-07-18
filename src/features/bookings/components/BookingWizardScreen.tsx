@@ -349,10 +349,7 @@ export function BookingWizardScreen({
   };
 
   const navigateToDetail = useCallback((bookingId: string) => {
-    router.replace('/(tabs)/bookings');
-    setTimeout(() => {
-      router.push(`/booking/${bookingId}`);
-    }, 100);
+    router.replace(`/booking/${bookingId}`);
   }, [router]);
 
   const handleConfirmPayment = async () => {

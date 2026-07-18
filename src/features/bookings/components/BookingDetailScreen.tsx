@@ -153,7 +153,6 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
   };
 
   const loadBookingDetail = useCallback(async () => {
-    setLoading(true);
     try {
       const data = await bookingWizardApi.getBooking(bookingId);
       setBooking(data);
@@ -322,6 +321,22 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
     };
   }, [booking]);
 
+  const damageLineItems = useMemo(() => {
+    if (booking?.damage_breakdown?.lineItems?.length) {
+      return booking.damage_breakdown.lineItems;
+    }
+    if (sessionDetail?.damageClaim?.damageLineItems?.length) {
+      return sessionDetail.damageClaim.damageLineItems;
+    }
+    const checkoutInsp = sessionDetail?.inspections?.find(
+      (i: any) => i.type === 'CHECK_OUT' && i.damageLineItems?.length
+    );
+    if (checkoutInsp?.damageLineItems?.length) {
+      return checkoutInsp.damageLineItems;
+    }
+    return [];
+  }, [booking, sessionDetail]);
+
   if (loading) {
     return (
       <SafeAreaView className="flex-grow flex-1 bg-[#f8fafc] dark:bg-[#0b0f19] justify-center items-center">
@@ -426,22 +441,6 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
   const damageComponent = onsiteComponents.find((c: any) => c.type === 'DAMAGE_CHARGE');
   const damageCharge = Number(damageComponent?.amount ?? 0);
 
-  const damageLineItems = useMemo(() => {
-    if (booking?.damage_breakdown?.lineItems?.length) {
-      return booking.damage_breakdown.lineItems;
-    }
-    if (sessionDetail?.damageClaim?.damageLineItems?.length) {
-      return sessionDetail.damageClaim.damageLineItems;
-    }
-    const checkoutInsp = sessionDetail?.inspections?.find(
-      (i: any) => i.type === 'CHECK_OUT' && i.damageLineItems?.length
-    );
-    if (checkoutInsp?.damageLineItems?.length) {
-      return checkoutInsp.damageLineItems;
-    }
-    return [];
-  }, [booking, sessionDetail]);
-
   const depositConsumedByDamage = Math.min(depositAmount, damageCharge);
   const depositRefundAmount = depositAmount - depositConsumedByDamage;
   const damageExceedingDeposit = Math.max(0, damageCharge - depositAmount);
@@ -458,11 +457,10 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
 
   const prepaidTx = transactions.find((t: any) => t.type === 'PAYMENT' && t.gateway !== 'DIRECT' && t.status === 'SUCCESS');
   const counterTx = transactions.find((t: any) => t.type === 'PAYMENT' && t.gateway === 'DIRECT' && t.status === 'SUCCESS');
-  const additionalVnpayTx = transactions.filter(
+  const successfulVnpayTxs = transactions.filter(
     (t: any) => t.type === 'PAYMENT' && t.gateway !== 'DIRECT' && t.status === 'SUCCESS'
-  ).length > 1
-    ? transactions.filter((t: any) => t.type === 'PAYMENT' && t.gateway !== 'DIRECT' && t.status === 'SUCCESS').at(-1)
-    : undefined;
+  );
+  const additionalVnpayTx = successfulVnpayTxs.length > 1 ? successfulVnpayTxs[successfulVnpayTxs.length - 1] : undefined;
 
   return (
     <SafeAreaView className="flex-grow flex-1 bg-[#f8fafc] dark:bg-[#0b0f19]" edges={['top', 'left', 'right']}>

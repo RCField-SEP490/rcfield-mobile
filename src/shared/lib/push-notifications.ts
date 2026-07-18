@@ -94,7 +94,7 @@ function handleNotificationResponse(response: Notifications.NotificationResponse
   if (!route) return;
 
   setTimeout(() => {
-    router.push(route as any);
+    router.navigate(route as any);
   }, 0);
 }
 
