@@ -49,14 +49,26 @@ export default function CustomerExtensionResponseScreen() {
   const extensionProposal = sessionDetail?.extensionProposal;
   const canRespond = extensionProposal?.status === 'PENDING';
 
+  const [timeLeft, setTimeLeft] = useState<number>(0);
+
+  useEffect(() => {
+    if (!extensionProposal?.expiresAt) return;
+    const updateCountdown = () => {
+      const ms = new Date(extensionProposal.expiresAt).getTime() - Date.now();
+      setTimeLeft(Math.max(0, ms));
+    };
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
+  }, [extensionProposal?.expiresAt]);
+
   const expiresInText = useMemo(() => {
     if (!extensionProposal?.expiresAt) return '';
-    const ms = new Date(extensionProposal.expiresAt).getTime() - Date.now();
-    if (ms <= 0) return 'Đã hết hạn';
-    const minutes = Math.floor(ms / 60000);
-    const seconds = Math.floor((ms % 60000) / 1000);
+    if (timeLeft <= 0) return 'Đã hết hạn';
+    const minutes = Math.floor(timeLeft / 60000);
+    const seconds = Math.floor((timeLeft % 60000) / 1000);
     return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-  }, [extensionProposal?.expiresAt]);
+  }, [timeLeft, extensionProposal?.expiresAt]);
 
   const loadSession = useCallback(async (isRefresh = false) => {
     if (!normalizedSessionId) {

@@ -105,10 +105,9 @@ function MenuItemCard({ item, fnbQuantities, onChangeQty, compact, orderCount }:
           {!hasVariants ? (
             <Pressable
               onPress={() => onChangeQty(item.id, 1)}
-              className="flex-row items-center gap-0.5 border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1 active:bg-slate-100 dark:active:bg-slate-800"
+              className="h-6 w-6 rounded-full bg-[#ea580c] items-center justify-center active:bg-[#f97316]"
             >
-              <Plus color="#f97316" size={11} />
-              <Text className="text-[10px] text-slate-700 dark:text-slate-300 font-bold">Thêm</Text>
+              <Plus color="#ffffff" size={11} />
             </Pressable>
           ) : (
             <Text className="text-[9px] text-slate-400 font-semibold italic">Chọn size ↓</Text>
@@ -204,21 +203,14 @@ function MenuItemCard({ item, fnbQuantities, onChangeQty, compact, orderCount }:
                       <Text className="text-[12px] text-slate-900 dark:text-white font-bold w-4 text-center">
                         {qty}
                       </Text>
-                      <Pressable
-                        onPress={() => onChangeQty(key, 1)}
-                        className="h-6 w-6 rounded-full bg-[#ea580c] items-center justify-center active:bg-[#f97316]"
-                      >
-                        <Plus color="#ffffff" size={12} />
-                      </Pressable>
                     </>
-                  ) : (
-                    <Pressable
-                      onPress={() => onChangeQty(key, 1)}
-                      className="h-6 items-center justify-center border border-slate-300 dark:border-slate-700 rounded-lg px-3 active:bg-slate-100 dark:active:bg-slate-800"
-                    >
-                      <Text className="text-[11px] text-slate-700 dark:text-slate-300 font-bold">Thêm</Text>
-                    </Pressable>
-                  )}
+                  ) : null}
+                  <Pressable
+                    onPress={() => onChangeQty(key, 1)}
+                    className="h-6 w-6 rounded-full bg-[#ea580c] items-center justify-center active:bg-[#f97316]"
+                  >
+                    <Plus color="#ffffff" size={12} />
+                  </Pressable>
                 </View>
               </View>
             );

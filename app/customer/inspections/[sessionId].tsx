@@ -46,6 +46,27 @@ function getInspectionPhotoLabel(angle?: string, index = 0) {
   return INSPECTION_PHOTO_LABELS[angle || ''] || `Ảnh ${index + 1}`;
 }
 
+export const PART_TYPE_NAMES: Record<string, string> = {
+  TIRE_WHEEL: 'Bánh xe / Lốp',
+  WHEEL_TIRE: 'Bánh xe / Lốp',
+  MOTOR: 'Động cơ (Motor)',
+  BATTERY: 'Pin / Ắc quy',
+  SERVO: 'Bộ bẻ lái (Servo)',
+  ESC: 'Bộ điều tốc (ESC)',
+  CHASSIS: 'Khung gầm (Chassis)',
+  BODY_SHELL: 'Vỏ xe (Body Shell)',
+  SUSPENSION: 'Phuộc / Giảm xóc',
+  TRANSMISSION: 'Hộp số / Truyền động',
+  REMOTE_CONTROL: 'Tay điều khiển (Remote)',
+  OTHER: 'Hạng mục khác',
+};
+
+export function getPartTypeName(partType?: string, customPartName?: string | null): string {
+  if (customPartName && customPartName.trim()) return customPartName;
+  if (!partType) return 'Hạng mục hư hỏng';
+  return PART_TYPE_NAMES[partType.toUpperCase()] || partType;
+}
+
 export default function InspectionReviewScreen() {
   const { sessionId, inspectionId } = useLocalSearchParams<{
     sessionId?: string | string[];
@@ -282,11 +303,11 @@ export default function InspectionReviewScreen() {
         </View>
 
         {damageSummary ? (
-          <View className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 mt-4 shadow-xl">
+          <View className="bg-red-50 dark:bg-red-950/15 border border-red-200 dark:border-red-900/30 rounded-2xl p-4 mt-4 shadow-sm">
             <View className="flex-row items-start gap-2.5">
               <AlertTriangle color="#ef4444" size={17} />
               <View className="flex-1">
-                <Text className="text-red-650 dark:text-red-300 font-bold text-xs uppercase tracking-wider">
+                <Text className="text-red-600 dark:text-red-400 font-bold text-xs uppercase tracking-wider">
                   Hư hỏng/phí phát sinh
                 </Text>
                 <Text className="text-slate-700 dark:text-red-100/80 text-[11px] leading-4 mt-1">
@@ -294,14 +315,14 @@ export default function InspectionReviewScreen() {
                 </Text>
               </View>
             </View>
-            <View className="mt-3 rounded-xl border border-red-500/20 bg-slate-100/60 dark:bg-slate-950/50 p-3">
+            <View className="mt-3 rounded-xl border border-red-200 dark:border-red-900/20 bg-white dark:bg-slate-950/50 p-3">
               {damageSummary.lineItems.length ? damageSummary.lineItems.map((item: any, index: number) => (
                 <View key={item.id || `${item.partType}-${index}`} className="mb-2 flex-row justify-between gap-3">
                   <View className="flex-1">
                     <Text className="text-slate-700 dark:text-red-100 text-[11px] font-bold">
-                      {item.customPartName || item.partType}
+                      {getPartTypeName(item.partType, item.customPartName)}
                     </Text>
-                    <Text className="mt-0.5 text-slate-500 dark:text-red-100/60 text-[10px]">
+                    <Text className="mt-0.5 text-slate-550 dark:text-red-100/65 text-[10px]">
                       Linh kiện {formatCurrency(item.partsPrice)}{Number(item.laborPrice || 0) > 0 ? ` • Công ${formatCurrency(item.laborPrice)}` : ''}
                     </Text>
                   </View>
@@ -310,13 +331,13 @@ export default function InspectionReviewScreen() {
                   </Text>
                 </View>
               )) : (
-                <Text className="text-slate-600 dark:text-red-100/60 text-[11px]">
+                <Text className="text-slate-650 dark:text-red-100/60 text-[11px]">
                   Chi tiết phí chưa được cập nhật. Vui lòng liên hệ nhân viên trước khi xác nhận.
                 </Text>
               )}
-              <View className="mt-2 flex-row justify-between gap-3 border-t border-red-500/20 pt-2">
+              <View className="mt-2 flex-row justify-between gap-3 border-t border-red-200 dark:border-red-900/20 pt-2">
                 <Text className="text-slate-650 dark:text-red-100/60 text-[11px]">Tổng tính phí</Text>
-                <Text className="text-red-600 dark:text-red-300 text-[12px] font-black">
+                <Text className="text-red-600 dark:text-red-400 text-[12px] font-black">
                   {formatCurrency(damageSummary.totalDamageCharge)}
                 </Text>
               </View>

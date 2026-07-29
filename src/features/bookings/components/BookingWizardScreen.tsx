@@ -136,27 +136,45 @@ export function BookingWizardScreen({
     }, 0);
   }, [selectedVehicleIds, vehicleUnits, durationHours, cafe?.slotDurationMinutes]);
 
-  // Fnb preorder price total
+  // Fnb preorder price total — hỗ trợ key dạng "itemId" hoặc "itemId__variantId"
   const fnbPriceTotal = useMemo(() => {
-    return Object.entries(fnbQuantities).reduce((sum, [id, qty]) => {
-      const match = menuItems.find((m) => m.id === id);
-      const rate = match ? Number(match.price) : 0;
-      return sum + rate * qty;
+    return Object.entries(fnbQuantities).reduce((sum, [key, qty]) => {
+      const [itemId, variantId] = key.split('__');
+      const item = menuItems.find((m) => m.id === itemId);
+      if (!item) return sum;
+      // Nếu có variantId thì lấy giá của variant đó, ngược lại lấy giá base
+      let unitPrice = Number(item.price);
+      if (variantId && item.variants) {
+        const variant = item.variants.find((v) => v.id === variantId);
+        if (variant) unitPrice = Number(variant.price);
+      }
+      return sum + unitPrice * qty;
     }, 0);
   }, [fnbQuantities, menuItems]);
 
   const fnbDetailsList = useMemo(() => {
     return Object.entries(fnbQuantities)
-      .map(([id, qty]) => {
-        const match = menuItems.find((m) => m.id === id);
-        return {
-          name: match ? match.name : 'Món F&B',
-          qty,
-          price: match ? Number(match.price) : 0,
-        };
+      .map(([key, qty]) => {
+        const [itemId, variantId] = key.split('__');
+        const item = menuItems.find((m) => m.id === itemId);
+        let name = 'Món F&B';
+        let unitPrice = 0;
+        if (item) {
+          name = item.name;
+          unitPrice = Number(item.price);
+          if (variantId && item.variants) {
+            const variant = item.variants.find((v) => v.id === variantId);
+            if (variant) {
+              name = `${item.name} (${variant.name})`;
+              unitPrice = Number(variant.price);
+            }
+          }
+        }
+        return { name, qty, price: unitPrice };
       })
       .filter((m) => m.qty > 0);
   }, [fnbQuantities, menuItems]);
+
 
   // Final Total calculation for Step 4 Preview (also used for next step button label)
   const finalTotalAmount = useMemo(() => {
