@@ -36,12 +36,13 @@ import {
   listCafeReviews,
   listPublicPackages,
   purchasePackage,
+  listActivePromotions,
 } from '../api/explore.api';
 import { favoriteApi, favoriteLocal } from '../api/favorite.api';
 import { bookingWizardApi } from '@/features/bookings/api/booking-wizard.api';
 import { getVnpayReturnUrl } from '@/shared/lib/vnpay-return-url';
 import { openVnpayPaymentSession } from '@/shared/lib/vnpay-browser';
-import type { Cafe, PublicPackage, Review } from '../types/explore.types';
+import type { Cafe, PublicPackage, Review, ActivePromotion } from '../types/explore.types';
 import type { TrackConfig, VehicleCatalog, MenuItem } from '@/features/bookings/api/booking-wizard.api';
 
 interface CafeDetailScreenProps {
@@ -60,6 +61,7 @@ export function CafeDetailScreen({ cafeId }: CafeDetailScreenProps) {
   const [images, setImages] = useState<string[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [packages, setPackages] = useState<PublicPackage[]>([]);
+  const [promotions, setPromotions] = useState<ActivePromotion[]>([]);
   const [tracks, setTracks] = useState<TrackConfig[]>([]);
   const [catalogs, setCatalogs] = useState<VehicleCatalog[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -73,12 +75,6 @@ export function CafeDetailScreen({ cafeId }: CafeDetailScreenProps) {
   const [activeImageIdx, setActiveImageIdx] = useState(0);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [fnbQuantities, setFnbQuantities] = useState<Record<string, number>>({});
-
-  // Mock Promos/Vouchers
-  const mockPromos = useMemo(() => [
-    { code: 'WELCOME50', description: 'Giảm 50% cho lượt đặt đầu tiên' },
-    { code: 'RCDRIFT', description: 'Giảm 20k tiền thuê xe Drift' },
-  ], []);
 
   // Tính toán tổng tiền ước lượng tạm tính (1 slot + xe + F&B pre-selected)
   const totalEstimation = useMemo(() => {
@@ -116,7 +112,8 @@ export function CafeDetailScreen({ cafeId }: CafeDetailScreenProps) {
           tracksData,
           catalogsData,
           menuData,
-          localFavs
+          localFavs,
+          promosData
         ] = await Promise.all([
           getCafeById(cafeId),
           listCafeImages(cafeId),
@@ -125,7 +122,8 @@ export function CafeDetailScreen({ cafeId }: CafeDetailScreenProps) {
           bookingWizardApi.getCafeTrackConfigs(cafeId),
           bookingWizardApi.getCafeCatalogs(cafeId),
           bookingWizardApi.getCafeMenu(cafeId),
-          favoriteLocal.getLocalFavorites()
+          favoriteLocal.getLocalFavorites(),
+          listActivePromotions(cafeId)
         ]);
 
         if (cafeData) {
@@ -139,6 +137,7 @@ export function CafeDetailScreen({ cafeId }: CafeDetailScreenProps) {
         setImages(imagesData.length > 0 ? imagesData : [cafeData.image]);
         setReviews(reviewsData);
         setPackages(packagesData);
+        setPromotions(promosData);
         setTracks(tracksData);
         setCatalogs(catalogsData);
         setMenuItems(menuData);
@@ -441,18 +440,24 @@ export function CafeDetailScreen({ cafeId }: CafeDetailScreenProps) {
               <Sparkles color="#f97316" size={16} />
               <Text className="text-[14px] text-slate-900 dark:text-white font-bold uppercase tracking-wider">Ưu đãi hôm nay</Text>
             </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-3">
-              {mockPromos.map((p, idx) => (
-                <Pressable
-                  key={idx}
-                  onPress={() => handleCopyPromo(p.code)}
-                  className="rounded-2xl border border-dashed border-orange-500/40 bg-orange-500/5 p-4 justify-center items-start min-w-[200px]"
-                >
-                  <Text className="text-[13px] text-[#f97316]" weight="700">Mã: {p.code}</Text>
-                  <Text className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 font-semibold">{p.description}</Text>
-                </Pressable>
-              ))}
-            </ScrollView>
+            {promotions.length === 0 ? (
+              <Text className="text-[11px] text-slate-500 font-medium pl-1">Hiện tại chi nhánh chưa có chương trình ưu đãi.</Text>
+            ) : (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-3">
+                {promotions.map((p, idx) => (
+                  <Pressable
+                    key={idx}
+                    onPress={() => handleCopyPromo(p.code)}
+                    className="rounded-2xl border border-dashed border-orange-500/40 bg-orange-500/5 p-4 justify-center items-start min-w-[200px]"
+                  >
+                    <Text className="text-[13px] text-[#f97316]" weight="700">Mã: {p.code}</Text>
+                    <Text className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 font-semibold">
+                      {p.description || `Giảm ${p.discount_value}${p.discount_type === 'PERCENT' ? '%' : 'đ'}`}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            )}
           </View>
 
           {/* Divider */}

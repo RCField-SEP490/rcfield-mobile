@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { View, TextInput, Pressable, Image, ActivityIndicator, LayoutAnimation, UIManager, Platform } from 'react-native';
-import { User, Plus, Minus, AlertTriangle, Car, Smartphone, ChevronDown, ChevronUp, CheckCircle2 } from 'lucide-react-native';
+import { User, Plus, Minus, AlertTriangle, Car, Smartphone, ChevronDown, ChevronUp, CheckCircle2, Layers, RefreshCw, ExternalLink } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
+import { useRouter } from 'expo-router';
 import { Text } from '@/shared/ui/Text';
 import { cn } from '@/shared/lib/utils';
 import { bookingWizardApi, type Companion, type RentalVehicleUnit } from '../api/booking-wizard.api';
@@ -40,6 +41,8 @@ export function ParticipantsStep({
   vehicleUnits,
 }: ParticipantsStepProps) {
   const { colorScheme } = useColorScheme();
+  const router = useRouter();
+  const [showRepurchase, setShowRepurchase] = useState(true);
   const [loadingVehicles, setLoadingVehicles] = useState(false);
   const [availableVehicleIds, setAvailableVehicleIds] = useState<string[]>([]);
   const [byocRemaining, setByocRemaining] = useState<number | null>(null);
@@ -199,6 +202,55 @@ export function ParticipantsStep({
 
   return (
     <View className="space-y-6">
+      {/* Package Repurchase Banner */}
+      {showRepurchase && (
+        <View className="mb-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/40 p-4 shadow-sm">
+          <View className="flex-row items-center gap-2 mb-1.5">
+            <Layers color="#f97316" size={15} />
+            <Text className="text-[13px] text-slate-800 dark:text-white font-extrabold">
+              Dùng gói slot của bạn
+            </Text>
+          </View>
+          <Text className="text-[10.5px] text-slate-500 dark:text-slate-400 leading-4.5 font-semibold">
+            Áp dụng gói để phí lịch chơi = 0. Các khoản khác (thuê xe, đồ ăn & thức uống) vẫn thanh toán qua VNPay.
+          </Text>
+
+          <View className="mt-3 rounded-xl border border-orange-200 dark:border-orange-900/50 bg-orange-50/10 dark:bg-orange-950/5 p-3">
+            <View className="flex-row items-start gap-2.5">
+              <RefreshCw color="#f97316" size={14} className="mt-0.5" />
+              <View className="flex-1">
+                <Text className="text-[12px] text-slate-900 dark:text-white font-extrabold">
+                  Gói &ldquo;Gói Tuần Pro&rdquo; đã hết hạn
+                </Text>
+                <Text className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 leading-4.5 font-semibold">
+                  Mua lại để tiếp tục được miễn phí slot ở những lần đặt sau.
+                </Text>
+
+                <View className="mt-3 flex-row items-center gap-3">
+                  <Pressable
+                    onPress={() => router.push(`/cafe-detail/${cafeId}`)}
+                    className="h-8 flex-row items-center justify-center gap-1 bg-[#ea580c] active:bg-[#f97316] px-3.5 rounded-lg"
+                  >
+                    <Text className="text-[11px] text-white font-bold">Xem gói của quán</Text>
+                    <ExternalLink color="#ffffff" size={10} />
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setShowRepurchase(false)}
+                    className="h-8 justify-center items-center px-3.5 rounded-lg bg-slate-100 dark:bg-slate-800 active:bg-slate-200 dark:active:bg-slate-700"
+                  >
+                    <Text className="text-[11px] text-slate-500 dark:text-slate-400 font-bold">Để sau</Text>
+                  </Pressable>
+                </View>
+
+                <Text className="mt-2.5 text-[9px] text-slate-400 font-semibold">
+                  Quay lại chi nhánh – đơn đặt đang làm dở của bạn được giữ nguyên.
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      )}
+
       {/* 1. Số người chơi */}
       <View>
         <View className="flex-row items-center gap-1.5 mb-3">

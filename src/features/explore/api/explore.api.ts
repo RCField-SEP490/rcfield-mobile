@@ -1,6 +1,6 @@
 import { api } from '@/shared/lib/api';
 import { getVnpayReturnUrl } from '@/shared/lib/vnpay-return-url';
-import type { Cafe, CafeSearchParams, PublicPackage, Review } from '../types/explore.types';
+import type { Cafe, CafeSearchParams, PublicPackage, Review, ActivePromotion } from '../types/explore.types';
 
 export const CAFE_PLACEHOLDER_IMAGE =
   'https://images.unsplash.com/photo-1554118811-1e0d58224f24?q=80&w=600&auto=format&fit=crop';
@@ -201,3 +201,14 @@ export async function purchasePackage(
   });
   return response.data?.data;
 }
+
+export async function listActivePromotions(cafeId: string): Promise<ActivePromotion[]> {
+  try {
+    const response = await api.get(`/cafes/${cafeId}/promotions/active`);
+    return response.data?.data || [];
+  } catch (error) {
+    console.error('[ExploreAPI] Error fetching active promotions:', error);
+    return [];
+  }
+}
+

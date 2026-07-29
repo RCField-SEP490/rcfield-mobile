@@ -14,7 +14,7 @@ import {
   CreditCard,
   Star,
 } from 'lucide-react-native';
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -78,6 +78,31 @@ export function getPartTypeName(partType?: string, customPartName?: string | nul
 
 function getInspectionPhotoLabel(angle?: string, index = 0) {
   return INSPECTION_PHOTO_LABELS[angle || ''] || `Ảnh ${index + 1}`;
+}
+
+function formatDateTimeStep(dateInput: Date | string) {
+  const date = new Date(dateInput);
+  const day = date.getDate();
+  const month = date.getMonth() + 1;
+  const year = date.getFullYear();
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${day}/${month}/${year}, ${hours}:${minutes}`;
+}
+
+function formatDateOnlyStep(dateInput: Date | string) {
+  const date = new Date(dateInput);
+  const day = date.getDate();
+  const month = date.getMonth() + 1;
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
+function formatTimeOnlyStep(dateInput: Date | string) {
+  const date = new Date(dateInput);
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${hours}:${minutes}`;
 }
 
 export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
@@ -194,29 +219,46 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
     loadBookingDetail();
   }, [loadBookingDetail]);
 
+  // Lưu ref của booking để so khớp trong callback websocket mà không cần re-subscribe
+  const bookingRef = useRef<any>(null);
+  bookingRef.current = booking;
+
   useEffect(() => {
     const unsubscribe = wsClient.subscribe((event, data) => {
-      if (
-        [
-          'SESSION_CHECKIN_INSPECTION',
-          'SESSION_CHECKOUT_INSPECTION',
-          'CUSTOMER_CHECKIN_CONFIRMED',
-          'CUSTOMER_CHECKOUT_CONFIRMED',
-          'CUSTOMER_PAYMENT_CONFIRMED',
-          'SESSION_EXTENSION_PROPOSED',
-          'SESSION_FNB_ORDER_ADDED',
-          'BOOKING_REVIEW_REQUEST',
-        ].includes(event)
-      ) {
-        console.log(`[BookingDetailScreen] WebSocket event '${event}' received, reloading...`);
-        loadBookingDetail();
+      const targetBookingId = data?.bookingId || data?.booking_id;
+      const targetSessionId = data?.sessionId || data?.session_id;
+
+      // Chỉ reload nếu sự kiện thuộc về booking hoặc session hiện tại
+      const isCurrentBooking = targetBookingId && targetBookingId === bookingId;
+      const isCurrentSession = targetSessionId && bookingRef.current?.session?.id === targetSessionId;
+
+      if (isCurrentBooking || isCurrentSession || !targetBookingId) {
+        if (
+          [
+            'SESSION_CHECKIN_INSPECTION',
+            'SESSION_CHECKOUT_INSPECTION',
+            'CUSTOMER_CHECKIN_CONFIRMED',
+            'CUSTOMER_CHECKOUT_CONFIRMED',
+            'CUSTOMER_PAYMENT_CONFIRMED',
+            'SESSION_EXTENSION_PROPOSED',
+            'SESSION_EXTENSION_UPDATED',
+            'SESSION_CHECKOUT_COMPLETED',
+            'SESSION_FNB_ORDER_ADDED',
+            'SESSION_FNB_ORDER_UPDATED',
+            'FNB_ORDER_SERVED',
+            'BOOKING_REVIEW_REQUEST',
+          ].includes(event)
+        ) {
+          console.log(`[BookingDetailScreen] WebSocket event '${event}' received for current booking, reloading...`);
+          loadBookingDetail();
+        }
       }
     });
 
     return () => {
       unsubscribe();
     };
-  }, [loadBookingDetail]);
+  }, [bookingId, loadBookingDetail]);
 
   useEffect(() => {
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
@@ -498,28 +540,26 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
 
       <ScrollView contentContainerClassName="px-5 py-5 pb-12" showsVerticalScrollIndicator={false}>
 
-        {/* Mã QR Code Check-in — dùng endpoint BE /bookings/:id/qr (Ẩn nếu đã checkout hoặc bị hủy) */}
-        {displayBookingStatus !== 'CANCELLED' && displayBookingStatus !== 'NO_SHOW' && (!session || session.status !== 'COMPLETED') && (
-          <View className="items-center mb-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-6 shadow-xl">
-            <View className="bg-white p-3 rounded-2xl shadow-lg mb-4">
-              <Image
-                source={{
-                  uri: `${process.env.EXPO_PUBLIC_API_URL}/bookings/${bookingId}/qr`,
-                  headers: { 'Cache-Control': 'no-cache' },
-                }}
-                className="size-48 rounded-xl"
-                onError={() => console.warn('[BookingQR] QR image load failed for', bookingId)}
-              />
-            </View>
-            <Text className="text-slate-500 dark:text-slate-400 text-xs font-bold tracking-widest uppercase">Mã check-in của bạn</Text>
-            <Text className="text-slate-900 dark:text-white text-xl font-mono mt-1" weight="700">
-              {bookingId.slice(0, 8).toUpperCase()}
-            </Text>
-            <Text className="text-slate-500 dark:text-slate-400 text-[11px] text-center font-medium mt-2 leading-4">
-              Đưa mã QR này cho nhân viên tại quầy để check-in nhận làn đua và nhận xe thuê của bạn.
-            </Text>
+        {/* Mã QR Code Check-in — dùng endpoint BE /bookings/:id/qr (Hiển thị ở tất cả các bước/trạng thái) */}
+        <View className="items-center mb-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-6 shadow-xl">
+          <View className="bg-white p-3 rounded-2xl shadow-lg mb-4">
+            <Image
+              source={{
+                uri: `${process.env.EXPO_PUBLIC_API_URL}/bookings/${bookingId}/qr`,
+                headers: { 'Cache-Control': 'no-cache' },
+              }}
+              className="size-48 rounded-xl"
+              onError={() => console.warn('[BookingQR] QR image load failed for', bookingId)}
+            />
           </View>
-        )}
+          <Text className="text-slate-500 dark:text-slate-400 text-xs font-bold tracking-widest uppercase">Mã check-in của bạn</Text>
+          <Text className="text-slate-900 dark:text-white text-xl font-mono mt-1" weight="700">
+            {bookingId.slice(0, 8).toUpperCase()}
+          </Text>
+          <Text className="text-slate-500 dark:text-slate-400 text-[11px] text-center font-medium mt-2 leading-4">
+            Đưa mã QR này cho nhân viên tại quầy để check-in nhận làn đua và nhận xe thuê của bạn.
+          </Text>
+        </View>
 
         {checkInExpired ? (
           <View className="mb-6 flex-row items-start gap-3 rounded-2xl border border-slate-500/20 bg-slate-500/10 p-4">
@@ -561,7 +601,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
         )}
 
         {pendingInspection ? (
-          <View className="mb-6 rounded-2xl border border-orange-500/20 bg-orange-500/10 p-4 shadow-lg">
+          <View className="mb-6 rounded-2xl border border-[#ffedd5] dark:border-[#431407]/40 bg-[#fff7ed] dark:bg-[#1e130c] p-4 shadow-sm">
             <View className="flex-row items-start gap-3">
               <AlertTriangle color="#f97316" size={20} style={{ marginTop: 2 }} />
               <View className="flex-1">
@@ -611,20 +651,20 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
         ) : null}
 
         {(booking.status === 'COMPLETED' || session?.status === 'COMPLETED') ? (
-          <View className="mb-6 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 shadow-lg">
+          <View className="mb-6 rounded-2xl border border-[#fde68a] dark:border-[#451a03]/50 bg-[#fffbeb] dark:bg-[#1c1912] p-4 shadow-sm">
             <View className="flex-row items-start gap-3">
-              <Star color="#f59e0b" size={20} style={{ marginTop: 2 }} />
+              <Star color="#d97706" fill="#d97706" size={20} style={{ marginTop: 2 }} />
               <View className="flex-1">
-                <Text className="text-amber-300 text-[14px]" weight="700">
+                <Text className="text-amber-900 dark:text-amber-200 text-[14px]" weight="700">
                   Đánh giá trải nghiệm sau phiên
                 </Text>
-                <Text className="mt-1 text-xs leading-4 text-slate-700 dark:text-slate-300 font-semibold">
+                <Text className="mt-1 text-xs leading-4 text-amber-800/80 dark:text-amber-300/80 font-semibold">
                   Gửi đánh giá về sân, xe và nhân viên sau khi checkout hoàn tất.
                 </Text>
               </View>
             </View>
             <Pressable
-              className="mt-3 h-10 flex-row items-center justify-center rounded-xl bg-amber-500 active:bg-amber-400 gap-1.5 shadow-md"
+              className="mt-3 h-10 flex-row items-center justify-center rounded-xl bg-[#d97706] active:bg-[#b45309] gap-1.5 shadow-sm"
               onPress={handleOpenReview}
             >
               <Star color="#ffffff" fill="#ffffff" size={15} />
@@ -634,94 +674,172 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
             </Pressable>
           </View>
         ) : null}
-
-        {/* Timeline đứng tiến trình (Booking Lifecycle) */}
         <View className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-5 shadow-xl mb-6">
           <Text className="text-[12px] font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-4">
             Tiến trình lượt chơi
           </Text>
 
           <View className="space-y-4">
-            {/* Step 1 */}
-            <View className="flex-row gap-3">
-              <View className="items-center">
-                <View className="size-6 rounded-full bg-emerald-500 border border-emerald-400 justify-center items-center">
-                  <CheckCircle2 color="#ffffff" size={13} />
+            {!session?.actualStartAt ? (
+              // ─── HÌNH 1: CHƯA CHECK-IN (3 BƯỚC) ───
+              <>
+                {/* Bước 1: Đặt thành công */}
+                <View className="flex-row gap-3">
+                  <View className="items-center">
+                    <View className="size-6 rounded-full bg-emerald-500 border border-emerald-400 justify-center items-center">
+                      <CheckCircle2 color="#ffffff" size={13} />
+                    </View>
+                    <View className="w-[1.5px] h-8 bg-emerald-500/50 mt-1" />
+                  </View>
+                  <View className="flex-1 pt-0.5">
+                    <Text className="text-slate-900 dark:text-white text-sm" weight="700">Đặt thành công</Text>
+                    <Text className="text-slate-500 dark:text-slate-400 text-xs mt-0.5 font-semibold">
+                      {formatDateTimeStep(booking.createdAt)}
+                    </Text>
+                  </View>
                 </View>
-                <View className="w-[1.5px] h-8 bg-emerald-500/50 mt-1" />
-              </View>
-              <View className="flex-1 pt-0.5">
-                <Text className="text-slate-900 dark:text-white text-sm" weight="600">Khởi tạo & Đặt sân thành công</Text>
-                <Text className="text-slate-500 dark:text-slate-400 text-xs mt-0.5 font-semibold">Đã tạo đơn đặt lịch chơi lúc {new Date(booking.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} ngày {new Date(booking.createdAt).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}</Text>
-              </View>
-            </View>
 
-            {/* Step 2 */}
-            <View className="flex-row gap-3">
-              <View className="items-center">
-                <View className={cn("size-6 rounded-full justify-center items-center border", booking.status !== 'PENDING' ? 'bg-emerald-500 border-emerald-400' : 'bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800')}>
-                  {booking.status !== 'PENDING' ? (
-                    <CheckCircle2 color="#ffffff" size={13} />
-                  ) : (
-                    <Text className="text-slate-500 dark:text-slate-400 text-[10px] font-black font-mono">2</Text>
-                  )}
+                {/* Bước 2: Chờ check-in */}
+                <View className="flex-row gap-3">
+                  <View className="items-center">
+                    <View className="size-6 rounded-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 justify-center items-center">
+                      <Clock color={colorScheme === 'dark' ? '#94a3b8' : '#64748b'} size={13} />
+                    </View>
+                    <View className="w-[1.5px] h-8 bg-slate-200 dark:bg-slate-800 mt-1" />
+                  </View>
+                  <View className="flex-1 pt-0.5">
+                    <Text className="text-slate-900 dark:text-white text-sm" weight="700">Chờ check-in</Text>
+                    <Text className="text-slate-500 dark:text-slate-400 text-xs mt-0.5 font-semibold">
+                      Dự kiến: {formatTimeOnlyStep(booking.slotStart)} - {formatTimeOnlyStep(booking.slotEnd)}, {formatDateOnlyStep(booking.slotStart)}
+                    </Text>
+                  </View>
                 </View>
-                <View className={cn("w-[1.5px] h-8 mt-1", booking.status !== 'PENDING' ? 'bg-emerald-500/50' : 'bg-slate-200 dark:bg-slate-800')} />
-              </View>
-              <View className="flex-1 pt-0.5">
-                <Text className="text-slate-900 dark:text-white text-sm" weight="600">Thanh toán hóa đơn</Text>
-                <Text className="text-slate-500 dark:text-slate-400 text-xs mt-0.5 font-semibold">
-                  {booking.status === 'PENDING' ? 'Đang chờ xử lý thanh toán...' : 'Đã thanh toán thành công qua cổng VNPay'}
-                </Text>
-              </View>
-            </View>
 
-            {/* Step 3 */}
-            <View className="flex-row gap-3">
-              <View className="items-center">
-                <View className={cn("size-6 rounded-full justify-center items-center border", session ? 'bg-emerald-500 border-emerald-400' : 'bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800')}>
-                  {session ? (
-                    <CheckCircle2 color="#ffffff" size={13} />
-                  ) : (
-                    <Text className="text-slate-500 dark:text-slate-400 text-[10px] font-black font-mono">3</Text>
-                  )}
+                {/* Bước 3: Hoàn thành */}
+                <View className="flex-row gap-3">
+                  <View className="items-center">
+                    <View className="size-6 rounded-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 justify-center items-center">
+                      <Calendar color={colorScheme === 'dark' ? '#94a3b8' : '#64748b'} size={13} />
+                    </View>
+                  </View>
+                  <View className="flex-1 pt-0.5">
+                    <Text className="text-slate-900 dark:text-white text-sm" weight="700">Hoàn thành</Text>
+                    <Text className="text-slate-550 dark:text-slate-400 text-xs mt-0.5 font-semibold">
+                      Sau khi check-out hoàn tất
+                    </Text>
+                  </View>
                 </View>
-                <View className={cn("w-[1.5px] h-8 mt-1", session ? 'bg-emerald-500/50' : 'bg-slate-200 dark:bg-slate-800')} />
-              </View>
-              <View className="flex-1 pt-0.5">
-                <Text className="text-slate-900 dark:text-white text-sm" weight="600">Bàn giao & Check-in tại sân</Text>
-                <Text className="text-slate-500 dark:text-slate-400 text-xs mt-0.5 font-semibold">
-                  {session?.actualStartAt
-                    ? `Nhân viên check-in đã bàn giao xe lúc ${new Date(session.actualStartAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`
-                    : 'Đưa mã check-in cho nhân viên tại quầy\nđể bàn giao xe và check-in'}
-                </Text>
-              </View>
-            </View>
+              </>
+            ) : (
+              // ─── HÌNH 2: ĐÃ CHECK-IN (4 BƯỚC) ───
+              <>
+                {/* Bước 1: Đặt thành công */}
+                <View className="flex-row gap-3">
+                  <View className="items-center">
+                    <View className="size-6 rounded-full bg-emerald-500 border border-emerald-400 justify-center items-center">
+                      <CheckCircle2 color="#ffffff" size={13} />
+                    </View>
+                    <View className="w-[1.5px] h-8 bg-emerald-500/50 mt-1" />
+                  </View>
+                  <View className="flex-1 pt-0.5">
+                    <Text className="text-slate-900 dark:text-white text-sm" weight="700">Đặt thành công</Text>
+                    <Text className="text-slate-500 dark:text-slate-400 text-xs mt-0.5 font-semibold">
+                      {formatDateTimeStep(booking.createdAt)}
+                    </Text>
+                  </View>
+                </View>
 
-            {/* Step 4 */}
-            <View className="flex-row gap-3">
-              <View className="items-center">
-                <View className={cn("size-6 rounded-full justify-center items-center border", isSessionActive ? 'bg-orange-500 border-orange-400' : session?.status === 'COMPLETED' ? 'bg-emerald-500 border-emerald-400' : 'bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800')}>
-                  {session?.status === 'COMPLETED' ? (
-                    <CheckCircle2 color="#ffffff" size={13} />
-                  ) : (
-                    <Text className={cn("text-[10px] font-black font-mono", isSessionActive ? 'text-white' : 'text-slate-500 dark:text-slate-400')}>4</Text>
-                  )}
+                {/* Bước 2: Đã check-in */}
+                <View className="flex-row gap-3">
+                  <View className="items-center">
+                    <View className="size-6 rounded-full bg-emerald-500 border border-emerald-400 justify-center items-center">
+                      <CheckCircle2 color="#ffffff" size={13} />
+                    </View>
+                    <View className="w-[1.5px] h-8 bg-emerald-500/50 mt-1" />
+                  </View>
+                  <View className="flex-1 pt-0.5">
+                    <Text className="text-slate-900 dark:text-white text-sm" weight="700">Đã check-in</Text>
+                    <Text className="text-slate-550 dark:text-slate-400 text-xs mt-0.5 font-semibold">
+                      Bắt đầu lúc {formatTimeOnlyStep(session.actualStartAt)} · NV: {sessionDetail?.staffName || 'Nhân viên trực ca'}
+                    </Text>
+                  </View>
                 </View>
-              </View>
-              <View className="flex-1 pt-0.5">
-                <Text className="text-slate-900 dark:text-white text-sm" weight="600">Trạng thái chơi & Kết thúc</Text>
-                <Text className="text-slate-500 dark:text-slate-400 text-xs mt-0.5 font-semibold">
-                  {checkInExpired
-                    ? 'Đã quá thời hạn check-in, phiên không được mở.'
-                    : session?.status === 'COMPLETED'
-                      ? 'Đã hoàn thành phiên chơi và checkout xe đua.'
-                      : isSessionActive
-                        ? 'Ca chơi đang hoạt động trên track.'
-                        : 'Chưa bắt đầu ca chơi.'}
-                </Text>
-              </View>
-            </View>
+
+                {/* Bước 3: Đã kết thúc phiên chơi / Đang hoàn tất checkout / Đang hoạt động */}
+                {session.status === 'COMPLETED' || booking.status === 'COMPLETED' ? (
+                  <View className="flex-row gap-3">
+                    <View className="items-center">
+                      <View className="size-6 rounded-full bg-emerald-500 border border-emerald-400 justify-center items-center">
+                        <CheckCircle2 color="#ffffff" size={13} />
+                      </View>
+                      <View className="w-[1.5px] h-8 bg-emerald-500/50 mt-1" />
+                    </View>
+                    <View className="flex-1 pt-0.5">
+                      <Text className="text-slate-900 dark:text-white text-sm" weight="700">Đã kết thúc phiên chơi</Text>
+                      <Text className="text-slate-550 dark:text-slate-400 text-xs mt-0.5 font-semibold">
+                        Kết thúc lúc {formatTimeOnlyStep(session.actualEndAt || new Date())}
+                      </Text>
+                    </View>
+                  </View>
+                ) : session.status === 'CHECKING_OUT' ? (
+                  <View className="flex-row gap-3">
+                    <View className="items-center">
+                      <View className="size-6 rounded-full bg-orange-500 border border-orange-400 justify-center items-center">
+                        <Clock color="#ffffff" size={13} />
+                      </View>
+                      <View className="w-[1.5px] h-8 bg-orange-500/50 mt-1" />
+                    </View>
+                    <View className="flex-1 pt-0.5">
+                      <Text className="text-slate-900 dark:text-white text-sm" weight="700">Đang hoàn tất checkout</Text>
+                      <Text className="text-slate-550 dark:text-slate-400 text-xs mt-0.5 font-semibold">
+                        Nhân viên đang kiểm tra tình trạng xe trả
+                      </Text>
+                    </View>
+                  </View>
+                ) : (
+                  <View className="flex-row gap-3">
+                    <View className="items-center">
+                      <View className="size-6 rounded-full bg-orange-500 border border-orange-400 justify-center items-center">
+                        <Clock color="#ffffff" size={13} />
+                      </View>
+                      <View className="w-[1.5px] h-8 bg-orange-500/50 mt-1" />
+                    </View>
+                    <View className="flex-1 pt-0.5">
+                      <Text className="text-slate-900 dark:text-white text-sm" weight="700">Đang hoạt động</Text>
+                      <Text className="text-slate-550 dark:text-slate-400 text-xs mt-0.5 font-semibold">
+                        Dự kiến kết thúc lúc {formatTimeOnlyStep(session.plannedEndAt)}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+
+                {/* Bước 4: Hoàn thành */}
+                <View className="flex-row gap-3">
+                  <View className="items-center">
+                    <View className={cn(
+                      "size-6 rounded-full justify-center items-center border",
+                      booking.status === 'COMPLETED'
+                        ? "bg-emerald-500 border-emerald-400"
+                        : "bg-slate-100 dark:bg-slate-900 border-slate-300 dark:border-slate-800"
+                    )}>
+                      {booking.status === 'COMPLETED' ? (
+                        <CheckCircle2 color="#ffffff" size={13} />
+                      ) : (
+                        <Calendar color={colorScheme === 'dark' ? '#94a3b8' : '#64748b'} size={13} />
+                      )}
+                    </View>
+                  </View>
+                  <View className="flex-1 pt-0.5">
+                    <Text className="text-slate-900 dark:text-white text-sm" weight="700">Hoàn thành</Text>
+                    <Text className="text-slate-550 dark:text-slate-400 text-xs mt-0.5 font-semibold">
+                      {booking.status === 'COMPLETED' && session.actualEndAt
+                        ? formatDateTimeStep(session.actualEndAt)
+                        : "Sau khi check-out hoàn tất"}
+                    </Text>
+                  </View>
+                </View>
+              </>
+            )}
           </View>
         </View>
 
@@ -979,7 +1097,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
 
               {/* Thẻ Chi Tiết Đền Bù Hư Hỏng Xe */}
               {damageCharge > 0 && (
-                <View className="mt-3 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-3.5 space-y-2">
+                <View className="mt-3 rounded-2xl border border-rose-200 dark:border-rose-900/35 bg-rose-50 dark:bg-rose-950/15 p-3.5 space-y-2">
                   <View className="flex-row justify-between items-center mb-1">
                     <Text className="text-rose-600 dark:text-rose-400 text-xs font-bold uppercase tracking-wider">
                       Phí đền bù hư hỏng xe
@@ -993,7 +1111,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                         const laborPrice = Number(item.laborPrice || 0);
                         const lineTotal = Number(item.subtotal ?? item.lineTotal ?? (partsPrice + laborPrice));
                         return (
-                          <View key={item.id || idx} className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-2.5">
+                          <View key={item.id || idx} className="rounded-xl border border-rose-100 dark:border-rose-900/20 bg-white dark:bg-slate-900/50 p-2.5">
                             <View className="flex-row justify-between items-center">
                               <Text className="text-rose-900 dark:text-rose-200 text-xs font-bold flex-1 pr-2">
                                 {name}
