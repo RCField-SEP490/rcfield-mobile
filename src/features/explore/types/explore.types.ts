@@ -94,3 +94,15 @@ export interface Review {
   } | null;
   ownerResponse?: string | null;
 }
+
+export interface ActivePromotion {
+  code: string;
+  description: string | null;
+  discount_type: 'PERCENT' | 'FIXED';
+  discount_value: number;
+  max_discount_amount: number | null;
+  min_order_amount: number | null;
+  applicable_to: 'ALL' | 'RENTAL' | 'BYOC';
+  expires_at: string | null;
+}
+
