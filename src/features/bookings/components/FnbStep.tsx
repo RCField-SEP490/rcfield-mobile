@@ -6,7 +6,6 @@ import { useColorScheme } from 'nativewind';
 import {
   bookingWizardApi,
   type MenuItem,
-  type MenuItemVariant,
   type PopularMenuItemEntry,
 } from '../api/booking-wizard.api';
 
@@ -36,8 +35,11 @@ function MenuItemCard({ item, fnbQuantities, onChangeQty, compact, orderCount }:
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
 
-  const hasVariants = (item.variants?.filter((v) => v.isAvailable) ?? []).length > 0;
-  const availableVariants = item.variants?.filter((v) => v.isAvailable) ?? [];
+  const availableVariants = useMemo(() => {
+    return item.variants?.filter((v) => v.isAvailable) ?? [];
+  }, [item.variants]);
+
+  const hasVariants = availableVariants.length > 0;
 
   // Tổng số lượng của món này (tất cả variants)
   const totalQty = useMemo(() => {

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { View, TextInput, Pressable, Image, ActivityIndicator, LayoutAnimation, UIManager, Platform } from 'react-native';
-import { User, Plus, Minus, AlertTriangle, Car, Smartphone, ChevronDown, ChevronUp, CheckCircle2, Trophy, Layers, RefreshCw, ExternalLink } from 'lucide-react-native';
+import { User, Plus, Minus, AlertTriangle, Car, Smartphone, ChevronDown, ChevronUp, CheckCircle2, Layers, RefreshCw, ExternalLink } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
 import { useRouter } from 'expo-router';
 import { Text } from '@/shared/ui/Text';

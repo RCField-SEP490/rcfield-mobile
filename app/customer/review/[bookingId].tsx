@@ -9,7 +9,6 @@ import {
   View,
   KeyboardAvoidingView,
   Platform,
-  Keyboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, CheckCircle2, Star, XCircle } from 'lucide-react-native';
@@ -40,23 +39,7 @@ export default function CustomerReviewScreen() {
   const [staffScore, setStaffScore] = useState(0);
   const [facilityScore, setFacilityScore] = useState(0);
   const [note, setNote] = useState('');
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
 
-  useEffect(() => {
-    const showSubscription = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      () => setKeyboardVisible(true)
-    );
-    const hideSubscription = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      () => setKeyboardVisible(false)
-    );
-
-    return () => {
-      showSubscription.remove();
-      hideSubscription.remove();
-    };
-  }, []);
 
   const loadBooking = useCallback(async () => {
     if (!normalizedBookingId) {

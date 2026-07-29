@@ -258,7 +258,7 @@ export function MyPackagesScreen() {
                     <View className="flex-row items-center gap-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-700/40 rounded-xl px-3 py-2 mb-3">
                       <AlertCircle color="#d97706" size={13} />
                       <Text className="text-[10px] text-amber-700 dark:text-amber-400 font-semibold flex-1 leading-4">
-                        Gói chưa được kích hoạt. Nhấn "Thanh toán lại" bên dưới để hoàn tất.
+                        {'Gói chưa được kích hoạt. Nhấn "Thanh toán lại" bên dưới để hoàn tất.'}
                       </Text>
                     </View>
                   )}
