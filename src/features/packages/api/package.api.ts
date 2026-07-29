@@ -1,4 +1,5 @@
 import { api } from '@/shared/lib/api';
+import { getVnpayReturnUrl } from '@/shared/lib/vnpay-return-url';
 
 export type CustomerPackageStatus = 'ACTIVE' | 'PENDING_PAYMENT' | 'EXHAUSTED' | 'EXPIRED';
 
@@ -98,5 +99,19 @@ export async function getPackageUsageHistory(customerPackageId: string): Promise
   } catch (error) {
     console.error('[PackageAPI] Error fetching package usage history:', error);
     return [];
+  }
+}
+
+// 5. Lấy lại payment URL cho gói đang chờ thanh toán (PENDING_PAYMENT)
+export async function getRepayUrl(customerPackageId: string): Promise<PurchasePackageResult | null> {
+  try {
+    const response = await api.post(`/customers/me/packages/${customerPackageId}/repay`, {
+      // Truyền mobile return URL để backend redirect về app sau thanh toán (giống các luồng khác)
+      return_url: getVnpayReturnUrl(),
+    });
+    return response.data?.data || null;
+  } catch (error) {
+    console.error('[PackageAPI] Error getting repay URL:', error);
+    throw error;
   }
 }

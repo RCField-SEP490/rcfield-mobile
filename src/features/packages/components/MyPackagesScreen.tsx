@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   ScrollView,
@@ -7,6 +7,7 @@ import {
   Modal,
   StyleSheet,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -20,12 +21,16 @@ import {
   History,
   Tag,
   HelpCircle,
+  CreditCard,
+  AlertCircle,
 } from 'lucide-react-native';
 
 import { Text } from '@/shared/ui/Text';
+import { openVnpayPaymentSession } from '@/shared/lib/vnpay-browser';
 import {
   getMyPackages,
   getPackageUsageHistory,
+  getRepayUrl,
   type MyPackageResponse,
   type PackageUsageEntry,
 } from '../api/package.api';
@@ -37,6 +42,9 @@ export function MyPackagesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [packages, setPackages] = useState<MyPackageResponse[]>([]);
   const [activeTab, setActiveTab] = useState<'ACTIVE' | 'INACTIVE'>('ACTIVE');
+
+  // Trạng thái loading thanh toán lại cho từng gói
+  const [repayingId, setRepayingId] = useState<string | null>(null);
 
   // Modal lịch sử sử dụng
   const [selectedPackage, setSelectedPackage] = useState<MyPackageResponse | null>(null);
@@ -82,6 +90,25 @@ export function MyPackagesScreen() {
     setSelectedPackage(null);
     setUsageHistory([]);
   };
+
+  // Xử lý thanh toán lại cho gói đang PENDING_PAYMENT
+  const handleRepay = useCallback(async (pkg: MyPackageResponse) => {
+    try {
+      setRepayingId(pkg.id);
+      const result = await getRepayUrl(pkg.id);
+      if (result?.payment_url) {
+        // Sử dụng sandbox VNPay WebView nhất quán với toàn bộ app
+        await openVnpayPaymentSession(result.payment_url);
+        // Refresh lại danh sách sau khi quay về (gói có thể đã được kích hoạt)
+        loadPackages(false);
+      }
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || 'Đã xảy ra lỗi khi tạo link thanh toán.';
+      Alert.alert('Thanh toán thất bại', msg);
+    } finally {
+      setRepayingId(null);
+    }
+  }, []);
 
   // Phân lọc gói theo tab
   const filteredPackages = packages.filter((pkg) => {
@@ -226,6 +253,16 @@ export function MyPackagesScreen() {
                     {getStatusBadge(pkg.status)}
                   </View>
 
+                  {/* Banner cảnh báo chờ thanh toán */}
+                  {pkg.status === 'PENDING_PAYMENT' && (
+                    <View className="flex-row items-center gap-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-700/40 rounded-xl px-3 py-2 mb-3">
+                      <AlertCircle color="#d97706" size={13} />
+                      <Text className="text-[10px] text-amber-700 dark:text-amber-400 font-semibold flex-1 leading-4">
+                        Gói chưa được kích hoạt. Nhấn "Thanh toán lại" bên dưới để hoàn tất.
+                      </Text>
+                    </View>
+                  )}
+
                   {/* Thanh tiến trình Slot */}
                   <View className="mb-4">
                     <View className="flex-row justify-between items-baseline mb-1.5">
@@ -266,10 +303,31 @@ export function MyPackagesScreen() {
                     <Text className="text-[9px] text-[#f97316] font-bold uppercase tracking-wider">
                       {getPlayModeLabel(pkg.applicable_play_modes)}
                     </Text>
-                    <View className="flex-row items-center gap-0.5">
-                      <Text className="text-[9px] text-slate-500 font-bold">Lịch sử dùng</Text>
-                      <History color="#64748b" size={11} />
-                    </View>
+                    {pkg.status === 'PENDING_PAYMENT' ? (
+                      // Nút thanh toán lại — chỉ hiện khi gói đang chờ thanh toán
+                      <Pressable
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          handleRepay(pkg);
+                        }}
+                        disabled={repayingId === pkg.id}
+                        className="flex-row items-center gap-1 bg-amber-500 active:bg-amber-400 rounded-lg px-2.5 py-1.5"
+                      >
+                        {repayingId === pkg.id ? (
+                          <ActivityIndicator size={10} color="#fff" />
+                        ) : (
+                          <CreditCard color="#fff" size={10} />
+                        )}
+                        <Text className="text-[9px] text-white font-bold">
+                          {repayingId === pkg.id ? 'Đang xử lý...' : 'Thanh toán lại'}
+                        </Text>
+                      </Pressable>
+                    ) : (
+                      <View className="flex-row items-center gap-0.5">
+                        <Text className="text-[9px] text-slate-500 font-bold">Lịch sử dùng</Text>
+                        <History color="#64748b" size={11} />
+                      </View>
+                    )}
                   </View>
                 </Pressable>
               );

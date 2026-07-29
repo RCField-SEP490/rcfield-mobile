@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { View, ScrollView, Pressable, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, DeviceEventEmitter, BackHandler } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from 'nativewind';
-import { ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, Trophy } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 
 import { Text } from '@/shared/ui/Text';
@@ -306,13 +306,17 @@ export function BookingWizardScreen({
     }
   }, [currentStep, router]);
 
+  // Sử dụng useRef để lưu trữ tham chiếu hàm handleBack mới nhất, tránh stale closure trong Event Listener
+  const handleBackRef = React.useRef(handleBack);
+  handleBackRef.current = handleBack;
+
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener('WIZARD_SWIPE_BACK', () => {
-      handleBack();
+      handleBackRef.current();
     });
 
     const onBackPress = () => {
-      handleBack();
+      handleBackRef.current();
       return true; // Chặn hành động back mặc định của hệ thống
     };
 
@@ -322,7 +326,7 @@ export function BookingWizardScreen({
       sub.remove();
       backHandlerSub.remove();
     };
-  }, [handleBack]);
+  }, []);
 
   // 4. Booking submission
   const getBookingPayload = () => {
@@ -337,10 +341,17 @@ export function BookingWizardScreen({
         guest_name: c.name.trim(),
         guest_phone: c.phone.trim(),
       })),
-      fnb_items: Object.entries(fnbQuantities).map(([menu_item_id, quantity]) => ({
-        menu_item_id,
-        quantity,
-      })),
+      fnb_items: Object.entries(fnbQuantities)
+        .filter(([, qty]) => qty > 0)
+        .map(([key, quantity]) => {
+          // Key có thể là "itemId" hoặc "itemId__variantId" (khi chọn size)
+          const [menu_item_id, variant_id] = key.split('__');
+          return {
+            menu_item_id,
+            ...(variant_id ? { variant_id } : {}),
+            quantity,
+          };
+        }),
       track_type_id: selectedTrackConfig?.track_type_id,
       track_config_id: selectedTrackConfig?.id,
       customer_package_id: selectedPackageId || undefined,
@@ -458,6 +469,29 @@ export function BookingWizardScreen({
             >
               {/* Stepper progress */}
               <StepperBar currentStep={currentStep} />
+
+              {/* Contest Banner */}
+              <View className="mb-4 flex-row items-center justify-between rounded-2xl border border-[#ffedd5] dark:border-[#431407]/40 bg-[#fff7ed] dark:bg-[#1e130c] p-3.5 shadow-sm">
+                <View className="flex-1 flex-row items-start gap-3 mr-2">
+                  <View className="size-9 items-center justify-center rounded-xl border border-orange-200 dark:border-orange-900 bg-white dark:bg-slate-900">
+                    <Trophy color="#f97316" size={16} />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-[13px] text-orange-900 dark:text-orange-300 font-bold">
+                      Bạn tham gia giải đấu?
+                    </Text>
+                    <Text className="text-[10px] text-orange-850 dark:text-orange-400 mt-0.5 leading-4 font-semibold">
+                      Thuê xe thi đấu cho contest đang mở – chọn giải, chi nhánh, khung giờ và dòng xe trong một bước.
+                    </Text>
+                  </View>
+                </View>
+                <Pressable
+                  onPress={() => router.push(`/cafe-detail/${cafeId}`)}
+                  className="h-8 justify-center items-center px-3 rounded-lg border border-orange-200 dark:border-orange-900 bg-white dark:bg-slate-900 active:bg-orange-100/50"
+                >
+                  <Text className="text-[11px] text-[#f97316] font-bold">Thuê xe thi đấu</Text>
+                </Pressable>
+              </View>
 
               {/* Steps Container */}
               {currentStep === 1 && (

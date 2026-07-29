@@ -38,12 +38,29 @@ export interface VehicleCatalog {
   }[];
 }
 
+export interface MenuItemVariant {
+  id: string;
+  name: string;
+  price: string;
+  displayOrder: number;
+  isAvailable: boolean;
+}
+
 export interface MenuItem {
   id: string;
   name: string;
   price: number | string;
   image: string | null;
+  imageUrl?: string | null;
   available: boolean;
+  isAvailable?: boolean;
+  categoryName?: string | null;
+  variants?: MenuItemVariant[];
+}
+
+export interface PopularMenuItemEntry {
+  menuItemId: string;
+  orderCount: number;
 }
 
 export interface CheckAvailabilityParams {
@@ -153,9 +170,30 @@ export const bookingWizardApi = {
       const response = await api.get(`/cafes/${cafeId}/menu`, {
         params: { available: true, limit: 100 },
       });
-      return response.data?.data || [];
+      // Backend trả về MenuItemWithComponents (có variants, categoryName, imageUrl)
+      // Map về MenuItem interface của mobile
+      const items: any[] = response.data?.data || [];
+      return items.map((item) => ({
+        id: item.id,
+        name: item.name,
+        price: item.price,
+        image: item.imageUrl ?? item.image ?? null,
+        available: item.isAvailable ?? item.available ?? true,
+        categoryName: item.categoryName ?? null,
+        variants: item.variants ?? [],
+      }));
     } catch (error) {
       console.error('[BookingWizardAPI] Error fetching menu items:', error);
+      return [];
+    }
+  },
+
+  getCafeMenuPopular: async (cafeId: string): Promise<PopularMenuItemEntry[]> => {
+    try {
+      const response = await api.get(`/cafes/${cafeId}/menu/popular`);
+      return response.data?.data || [];
+    } catch (error) {
+      console.error('[BookingWizardAPI] Error fetching popular menu items:', error);
       return [];
     }
   },
