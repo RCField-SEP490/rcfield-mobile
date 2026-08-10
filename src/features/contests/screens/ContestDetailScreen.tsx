@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, Image, ScrollView, ActivityIndicator, Pressable, Alert, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Calendar, MapPin, Award, ShieldAlert, BadgeInfo, Trophy, CreditCard } from 'lucide-react-native';
+import { Calendar, MapPin, Award, ShieldAlert, BadgeInfo, Trophy, CreditCard, Flag, Users } from 'lucide-react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { contestsApi } from '../api/contests.api';
 import { TournamentBracket } from '../components/TournamentBracket';
@@ -90,6 +90,11 @@ export const ContestDetailScreen: React.FC = () => {
       hour: '2-digit',
       minute: '2-digit',
     });
+  };
+
+  const isPastDate = (dateString: string | null) => {
+    if (!dateString) return false;
+    return new Date(dateString) <= new Date();
   };
 
   if (loading) {
@@ -186,41 +191,153 @@ export const ContestDetailScreen: React.FC = () => {
           <View style={{ padding: 16 }}>
             {activeSubTab === 'INFO' && (
               <View>
-                {/* Description */}
-                <View style={{ marginBottom: 16 }}>
-                  <Text className="text-sm font-extrabold text-gray-900 mb-1">Giới thiệu giải đấu</Text>
-                  <Text className="text-xs font-semibold text-gray-600 leading-relaxed">
+                {/* 1. Quick Stats Grid */}
+                <View style={styles.statsGrid}>
+                  {/* Lệ phí */}
+                  <View style={styles.statsCard}>
+                    <View style={styles.statsIconWrapper}>
+                      <CreditCard size={18} color="#ea580c" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.statsLabel}>Lệ phí tham gia</Text>
+                      <Text style={styles.statsValue}>{formatPrice(contest.entry_fee)}</Text>
+                    </View>
+                  </View>
+
+                  {/* Số lượng */}
+                  <View style={styles.statsCard}>
+                    <View style={styles.statsIconWrapper}>
+                      <Users size={18} color="#ea580c" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.statsLabel}>Đã đăng ký</Text>
+                      <Text style={styles.statsValue}>
+                        {contest.public_stats?.registration_count || 0} / {contest.capacity || '∞'} tay đua
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* 2. Description Section */}
+                <View style={styles.sectionContainer}>
+                  <Text style={styles.sectionTitle}>Giới thiệu giải đấu</Text>
+                  <Text style={styles.sectionBody}>
                     {contest.description || 'Chưa có thông tin mô tả chi tiết cho giải đấu này.'}
                   </Text>
                 </View>
 
-                {/* Rules */}
-                <View className="mb-4 p-3 rounded-xl bg-orange-50/50 border border-orange-100/50">
-                  <View className="flex-row items-center mb-1.5">
-                    <BadgeInfo size={14} color="#ea580c" style={{ marginRight: 6 }} />
-                    <Text className="text-xs font-extrabold text-orange-900">Quy chế & Dòng xe thi đấu</Text>
+                {/* 3. Rules & Vehicles Section */}
+                <View style={styles.sectionContainer}>
+                  <Text style={styles.sectionTitle}>Quy chế & Dòng xe thi đấu</Text>
+                  <View style={styles.ruleCardList}>
+                    {/* Thể thức */}
+                    <View style={styles.ruleItem}>
+                      <View style={styles.ruleBullet} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.ruleTextTitle}>Thể thức thi đấu</Text>
+                        <Text style={styles.ruleTextDesc}>
+                          {contest.contest_format?.name || 'Đấu loại trực tiếp 1v1 (Knockout)'}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Quy định xe */}
+                    <View style={styles.ruleItem}>
+                      <View style={styles.ruleBullet} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.ruleTextTitle}>Quy định dòng xe</Text>
+                        <Text style={styles.ruleTextDesc}>
+                          {contest.vehicle_rule?.vehicle_policy === 'RENTAL_ONLY' ? 'Chỉ sử dụng xe thuê của cơ sở.' :
+                           contest.vehicle_rule?.vehicle_policy === 'BYOC_ONLY' ? 'Chỉ sử dụng xe cá nhân tự mang theo (BYOC).' :
+                           'Hỗn hợp (MIXED) - Sử dụng xe thuê hoặc xe cá nhân tùy chọn.'}
+                        </Text>
+                      </View>
+                    </View>
                   </View>
-                  <Text className="text-[11px] font-semibold text-orange-800 leading-relaxed">
-                    • Thể thức thi đấu: Đấu loại trực tiếp 1v1 (Knockout).{'\n'}
-                    • Quy định xe: {
-                      contest.vehicle_rule?.vehicle_policy === 'RENTAL_ONLY' ? 'Chỉ sử dụng xe thuê của cơ sở.' :
-                      contest.vehicle_rule?.vehicle_policy === 'BYOC_ONLY' ? 'Chỉ sử dụng xe cá nhân (BYOC).' :
-                      'Tùy chọn: Sử dụng xe thuê hoặc xe cá nhân tự mang (MIXED).'
-                    }
-                  </Text>
                 </View>
 
-                {/* Prize list */}
+                {/* 4. Track Information Section */}
+                <View style={styles.sectionContainer}>
+                  <Text style={styles.sectionTitle}>Thông tin đường đua</Text>
+                  <View style={styles.trackCard}>
+                    <View style={styles.trackIconWrapper}>
+                      <Flag size={20} color="#ea580c" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.trackName}>{contest.track_type?.name || 'Đường đua RC Field'}</Text>
+                      <Text style={styles.trackDesc}>
+                        {contest.track_type?.description || 'Đường đua chuyên nghiệp được thiết kế với các góc cua kỹ thuật khó, phù hợp với các giải đấu đối kháng đỉnh cao.'}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* 5. Timeline Schedule Section */}
+                <View style={styles.sectionContainer}>
+                  <Text style={styles.sectionTitle}>Lịch trình giải đấu</Text>
+                  <View style={styles.timelineContainer}>
+                    {/* Mốc 1: Mở đăng ký */}
+                    <View style={styles.timelineItem}>
+                      <View style={styles.timelineLineWrapper}>
+                        <View style={[styles.timelineDot, isPastDate(contest.registration_opens_at) ? styles.timelineDotActive : styles.timelineDotInactive]} />
+                        <View style={styles.timelineLine} />
+                      </View>
+                      <View style={styles.timelineContent}>
+                        <Text style={styles.timelineLabel}>Mở cổng đăng ký</Text>
+                        <Text style={styles.timelineTime}>{formatDate(contest.registration_opens_at)}</Text>
+                      </View>
+                    </View>
+
+                    {/* Mốc 2: Đóng đăng ký */}
+                    <View style={styles.timelineItem}>
+                      <View style={styles.timelineLineWrapper}>
+                        <View style={[styles.timelineDot, isPastDate(contest.registration_closes_at) ? styles.timelineDotActive : styles.timelineDotInactive]} />
+                        <View style={styles.timelineLine} />
+                      </View>
+                      <View style={styles.timelineContent}>
+                        <Text style={styles.timelineLabel}>Đóng cổng đăng ký</Text>
+                        <Text style={styles.timelineTime}>{formatDate(contest.registration_closes_at)}</Text>
+                      </View>
+                    </View>
+
+                    {/* Mốc 3: Khai mạc */}
+                    <View style={styles.timelineItem}>
+                      <View style={styles.timelineLineWrapper}>
+                        <View style={[styles.timelineDot, isPastDate(contest.starts_at) ? styles.timelineDotActive : styles.timelineDotInactive]} />
+                        <View style={styles.timelineLine} />
+                      </View>
+                      <View style={styles.timelineContent}>
+                        <Text style={styles.timelineLabel}>Khai mạc & Khởi tranh</Text>
+                        <Text style={styles.timelineTime}>{formatDate(contest.starts_at)}</Text>
+                      </View>
+                    </View>
+
+                    {/* Mốc 4: Kết thúc */}
+                    <View style={[styles.timelineItem, { marginBottom: 0 }]}>
+                      <View style={[styles.timelineLineWrapper, { minHeight: 0 }]}>
+                        <View style={[styles.timelineDot, isPastDate(contest.ends_at) ? styles.timelineDotActive : styles.timelineDotInactive]} />
+                      </View>
+                      <View style={styles.timelineContent}>
+                        <Text style={styles.timelineLabel}>Bế mạc & Tổng kết</Text>
+                        <Text style={styles.timelineTime}>{formatDate(contest.ends_at)}</Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+
+                {/* 6. Prize list */}
                 {contest.prize_structure && contest.prize_structure.length > 0 && (
-                  <View style={{ marginBottom: 16 }}>
-                    <Text className="text-sm font-extrabold text-gray-900 mb-2">Cơ cấu giải thưởng</Text>
+                  <View style={styles.sectionContainer}>
+                    <Text style={styles.sectionTitle}>Cơ cấu giải thưởng</Text>
                     <View style={{ gap: 8 }}>
                       {contest.prize_structure.map((prize: any, idx: number) => (
-                        <View key={idx} className="flex-row items-center p-3 rounded-xl border border-gray-100 bg-gray-50/30">
-                          <Award size={18} color="#f59e0b" style={{ marginRight: 10 }} />
-                          <View className="flex-1">
-                            <Text className="text-xs font-extrabold text-gray-800">{prize.title}</Text>
-                            <Text className="text-[10px] font-semibold text-gray-500">{prize.description}</Text>
+                        <View key={idx} style={styles.prizeCard}>
+                          <View style={styles.prizeBadge}>
+                            <Award size={16} color="#f59e0b" />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.prizeTitle}>{prize.title}</Text>
+                            <Text style={styles.prizeDesc}>{prize.description}</Text>
                           </View>
                         </View>
                       ))}
@@ -417,5 +534,198 @@ const styles = StyleSheet.create({
   tabTextInactive: {
     fontWeight: '600',
     color: '#94a3b8',
+  },
+  // Các style mới cho Tab Info
+  statsGrid: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 16,
+  },
+  statsCard: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fafafa',
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+    borderRadius: 16,
+    padding: 12,
+    gap: 10,
+  },
+  statsIconWrapper: {
+    height: 36,
+    width: 36,
+    borderRadius: 10,
+    backgroundColor: '#fff7ed',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statsLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#94a3b8',
+    marginBottom: 2,
+  },
+  statsValue: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  sectionContainer: {
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0f172a',
+    marginBottom: 8,
+  },
+  sectionBody: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#475569',
+    lineHeight: 18,
+  },
+  ruleCardList: {
+    backgroundColor: '#fff7ed',
+    borderWidth: 1,
+    borderColor: '#ffedd5',
+    borderRadius: 16,
+    padding: 14,
+    gap: 12,
+  },
+  ruleItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  ruleBullet: {
+    height: 6,
+    width: 6,
+    borderRadius: 3,
+    backgroundColor: '#ea580c',
+    marginTop: 6,
+  },
+  ruleTextTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#7c2d12',
+    marginBottom: 2,
+  },
+  ruleTextDesc: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#9a3412',
+    lineHeight: 15,
+  },
+  trackCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 16,
+    padding: 14,
+    gap: 12,
+  },
+  trackIconWrapper: {
+    height: 40,
+    width: 40,
+    borderRadius: 12,
+    backgroundColor: '#fff7ed',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  trackName: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#1e293b',
+    marginBottom: 2,
+  },
+  trackDesc: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748b',
+    lineHeight: 16,
+  },
+  prizeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fafafa',
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+    borderRadius: 16,
+    padding: 12,
+    gap: 12,
+  },
+  prizeBadge: {
+    height: 32,
+    width: 32,
+    borderRadius: 8,
+    backgroundColor: '#fef3c7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  prizeTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#1e293b',
+    marginBottom: 2,
+  },
+  prizeDesc: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  // Style cho Timeline
+  timelineContainer: {
+    backgroundColor: '#fafafa',
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+    borderRadius: 16,
+    padding: 16,
+  },
+  timelineItem: {
+    flexDirection: 'row',
+  },
+  timelineLineWrapper: {
+    width: 24,
+    alignItems: 'center',
+  },
+  timelineDot: {
+    height: 12,
+    width: 12,
+    borderRadius: 6,
+    borderWidth: 2.5,
+  },
+  timelineDotActive: {
+    borderColor: '#ea580c',
+    backgroundColor: '#ea580c',
+  },
+  timelineDotInactive: {
+    borderColor: '#cbd5e1',
+    backgroundColor: '#ffffff',
+  },
+  timelineLine: {
+    flex: 1,
+    width: 2,
+    backgroundColor: '#e2e8f0',
+    marginVertical: 4,
+  },
+  timelineContent: {
+    flex: 1,
+    paddingBottom: 20,
+    paddingLeft: 4,
+  },
+  timelineLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#334155',
+    marginBottom: 2,
+  },
+  timelineTime: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#64748b',
   },
 });

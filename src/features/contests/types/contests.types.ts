@@ -142,6 +142,18 @@ export interface Contest {
     supports_time_attack: boolean;
     supports_multi_round: boolean;
   } | null;
+  track_type?: {
+    id: string;
+    code: string;
+    name: string;
+    description: string | null;
+  } | null;
+  public_stats?: {
+    registration_count: number;
+    confirmed_count: number;
+    checked_in_count: number;
+    capacity_remaining: number | null;
+  } | null;
   
   host_branch: HostBranch | null;
   participating_branches: HostBranch[];
