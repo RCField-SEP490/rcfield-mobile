@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, Image, ScrollView, ActivityIndicator, Pressable, Alert, StyleSheet, TouchableOpacity } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from 'nativewind';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Calendar, MapPin, Award, ShieldAlert, BadgeInfo, Trophy, CreditCard, Flag, Users } from 'lucide-react-native';
@@ -16,6 +16,7 @@ type SubTabKey = 'INFO' | 'BRACKET' | 'LEADERBOARD';
 export const ContestDetailScreen: React.FC = () => {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   
@@ -343,11 +344,13 @@ export const ContestDetailScreen: React.FC = () => {
                     <View 
                       style={[
                         styles.horizTimelineLineActive,
-                        {
-                          width: isPastDate(contest.ends_at) ? '100%' :
-                                 isPastDate(contest.starts_at) ? '66%' :
-                                 isPastDate(contest.registration_closes_at) ? '33%' : '0%'
-                        }
+                        isPastDate(contest.ends_at)
+                          ? { right: '12.5%' }
+                          : isPastDate(contest.starts_at)
+                          ? { right: '37.5%' }
+                          : isPastDate(contest.registration_closes_at)
+                          ? { right: '62.5%' }
+                          : { width: 0 }
                       ]}
                     />
 
@@ -389,77 +392,75 @@ export const ContestDetailScreen: React.FC = () => {
                   </View>
                 </View>
 
-                {/* 6. Prizes Horizontal Carousel (Carousel giải thưởng nằm ngang - Ý tưởng 2) */}
+                {/* 6. Prizes Section (Thiết kế đứng Premium Tier List) */}
                 {contest.prize_structure && contest.prize_structure.length > 0 && (
                   <View style={styles.sectionContainer}>
                     <Text style={[styles.sectionTitle, isDark && styles.sectionTitleDark]}>Cơ cấu giải thưởng</Text>
-                    <ScrollView
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={styles.prizesCarouselContent}
-                    >
+                    <View className="gap-3">
                       {contest.prize_structure.map((prize: any, idx: number) => {
                         const rank = prize.rank || (idx + 1);
-                        let cardBg = '#f8fafc';
-                        let borderColor = '#e2e8f0';
-                        let badgeBg = '#e2e8f0';
-                        let badgeTextColor = '#475569';
-                        let iconColor = '#64748b';
-
-                        if (isDark) {
-                          if (rank === 1) {
-                            cardBg = 'rgba(251, 191, 36, 0.1)';
-                            borderColor = 'rgba(251, 191, 36, 0.25)';
-                            badgeBg = 'rgba(251, 191, 36, 0.15)';
-                            badgeTextColor = '#fbbf24';
-                            iconColor = '#fbbf24';
-                          } else if (rank === 2) {
-                            cardBg = 'rgba(148, 163, 184, 0.1)';
-                            borderColor = 'rgba(148, 163, 184, 0.25)';
-                            badgeBg = 'rgba(148, 163, 184, 0.15)';
-                            badgeTextColor = '#cbd5e1';
-                            iconColor = '#cbd5e1';
-                          } else if (rank === 3) {
-                            cardBg = 'rgba(168, 85, 247, 0.1)';
-                            borderColor = 'rgba(168, 85, 247, 0.25)';
-                            badgeBg = 'rgba(168, 85, 247, 0.15)';
-                            badgeTextColor = '#c084fc';
-                            iconColor = '#c084fc';
-                          }
-                        } else {
-                          if (rank === 1) {
-                            cardBg = '#fffbeb';
-                            borderColor = '#fde68a';
-                            badgeBg = '#fef3c7';
-                            badgeTextColor = '#b45309';
-                            iconColor = '#fbbf24';
-                          } else if (rank === 2) {
-                            cardBg = '#f1f5f9';
-                            borderColor = '#cbd5e1';
-                            badgeBg = '#e2e8f0';
-                            badgeTextColor = '#334155';
-                            iconColor = '#94a3b8';
-                          } else if (rank === 3) {
-                            cardBg = '#faf5ff';
-                            borderColor = '#e9d5ff';
-                            badgeBg = '#f3e8ff';
-                            badgeTextColor = '#6b21a8';
-                            iconColor = '#a855f7';
-                          }
+                        
+                        // Cấu hình style sang trọng cho từng hạng giải
+                        let cardBg = 'bg-amber-50/40 dark:bg-amber-950/10';
+                        let borderColor = 'border-amber-200/80 dark:border-amber-500/20';
+                        let badgeBg = 'bg-amber-100 dark:bg-amber-500/20';
+                        let badgeText = 'text-amber-700 dark:text-amber-400';
+                        let medalLabel = 'Giải Nhất';
+                        let medalSymbol = '🏆';
+                        
+                        if (rank === 2) {
+                          cardBg = 'bg-slate-50/50 dark:bg-slate-900/10';
+                          borderColor = 'border-slate-200/80 dark:border-slate-800/30';
+                          badgeBg = 'bg-slate-100 dark:bg-slate-800/60';
+                          badgeText = 'text-slate-700 dark:text-slate-350';
+                          medalLabel = 'Giải Nhì';
+                          medalSymbol = '🥈';
+                        } else if (rank === 3) {
+                          cardBg = 'bg-orange-50/30 dark:bg-orange-950/5';
+                          borderColor = 'border-orange-200/50 dark:border-orange-900/20';
+                          badgeBg = 'bg-orange-100/80 dark:bg-orange-950/30';
+                          badgeText = 'text-orange-700 dark:text-orange-400';
+                          medalLabel = 'Giải Ba';
+                          medalSymbol = '🥉';
+                        } else if (rank > 3) {
+                          cardBg = 'bg-gray-50/30 dark:bg-gray-900/5';
+                          borderColor = 'border-gray-100 dark:border-gray-800/30';
+                          badgeBg = 'bg-gray-100 dark:bg-gray-800/40';
+                          badgeText = 'text-gray-600 dark:text-gray-400';
+                          medalLabel = `Giải khuyến khích`;
+                          medalSymbol = '🏅';
                         }
 
                         return (
-                          <View key={idx} style={[styles.prizeCardCarousel, isDark && styles.prizeCardCarouselDark, { backgroundColor: cardBg, borderColor }]}>
-                            <View style={[styles.prizeBadge, { backgroundColor: badgeBg }]}>
-                               <Award size={20} color={iconColor} />
+                          <View
+                            key={idx}
+                            className={`flex-row items-center p-4 rounded-2xl border ${borderColor} ${cardBg}`}
+                          >
+                            {/* Medal Big Icon */}
+                            <View className={`h-12 w-12 rounded-xl items-center justify-center mr-4 ${badgeBg}`}>
+                              <Text className="text-xl">{medalSymbol}</Text>
                             </View>
-                            <Text style={[styles.prizeRankLabel, { color: badgeTextColor }]}>Hạng {rank}</Text>
-                            <Text style={[styles.prizeTitle, isDark && styles.prizeTitleDark]} numberOfLines={1}>{prize.title}</Text>
-                            <Text style={[styles.prizeDesc, isDark && styles.prizeDescDark]} numberOfLines={2}>{prize.description}</Text>
+
+                            {/* Prize Content */}
+                            <View className="flex-1 pr-2">
+                              <View className="flex-row items-center gap-1.5 mb-1">
+                                <Text className={`text-[10px] font-extrabold uppercase tracking-wider ${badgeText}`}>
+                                  {medalLabel}
+                                </Text>
+                              </View>
+                              <Text className="text-xs font-extrabold text-slate-850 dark:text-white" numberOfLines={1}>
+                                {prize.title}
+                              </Text>
+                              {prize.description ? (
+                                <Text className="text-[10px] font-semibold text-slate-405 dark:text-slate-400 mt-0.5 leading-4" numberOfLines={2}>
+                                  {prize.description}
+                                </Text>
+                              ) : null}
+                            </View>
                           </View>
                         );
                       })}
-                    </ScrollView>
+                    </View>
                   </View>
                 )}
               </View>
@@ -513,7 +514,10 @@ export const ContestDetailScreen: React.FC = () => {
         </ScrollView>
 
         {/* Bottom Bar: Action Register / Payment / Status */}
-        <View className="p-4 border-t border-gray-100 dark:border-slate-800/80 bg-white dark:bg-[#0b0f19]">
+        <View 
+          className="p-4 border-t border-gray-100 dark:border-slate-800/80 bg-white dark:bg-[#0b0f19]"
+          style={{ paddingBottom: Math.max(insets.bottom, 16) }}
+        >
           {/* Trường hợp Chưa đăng ký và giải đang mở */}
           {!myReg && contest.status === 'OPEN' && (
             <TouchableOpacity
@@ -1000,23 +1004,25 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingTop: 24,
     paddingBottom: 16,
+    overflow: 'hidden',
   },
   horizTimelineContainerDark: {
     backgroundColor: 'rgba(30, 41, 59, 0.3)',
     borderColor: 'rgba(255, 255, 255, 0.1)',
+    overflow: 'hidden',
   },
   horizTimelineLineBg: {
     position: 'absolute',
     top: 32,
-    left: 40,
-    right: 40,
+    left: '12.5%',
+    right: '12.5%',
     height: 3,
     backgroundColor: '#cbd5e1',
   },
   horizTimelineLineActive: {
     position: 'absolute',
     top: 32,
-    left: 40,
+    left: '12.5%',
     height: 3,
     backgroundColor: '#ea580c',
   },
