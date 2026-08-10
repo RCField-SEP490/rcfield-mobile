@@ -231,7 +231,7 @@ export const ContestDetailScreen: React.FC = () => {
             )}
 
             {activeSubTab === 'BRACKET' && (
-              <View style={{ height: 480 }}>
+              <View>
                 <TournamentBracket matches={matches} />
               </View>
             )}

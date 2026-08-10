@@ -50,6 +50,8 @@ export interface ContestRegistration {
     email: string;
     avatar_url: string | null;
   };
+  participant_name?: string | null;
+  driver_handle?: string | null;
   customer_journey_status?: string;
 }
 
@@ -149,7 +151,7 @@ export interface Contest {
 
 export interface ContestMatchParticipant {
   registration_id: string;
-  fullName: string; // Tên VĐV hiển thị (được map từ join)
+  fullName?: string;
   status: ContestParticipantStatus;
   is_winner: boolean;
   slot_no: number;
