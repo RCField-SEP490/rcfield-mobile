@@ -92,6 +92,17 @@ export const ContestDetailScreen: React.FC = () => {
     });
   };
 
+  const formatDateShort = (dateString: string | null) => {
+    if (!dateString) return 'Chưa định ngày';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
   const isPastDate = (dateString: string | null) => {
     if (!dateString) return false;
     return new Date(dateString) <= new Date();
@@ -136,6 +147,7 @@ export const ContestDetailScreen: React.FC = () => {
   const defaultBanner = 'https://images.unsplash.com/photo-1568605117036-5fecc6207a71?auto=format&fit=crop&w=600&q=80';
   const myReg = contest.my_registration;
   const branchName = contest.host_branch?.cafe?.name || 'RC Field Branch';
+  const trackImage = contest.track_type?.image_url || contest.config?.track_image_url || contest.track_type?.layout_image_url || null;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#ffffff' }} edges={['top', 'left', 'right']}>
@@ -300,13 +312,17 @@ export const ContestDetailScreen: React.FC = () => {
                   </View>
                 </View>
 
-                {/* 4. Track Information Section */}
+                {/* 4. Track Information Section (Lá cờ fallback hoặc Ảnh đường đua thực tế) */}
                 <View style={styles.sectionContainer}>
                   <Text style={styles.sectionTitle}>Thông tin đường đua</Text>
                   <View style={styles.trackCard}>
-                    <View style={styles.trackIconWrapper}>
-                      <Flag size={20} color="#ea580c" />
-                    </View>
+                    {trackImage ? (
+                      <Image source={{ uri: trackImage }} style={styles.trackImage} resizeMode="cover" />
+                    ) : (
+                      <View style={styles.trackIconWrapper}>
+                        <Flag size={20} color="#ea580c" />
+                      </View>
+                    )}
                     <View style={{ flex: 1 }}>
                       <Text style={styles.trackName}>{contest.track_type?.name || 'Đường đua RC Field'}</Text>
                       <Text style={styles.trackDesc}>
@@ -316,64 +332,69 @@ export const ContestDetailScreen: React.FC = () => {
                   </View>
                 </View>
 
-                {/* 5. Timeline Schedule Section (Đường đi lịch trình phát sáng - Ý tưởng 5) */}
+                {/* 5. Horizontal Timeline Progress Bar (Lịch trình nằm ngang) */}
                 <View style={styles.sectionContainer}>
-                  <Text style={styles.sectionTitle}>Lịch trình giải đấu</Text>
-                  <View style={styles.timelineContainer}>
+                  <Text style={styles.sectionTitle}>Tiến trình giải đấu</Text>
+                  <View style={styles.horizTimelineContainer}>
+                    <View style={styles.horizTimelineLineBg} />
+                    <View 
+                      style={[
+                        styles.horizTimelineLineActive,
+                        {
+                          width: isPastDate(contest.ends_at) ? '100%' :
+                                 isPastDate(contest.starts_at) ? '66%' :
+                                 isPastDate(contest.registration_closes_at) ? '33%' : '0%'
+                        }
+                      ]}
+                    />
+
                     {/* Mốc 1: Mở đăng ký */}
-                    <View style={styles.timelineItem}>
-                      <View style={styles.timelineLineWrapper}>
-                        <View style={[styles.timelineDot, isPastDate(contest.registration_opens_at) ? styles.timelineDotActive : styles.timelineDotInactive]} />
-                        <View style={[styles.timelineLine, isPastDate(contest.registration_closes_at) ? styles.timelineLineActive : styles.timelineLineInactive]} />
+                    <View style={styles.horizTimelineStep}>
+                      <View style={[styles.horizTimelineDot, isPastDate(contest.registration_opens_at) ? styles.horizTimelineDotActive : styles.horizTimelineDotInactive]}>
+                        <Text style={[styles.horizTimelineStepNum, isPastDate(contest.registration_opens_at) && styles.horizTimelineStepNumActive]}>1</Text>
                       </View>
-                      <View style={styles.timelineContent}>
-                        <Text style={styles.timelineLabel}>Mở cổng đăng ký</Text>
-                        <Text style={styles.timelineTime}>{formatDate(contest.registration_opens_at)}</Text>
-                      </View>
+                      <Text style={styles.horizTimelineLabel}>Mở Đăng Ký</Text>
+                      <Text style={styles.horizTimelineTime}>{formatDateShort(contest.registration_opens_at)}</Text>
                     </View>
 
                     {/* Mốc 2: Đóng đăng ký */}
-                    <View style={styles.timelineItem}>
-                      <View style={styles.timelineLineWrapper}>
-                        <View style={[styles.timelineDot, isPastDate(contest.registration_closes_at) ? styles.timelineDotActive : styles.timelineDotInactive]} />
-                        <View style={[styles.timelineLine, isPastDate(contest.starts_at) ? styles.timelineLineActive : styles.timelineLineInactive]} />
+                    <View style={styles.horizTimelineStep}>
+                      <View style={[styles.horizTimelineDot, isPastDate(contest.registration_closes_at) ? styles.horizTimelineDotActive : styles.horizTimelineDotInactive]}>
+                        <Text style={[styles.horizTimelineStepNum, isPastDate(contest.registration_closes_at) && styles.horizTimelineStepNumActive]}>2</Text>
                       </View>
-                      <View style={styles.timelineContent}>
-                        <Text style={styles.timelineLabel}>Đóng cổng đăng ký</Text>
-                        <Text style={styles.timelineTime}>{formatDate(contest.registration_closes_at)}</Text>
-                      </View>
+                      <Text style={styles.horizTimelineLabel}>Đóng Đăng Ký</Text>
+                      <Text style={styles.horizTimelineTime}>{formatDateShort(contest.registration_closes_at)}</Text>
                     </View>
 
                     {/* Mốc 3: Khai mạc */}
-                    <View style={styles.timelineItem}>
-                      <View style={styles.timelineLineWrapper}>
-                        <View style={[styles.timelineDot, isPastDate(contest.starts_at) ? styles.timelineDotActive : styles.timelineDotInactive]} />
-                        <View style={[styles.timelineLine, isPastDate(contest.ends_at) ? styles.timelineLineActive : styles.timelineLineInactive]} />
+                    <View style={styles.horizTimelineStep}>
+                      <View style={[styles.horizTimelineDot, isPastDate(contest.starts_at) ? styles.horizTimelineDotActive : styles.horizTimelineDotInactive]}>
+                        <Text style={[styles.horizTimelineStepNum, isPastDate(contest.starts_at) && styles.horizTimelineStepNumActive]}>3</Text>
                       </View>
-                      <View style={styles.timelineContent}>
-                        <Text style={styles.timelineLabel}>Khai mạc & Khởi tranh</Text>
-                        <Text style={styles.timelineTime}>{formatDate(contest.starts_at)}</Text>
-                      </View>
+                      <Text style={styles.horizTimelineLabel}>Khởi Tranh</Text>
+                      <Text style={styles.horizTimelineTime}>{formatDateShort(contest.starts_at)}</Text>
                     </View>
 
                     {/* Mốc 4: Kết thúc */}
-                    <View style={[styles.timelineItem, { marginBottom: 0 }]}>
-                      <View style={[styles.timelineLineWrapper, { minHeight: 0 }]}>
-                        <View style={[styles.timelineDot, isPastDate(contest.ends_at) ? styles.timelineDotActive : styles.timelineDotInactive]} />
+                    <View style={styles.horizTimelineStep}>
+                      <View style={[styles.horizTimelineDot, isPastDate(contest.ends_at) ? styles.horizTimelineDotActive : styles.horizTimelineDotInactive]}>
+                        <Text style={[styles.horizTimelineStepNum, isPastDate(contest.ends_at) && styles.horizTimelineStepNumActive]}>4</Text>
                       </View>
-                      <View style={styles.timelineContent}>
-                        <Text style={styles.timelineLabel}>Bế mạc & Tổng kết</Text>
-                        <Text style={styles.timelineTime}>{formatDate(contest.ends_at)}</Text>
-                      </View>
+                      <Text style={styles.horizTimelineLabel}>Kết Thúc</Text>
+                      <Text style={styles.horizTimelineTime}>{formatDateShort(contest.ends_at)}</Text>
                     </View>
                   </View>
                 </View>
 
-                {/* 6. Prize list (Giải thưởng lấp lánh - Ý tưởng 2) */}
+                {/* 6. Prizes Horizontal Carousel (Carousel giải thưởng nằm ngang - Ý tưởng 2) */}
                 {contest.prize_structure && contest.prize_structure.length > 0 && (
                   <View style={styles.sectionContainer}>
                     <Text style={styles.sectionTitle}>Cơ cấu giải thưởng</Text>
-                    <View style={{ gap: 12 }}>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.prizesCarouselContent}
+                    >
                       {contest.prize_structure.map((prize: any, idx: number) => {
                         const rank = prize.rank || (idx + 1);
                         let cardBg = '#f8fafc';
@@ -403,19 +424,17 @@ export const ContestDetailScreen: React.FC = () => {
                         }
 
                         return (
-                          <View key={idx} style={[styles.prizeCard, { backgroundColor: cardBg, borderColor }]}>
+                          <View key={idx} style={[styles.prizeCardCarousel, { backgroundColor: cardBg, borderColor }]}>
                             <View style={[styles.prizeBadge, { backgroundColor: badgeBg }]}>
-                              <Award size={18} color={iconColor} />
-                            </View>
-                            <View style={{ flex: 1 }}>
-                              <Text style={[styles.prizeTitle, { color: badgeTextColor }]}>{prize.title}</Text>
-                              <Text style={styles.prizeDesc}>{prize.description}</Text>
+                              <Award size={20} color={iconColor} />
                             </View>
                             <Text style={[styles.prizeRankLabel, { color: badgeTextColor }]}>Hạng {rank}</Text>
+                            <Text style={styles.prizeTitle} numberOfLines={1}>{prize.title}</Text>
+                            <Text style={styles.prizeDesc} numberOfLines={2}>{prize.description}</Text>
                           </View>
                         );
                       })}
-                    </View>
+                    </ScrollView>
                   </View>
                 )}
               </View>
@@ -729,7 +748,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: -10,
-    zIndex: 2,
   },
   avatarMoreText: {
     fontSize: 8,
@@ -801,6 +819,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  trackImage: {
+    height: 40,
+    width: 40,
+    borderRadius: 12,
+    backgroundColor: '#f1f5f9',
+  },
   trackName: {
     fontSize: 12,
     fontWeight: '800',
@@ -813,13 +837,16 @@ const styles = StyleSheet.create({
     color: '#64748b',
     lineHeight: 16,
   },
-  prizeCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  prizesCarouselContent: {
+    paddingRight: 16,
+    gap: 12,
+  },
+  prizeCardCarousel: {
+    width: 180,
     borderWidth: 1,
     borderRadius: 16,
     padding: 12,
-    gap: 12,
+    alignItems: 'flex-start',
   },
   prizeBadge: {
     height: 32,
@@ -827,76 +854,98 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 8,
   },
   prizeTitle: {
     fontSize: 12,
     fontWeight: '800',
+    color: '#1e293b',
     marginBottom: 2,
+    width: '100%',
   },
   prizeDesc: {
     fontSize: 10,
     fontWeight: '600',
     color: '#64748b',
+    width: '100%',
+    lineHeight: 14,
   },
   prizeRankLabel: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '900',
     textTransform: 'uppercase',
+    marginBottom: 4,
   },
-  // Style cho Timeline
-  timelineContainer: {
+  // Style cho Horizontal Timeline
+  horizTimelineContainer: {
+    position: 'relative',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     backgroundColor: '#fafafa',
     borderWidth: 1,
     borderColor: '#f1f5f9',
     borderRadius: 16,
     padding: 16,
+    paddingTop: 24,
+    paddingBottom: 16,
   },
-  timelineItem: {
-    flexDirection: 'row',
+  horizTimelineLineBg: {
+    position: 'absolute',
+    top: 32,
+    left: 40,
+    right: 40,
+    height: 3,
+    backgroundColor: '#cbd5e1',
   },
-  timelineLineWrapper: {
-    width: 24,
+  horizTimelineLineActive: {
+    position: 'absolute',
+    top: 32,
+    left: 40,
+    height: 3,
+    backgroundColor: '#ea580c',
+  },
+  horizTimelineStep: {
+    flex: 1,
     alignItems: 'center',
   },
-  timelineDot: {
-    height: 12,
-    width: 12,
-    borderRadius: 6,
-    borderWidth: 2.5,
+  horizTimelineDot: {
+    height: 20,
+    width: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+    zIndex: 2,
+    marginBottom: 8,
   },
-  timelineDotActive: {
+  horizTimelineDotActive: {
     borderColor: '#ea580c',
     backgroundColor: '#ea580c',
   },
-  timelineDotInactive: {
+  horizTimelineDotInactive: {
     borderColor: '#cbd5e1',
     backgroundColor: '#ffffff',
   },
-  timelineLine: {
-    flex: 1,
-    width: 2,
-    marginVertical: 4,
+  horizTimelineStepNum: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#64748b',
   },
-  timelineLineActive: {
-    backgroundColor: '#ea580c',
+  horizTimelineStepNumActive: {
+    color: '#ffffff',
   },
-  timelineLineInactive: {
-    backgroundColor: '#e2e8f0',
-  },
-  timelineContent: {
-    flex: 1,
-    paddingBottom: 20,
-    paddingLeft: 4,
-  },
-  timelineLabel: {
-    fontSize: 11,
+  horizTimelineLabel: {
+    fontSize: 10,
     fontWeight: '800',
     color: '#334155',
     marginBottom: 2,
+    textAlign: 'center',
   },
-  timelineTime: {
-    fontSize: 10,
+  horizTimelineTime: {
+    fontSize: 8,
     fontWeight: '600',
     color: '#64748b',
+    textAlign: 'center',
   },
 });

@@ -149,6 +149,8 @@ export interface Contest {
     code: string;
     name: string;
     description: string | null;
+    image_url?: string | null;
+    layout_image_url?: string | null;
   } | null;
   public_stats?: {
     registration_count: number;
