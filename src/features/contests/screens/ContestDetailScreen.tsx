@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, Image, ScrollView, ActivityIndicator, Pressable, Alert, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -97,6 +97,24 @@ export const ContestDetailScreen: React.FC = () => {
     return new Date(dateString) <= new Date();
   };
 
+  // Trích xuất danh sách avatar tay đua đăng ký từ danh sách trận đấu
+  const topEntrants = useMemo(() => {
+    const map = new Map<string, { name: string; avatar: string | null }>();
+    matches.forEach((match) => {
+      match.participants.forEach((p) => {
+        if (p.registration_id) {
+          const regId = p.registration?.id || p.registration_id;
+          const name = p.registration?.participant_name || p.fullName || 'Racer';
+          const avatar = p.registration?.participant_avatar_url || null;
+          if (name !== 'Chờ vòng trước' && name !== 'Không có đối thủ') {
+            map.set(regId, { name, avatar });
+          }
+        }
+      });
+    });
+    return Array.from(map.values()).slice(0, 5);
+  }, [matches]);
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -124,7 +142,7 @@ export const ContestDetailScreen: React.FC = () => {
       <View style={{ flex: 1 }}>
         {/* Toàn bộ nội dung cuộn trang đồng bộ */}
         <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
-          {/* Banner */}
+          {/* Banner & Title Glass Card lồng đè lên nhau */}
           <View style={styles.bannerContainer}>
             <Image
               source={contest.banner_image_url ? { uri: contest.banner_image_url } : { uri: defaultBanner }}
@@ -138,22 +156,20 @@ export const ContestDetailScreen: React.FC = () => {
             >
               <Text style={styles.backButtonText}>←</Text>
             </Pressable>
-          </View>
 
-          {/* Title & Cafe Info */}
-          <View style={styles.headerInfo}>
-            <Text className="text-lg font-extrabold text-gray-900 leading-tight mb-2">
-              {contest.name}
-            </Text>
-            
-            <View className="flex-row items-center mb-1.5">
-              <MapPin size={12} color="#94a3b8" style={{ marginRight: 6 }} />
-              <Text className="text-xs font-semibold text-gray-600">Địa điểm tổ chức: {branchName}</Text>
-            </View>
-
-            <View className="flex-row items-center">
-              <Calendar size={12} color="#94a3b8" style={{ marginRight: 6 }} />
-              <Text className="text-xs font-semibold text-gray-600">Thời gian bắt đầu: {formatDate(contest.starts_at)}</Text>
+            {/* Title Glass Card lơ lửng đè lên Banner */}
+            <View style={styles.headerGlassCard}>
+              <Text style={styles.headerTitle}>{contest.name}</Text>
+              <View style={styles.headerMetaRow}>
+                <View style={styles.headerMetaItem}>
+                  <MapPin size={10} color="#ea580c" style={{ marginRight: 4 }} />
+                  <Text style={styles.headerMetaText} numberOfLines={1}>{branchName}</Text>
+                </View>
+                <View style={styles.headerMetaItem}>
+                  <Calendar size={10} color="#ea580c" style={{ marginRight: 4 }} />
+                  <Text style={styles.headerMetaText}>{formatDate(contest.starts_at)}</Text>
+                </View>
+              </View>
             </View>
           </View>
 
@@ -187,34 +203,62 @@ export const ContestDetailScreen: React.FC = () => {
             </Pressable>
           </View>
 
-          {/* Tab Content Area - Render trực tiếp tĩnh để chiều cao tự giãn nở theo cha */}
+          {/* Tab Content Area */}
           <View style={{ padding: 16 }}>
             {activeSubTab === 'INFO' && (
               <View>
-                {/* 1. Quick Stats Grid */}
+                {/* 1. Quick Stats Grid - Thể hiện Lệ phí và Danh sách Tay đua Avatar Overlap */}
                 <View style={styles.statsGrid}>
                   {/* Lệ phí */}
-                  <View style={styles.statsCard}>
+                  <View style={styles.statsCardSmall}>
                     <View style={styles.statsIconWrapper}>
-                      <CreditCard size={18} color="#ea580c" />
+                      <CreditCard size={16} color="#ea580c" />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.statsLabel}>Lệ phí tham gia</Text>
+                      <Text style={styles.statsLabel}>Lệ phí</Text>
                       <Text style={styles.statsValue}>{formatPrice(contest.entry_fee)}</Text>
                     </View>
                   </View>
 
-                  {/* Số lượng */}
-                  <View style={styles.statsCard}>
-                    <View style={styles.statsIconWrapper}>
-                      <Users size={18} color="#ea580c" />
-                    </View>
+                  {/* Danh sách người chơi Đăng ký (Overlap Avatars) */}
+                  <View style={styles.statsCardLong}>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.statsLabel}>Đã đăng ký</Text>
                       <Text style={styles.statsValue}>
-                        {contest.public_stats?.registration_count || 0} / {contest.capacity || '∞'} tay đua
+                        {contest.public_stats?.registration_count || 0} / {contest.capacity || '∞'} VĐV
                       </Text>
                     </View>
+
+                    {topEntrants.length > 0 && (
+                      <View style={styles.avatarOverlapContainer}>
+                        {topEntrants.map((entrant, idx) => (
+                          <View
+                            key={idx}
+                            style={[
+                              styles.avatarBubble,
+                              { marginLeft: idx === 0 ? 0 : -10, zIndex: idx }
+                            ]}
+                          >
+                            {entrant.avatar ? (
+                              <Image source={{ uri: entrant.avatar }} style={styles.avatarImage} />
+                            ) : (
+                              <View style={styles.avatarPlaceholder}>
+                                <Text style={styles.avatarPlaceholderText}>
+                                  {entrant.name.charAt(0).toUpperCase()}
+                                </Text>
+                              </View>
+                            )}
+                          </View>
+                        ))}
+                        {contest.public_stats?.registration_count && contest.public_stats.registration_count > topEntrants.length && (
+                          <View style={[styles.avatarMoreBadge, { zIndex: topEntrants.length }]}>
+                            <Text style={styles.avatarMoreText}>
+                              +{contest.public_stats.registration_count - topEntrants.length}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    )}
                   </View>
                 </View>
 
@@ -226,7 +270,7 @@ export const ContestDetailScreen: React.FC = () => {
                   </Text>
                 </View>
 
-                {/* 3. Rules & Vehicles Section */}
+                {/* 3. Rules & Vehicles Section (Quy chế - Ý tưởng 3) */}
                 <View style={styles.sectionContainer}>
                   <Text style={styles.sectionTitle}>Quy chế & Dòng xe thi đấu</Text>
                   <View style={styles.ruleCardList}>
@@ -272,7 +316,7 @@ export const ContestDetailScreen: React.FC = () => {
                   </View>
                 </View>
 
-                {/* 5. Timeline Schedule Section */}
+                {/* 5. Timeline Schedule Section (Đường đi lịch trình phát sáng - Ý tưởng 5) */}
                 <View style={styles.sectionContainer}>
                   <Text style={styles.sectionTitle}>Lịch trình giải đấu</Text>
                   <View style={styles.timelineContainer}>
@@ -280,7 +324,7 @@ export const ContestDetailScreen: React.FC = () => {
                     <View style={styles.timelineItem}>
                       <View style={styles.timelineLineWrapper}>
                         <View style={[styles.timelineDot, isPastDate(contest.registration_opens_at) ? styles.timelineDotActive : styles.timelineDotInactive]} />
-                        <View style={styles.timelineLine} />
+                        <View style={[styles.timelineLine, isPastDate(contest.registration_closes_at) ? styles.timelineLineActive : styles.timelineLineInactive]} />
                       </View>
                       <View style={styles.timelineContent}>
                         <Text style={styles.timelineLabel}>Mở cổng đăng ký</Text>
@@ -292,7 +336,7 @@ export const ContestDetailScreen: React.FC = () => {
                     <View style={styles.timelineItem}>
                       <View style={styles.timelineLineWrapper}>
                         <View style={[styles.timelineDot, isPastDate(contest.registration_closes_at) ? styles.timelineDotActive : styles.timelineDotInactive]} />
-                        <View style={styles.timelineLine} />
+                        <View style={[styles.timelineLine, isPastDate(contest.starts_at) ? styles.timelineLineActive : styles.timelineLineInactive]} />
                       </View>
                       <View style={styles.timelineContent}>
                         <Text style={styles.timelineLabel}>Đóng cổng đăng ký</Text>
@@ -304,7 +348,7 @@ export const ContestDetailScreen: React.FC = () => {
                     <View style={styles.timelineItem}>
                       <View style={styles.timelineLineWrapper}>
                         <View style={[styles.timelineDot, isPastDate(contest.starts_at) ? styles.timelineDotActive : styles.timelineDotInactive]} />
-                        <View style={styles.timelineLine} />
+                        <View style={[styles.timelineLine, isPastDate(contest.ends_at) ? styles.timelineLineActive : styles.timelineLineInactive]} />
                       </View>
                       <View style={styles.timelineContent}>
                         <Text style={styles.timelineLabel}>Khai mạc & Khởi tranh</Text>
@@ -325,22 +369,52 @@ export const ContestDetailScreen: React.FC = () => {
                   </View>
                 </View>
 
-                {/* 6. Prize list */}
+                {/* 6. Prize list (Giải thưởng lấp lánh - Ý tưởng 2) */}
                 {contest.prize_structure && contest.prize_structure.length > 0 && (
                   <View style={styles.sectionContainer}>
                     <Text style={styles.sectionTitle}>Cơ cấu giải thưởng</Text>
-                    <View style={{ gap: 8 }}>
-                      {contest.prize_structure.map((prize: any, idx: number) => (
-                        <View key={idx} style={styles.prizeCard}>
-                          <View style={styles.prizeBadge}>
-                            <Award size={16} color="#f59e0b" />
+                    <View style={{ gap: 12 }}>
+                      {contest.prize_structure.map((prize: any, idx: number) => {
+                        const rank = prize.rank || (idx + 1);
+                        let cardBg = '#f8fafc';
+                        let borderColor = '#e2e8f0';
+                        let badgeBg = '#e2e8f0';
+                        let badgeTextColor = '#475569';
+                        let iconColor = '#64748b';
+
+                        if (rank === 1) {
+                          cardBg = '#fffbeb';
+                          borderColor = '#fde68a';
+                          badgeBg = '#fef3c7';
+                          badgeTextColor = '#b45309';
+                          iconColor = '#fbbf24';
+                        } else if (rank === 2) {
+                          cardBg = '#f1f5f9';
+                          borderColor = '#cbd5e1';
+                          badgeBg = '#e2e8f0';
+                          badgeTextColor = '#334155';
+                          iconColor = '#94a3b8';
+                        } else if (rank === 3) {
+                          cardBg = '#faf5ff';
+                          borderColor = '#e9d5ff';
+                          badgeBg = '#f3e8ff';
+                          badgeTextColor = '#6b21a8';
+                          iconColor = '#a855f7';
+                        }
+
+                        return (
+                          <View key={idx} style={[styles.prizeCard, { backgroundColor: cardBg, borderColor }]}>
+                            <View style={[styles.prizeBadge, { backgroundColor: badgeBg }]}>
+                              <Award size={18} color={iconColor} />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={[styles.prizeTitle, { color: badgeTextColor }]}>{prize.title}</Text>
+                              <Text style={styles.prizeDesc}>{prize.description}</Text>
+                            </View>
+                            <Text style={[styles.prizeRankLabel, { color: badgeTextColor }]}>Hạng {rank}</Text>
                           </View>
-                          <View style={{ flex: 1 }}>
-                            <Text style={styles.prizeTitle}>{prize.title}</Text>
-                            <Text style={styles.prizeDesc}>{prize.description}</Text>
-                          </View>
-                        </View>
-                      ))}
+                        );
+                      })}
                     </View>
                   </View>
                 )}
@@ -394,7 +468,7 @@ export const ContestDetailScreen: React.FC = () => {
           </View>
         </ScrollView>
 
-        {/* Bottom Bar: Action Register / Payment / Status (Cố định ở đáy) */}
+        {/* Bottom Bar: Action Register / Payment / Status */}
         <View className="p-4 border-t border-gray-100 bg-white">
           {/* Trường hợp Chưa đăng ký và giải đang mở */}
           {!myReg && contest.status === 'OPEN' && (
@@ -477,7 +551,7 @@ const styles = StyleSheet.create({
   },
   bannerContainer: {
     position: 'relative',
-    height: 192,
+    height: 240,
     width: '100%',
     backgroundColor: '#f1f5f9',
   },
@@ -495,16 +569,50 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(15, 23, 42, 0.4)',
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 10,
   },
   backButtonText: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#ffffff',
   },
-  headerInfo: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(241, 245, 249, 0.5)',
+  headerGlassCard: {
+    position: 'absolute',
+    bottom: 12,
+    left: 16,
+    right: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.88)',
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.6)',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  headerTitle: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#0f172a',
+    lineHeight: 18,
+    marginBottom: 6,
+  },
+  headerMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  headerMetaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    maxWidth: '50%',
+  },
+  headerMetaText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#475569',
   },
   tabContainer: {
     flexDirection: 'row',
@@ -541,7 +649,7 @@ const styles = StyleSheet.create({
     gap: 10,
     marginBottom: 16,
   },
-  statsCard: {
+  statsCardSmall: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
@@ -550,18 +658,29 @@ const styles = StyleSheet.create({
     borderColor: '#f1f5f9',
     borderRadius: 16,
     padding: 12,
-    gap: 10,
+    gap: 8,
+  },
+  statsCardLong: {
+    flex: 1.4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#fafafa',
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+    borderRadius: 16,
+    padding: 12,
   },
   statsIconWrapper: {
-    height: 36,
-    width: 36,
+    height: 32,
+    width: 32,
     borderRadius: 10,
     backgroundColor: '#fff7ed',
     alignItems: 'center',
     justifyContent: 'center',
   },
   statsLabel: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '600',
     color: '#94a3b8',
     marginBottom: 2,
@@ -570,6 +689,52 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     color: '#0f172a',
+  },
+  avatarOverlapContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  avatarBubble: {
+    height: 24,
+    width: 24,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#ffffff',
+    overflow: 'hidden',
+    backgroundColor: '#e2e8f0',
+  },
+  avatarImage: {
+    height: '100%',
+    width: '100%',
+  },
+  avatarPlaceholder: {
+    height: '100%',
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fdba74',
+  },
+  avatarPlaceholderText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#ea580c',
+  },
+  avatarMoreBadge: {
+    height: 24,
+    width: 24,
+    borderRadius: 12,
+    backgroundColor: '#fff7ed',
+    borderWidth: 1.5,
+    borderColor: '#ffedd5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: -10,
+    zIndex: 2,
+  },
+  avatarMoreText: {
+    fontSize: 8,
+    fontWeight: '800',
+    color: '#ea580c',
   },
   sectionContainer: {
     marginBottom: 20,
@@ -651,9 +816,7 @@ const styles = StyleSheet.create({
   prizeCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fafafa',
     borderWidth: 1,
-    borderColor: '#f1f5f9',
     borderRadius: 16,
     padding: 12,
     gap: 12,
@@ -662,20 +825,23 @@ const styles = StyleSheet.create({
     height: 32,
     width: 32,
     borderRadius: 8,
-    backgroundColor: '#fef3c7',
     alignItems: 'center',
     justifyContent: 'center',
   },
   prizeTitle: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#1e293b',
     marginBottom: 2,
   },
   prizeDesc: {
     fontSize: 10,
     fontWeight: '600',
     color: '#64748b',
+  },
+  prizeRankLabel: {
+    fontSize: 10,
+    fontWeight: '900',
+    textTransform: 'uppercase',
   },
   // Style cho Timeline
   timelineContainer: {
@@ -709,8 +875,13 @@ const styles = StyleSheet.create({
   timelineLine: {
     flex: 1,
     width: 2,
-    backgroundColor: '#e2e8f0',
     marginVertical: 4,
+  },
+  timelineLineActive: {
+    backgroundColor: '#ea580c',
+  },
+  timelineLineInactive: {
+    backgroundColor: '#e2e8f0',
   },
   timelineContent: {
     flex: 1,

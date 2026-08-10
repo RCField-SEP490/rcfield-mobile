@@ -51,6 +51,8 @@ export interface ContestRegistration {
     avatar_url: string | null;
   };
   participant_name?: string | null;
+  participant_email?: string | null;
+  participant_avatar_url?: string | null;
   driver_handle?: string | null;
   customer_journey_status?: string;
 }
