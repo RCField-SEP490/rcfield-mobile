@@ -67,7 +67,7 @@ export const ContestCard: React.FC<ContestCardProps> = ({ contest, registeredCou
     <TouchableOpacity
       activeOpacity={0.8}
       onPress={() => router.push(`/customer/contest-detail/${contest.id}` as any)}
-      className="mb-4 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm"
+      className="mb-4 overflow-hidden rounded-2xl border border-gray-100 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 shadow-sm"
     >
       {/* Banner */}
       <View className="relative h-44 w-full">
@@ -89,7 +89,7 @@ export const ContestCard: React.FC<ContestCardProps> = ({ contest, registeredCou
       {/* Content */}
       <View className="p-4">
         {/* Title */}
-        <Text className="mb-2 text-base font-extrabold text-gray-900 leading-tight" numberOfLines={2}>
+        <Text className="mb-2 text-base font-extrabold text-gray-900 dark:text-white leading-tight" numberOfLines={2}>
           {contest.name}
         </Text>
 
@@ -97,14 +97,14 @@ export const ContestCard: React.FC<ContestCardProps> = ({ contest, registeredCou
         <View className="space-y-1.5 mb-4">
           <View className="flex-row items-center">
             <Calendar color="#94a3b8" size={14} style={{ marginRight: 8 }} />
-            <Text className="text-xs font-semibold text-gray-600">
+            <Text className="text-xs font-semibold text-gray-600 dark:text-slate-400">
               {formatDate(contest.starts_at)}
             </Text>
           </View>
 
           <View className="flex-row items-center">
             <MapPin color="#94a3b8" size={14} style={{ marginRight: 8 }} />
-            <Text className="text-xs font-semibold text-gray-600" numberOfLines={1}>
+            <Text className="text-xs font-semibold text-gray-600 dark:text-slate-400" numberOfLines={1}>
               {branchName}
             </Text>
           </View>
@@ -112,7 +112,7 @@ export const ContestCard: React.FC<ContestCardProps> = ({ contest, registeredCou
           <View className="flex-row items-center justify-between mt-1">
             <View className="flex-row items-center">
               <Users color="#94a3b8" size={14} style={{ marginRight: 8 }} />
-              <Text className="text-xs font-semibold text-gray-600">
+              <Text className="text-xs font-semibold text-gray-600 dark:text-slate-400">
                 Sức chứa: {contest.capacity ? `${contest.capacity} tay đua` : 'Không giới hạn'}
               </Text>
             </View>
@@ -127,7 +127,7 @@ export const ContestCard: React.FC<ContestCardProps> = ({ contest, registeredCou
         </View>
 
         {/* Action Button */}
-        <View className="border-t border-gray-50 pt-3 flex-row justify-end items-center">
+        <View className="border-t border-gray-50 dark:border-slate-800/60 pt-3 flex-row justify-end items-center">
           <Text className="text-xs font-extrabold text-orange-500 mr-1">Xem chi tiết giải đấu</Text>
           <Text className="text-xs font-extrabold text-orange-500">→</Text>
         </View>

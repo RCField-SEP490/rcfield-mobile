@@ -14,6 +14,7 @@ import {
 } from 'lucide-react-native';
 import { usePathname } from 'expo-router';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import { useColorScheme } from 'nativewind';
 
 import { BookingListScreen } from '@/features/bookings/components/BookingListScreen';
 import { ExploreScreen } from '@/features/explore/components/ExploreScreen';
@@ -74,15 +75,17 @@ const TabBarItem = memo(function TabBarItem({
   Icon,
   isActive,
   onPress,
+  isDark,
 }: {
   index: number;
   title: string;
   Icon: LucideIcon;
   isActive: boolean;
   onPress: (index: number) => void;
+  isDark: boolean;
 }) {
   const handlePress = useCallback(() => onPress(index), [index, onPress]);
-  const color: ColorValue = isActive ? ACTIVE_COLOR : INACTIVE_COLOR;
+  const color: ColorValue = isActive ? ACTIVE_COLOR : (isDark ? '#94a3b8' : INACTIVE_COLOR);
 
   return (
     <Pressable
@@ -110,6 +113,8 @@ const TabBarItem = memo(function TabBarItem({
 });
 
 export function SwipeTabPager() {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const insets = useSafeAreaInsets();
   const role = useAuthStore((state) => state.role);
   const tabs = role === 'staff' ? STAFF_TABS : CUSTOMER_TABS;
@@ -264,7 +269,7 @@ export function SwipeTabPager() {
         {isCustomerWithContest ? (
           <>
             {/* Section A: Main 4-item pill container */}
-            <View style={styles.sectionAPill}>
+            <View style={[styles.sectionAPill, isDark && styles.sectionAPillDark]}>
               {tabs.slice(0, 4).map(({ key, title, Icon }, index) => (
                 <TabBarItem
                   key={key}
@@ -273,6 +278,7 @@ export function SwipeTabPager() {
                   Icon={Icon}
                   isActive={activeIndex === index}
                   onPress={handleTabPress}
+                  isDark={isDark}
                 />
               ))}
             </View>
@@ -282,7 +288,8 @@ export function SwipeTabPager() {
               onPress={() => handleTabPress(4)}
               style={[
                 styles.sectionBButton,
-                activeIndex === 4 ? styles.sectionBActive : styles.sectionBInactive,
+                isDark && styles.sectionBButtonDark,
+                activeIndex === 4 ? styles.sectionBActive : (isDark ? styles.sectionBInactiveDark : styles.sectionBInactive),
               ]}
               android_ripple={{ color: '#ffedd5', borderless: true, radius: 26 }}
             >
@@ -296,7 +303,7 @@ export function SwipeTabPager() {
           </>
         ) : (
           /* Staff Layout: 4 tab floating hợp nhất */
-          <View style={[styles.sectionAPill, { marginRight: 0 }]}>
+          <View style={[styles.sectionAPill, isDark && styles.sectionAPillDark, { marginRight: 0 }]}>
             {tabs.map(({ key, title, Icon }, index) => (
               <TabBarItem
                 key={key}
@@ -305,6 +312,7 @@ export function SwipeTabPager() {
                 Icon={Icon}
                 isActive={activeIndex === index}
                 onPress={handleTabPress}
+                isDark={isDark}
               />
             ))}
           </View>
@@ -388,5 +396,15 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontSize: 9,
     fontWeight: '700',
+  },
+  sectionAPillDark: {
+    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  sectionBButtonDark: {
+    backgroundColor: '#0f172a',
+  },
+  sectionBInactiveDark: {
+    borderColor: 'rgba(51, 65, 85, 0.9)',
   },
 });

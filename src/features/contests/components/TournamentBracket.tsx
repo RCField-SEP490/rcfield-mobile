@@ -6,6 +6,7 @@ import type { ContestMatch, ContestMatchParticipant } from '../types/contests.ty
 interface TournamentBracketProps {
   matches: ContestMatch[];
   onMatchPress?: (match: ContestMatch) => void;
+  isDark?: boolean;
 }
 
 const NODE_WIDTH = 180;
@@ -15,7 +16,7 @@ const ROW_GAP = 25;
 const MARGIN_LEFT = 20;
 const MARGIN_TOP = 30;
 
-export const TournamentBracket: React.FC<TournamentBracketProps> = ({ matches, onMatchPress }) => {
+export const TournamentBracket: React.FC<TournamentBracketProps> = ({ matches, onMatchPress, isDark = false }) => {
   const { width: windowWidth } = useWindowDimensions();
 
   // Nhóm các trận đấu theo vòng (round_no)
@@ -116,8 +117,8 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ matches, o
 
   const getParticipantColor = (p: ContestMatchParticipant | undefined) => {
     if (!p) return '#94a3b8';
-    if (p.is_winner) return '#047857';
-    return '#334155';
+    if (p.is_winner) return isDark ? '#34d399' : '#047857';
+    return isDark ? '#cbd5e1' : '#334155';
   };
 
   const getParticipantFontWeight = (p: ContestMatchParticipant | undefined) => {
@@ -126,10 +127,10 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ matches, o
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isDark && styles.containerDark]}>
       {totalMatches === 0 ? (
         <View className="py-12 items-center justify-center">
-          <Text className="text-sm font-bold text-gray-400 italic">Chưa bốc thăm nên chưa có sơ đồ nhánh đấu.</Text>
+          <Text className="text-sm font-bold text-gray-400 dark:text-slate-500 italic">Chưa bốc thăm nên chưa có sơ đồ nhánh đấu.</Text>
         </View>
       ) : (
         <View style={{ width: containerWidth, height: displayHeight, overflow: 'hidden' }}>
@@ -170,7 +171,7 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ matches, o
                       key={`line-${match.id}`}
                       d={pathData}
                       fill="none"
-                      stroke="#cbd5e1"
+                      stroke={isDark ? '#334155' : '#cbd5e1'}
                       strokeWidth="2"
                     />
                   );
@@ -189,8 +190,8 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ matches, o
                   const isBye = match.metadata?.bye;
                   const isLive = match.status === 'RUNNING';
 
-                  const cardBorderColor = isLive ? '#ea580c' : '#e2e8f0';
-                  const cardBgColor = '#ffffff';
+                  const cardBorderColor = isLive ? '#ea580c' : (isDark ? '#334155' : '#e2e8f0');
+                  const cardBgColor = isDark ? '#1e293b' : '#ffffff';
 
                   return (
                     <G 
@@ -216,26 +217,26 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ matches, o
                         height="18"
                         rx="6"
                         ry="6"
-                        fill="#f8fafc"
+                        fill={isDark ? '#0f172a' : '#f8fafc'}
                       />
                       <SvgText
                         x="8"
                         y="13"
                         fontSize="9"
                         fontWeight="bold"
-                        fill="#64748b"
+                        fill={isDark ? '#94a3b8' : '#64748b'}
                       >
                         {match.name || `Trận ${match.match_no}`}
                       </SvgText>
 
-                      <Path d={`M 1 19 H ${NODE_WIDTH - 1}`} stroke="#f1f5f9" strokeWidth="1" />
+                      <Path d={`M 1 19 H ${NODE_WIDTH - 1}`} stroke={isDark ? '#1e293b' : '#f1f5f9'} strokeWidth="1" />
 
                       <Rect
                         x="2"
                         y="20"
                         width={NODE_WIDTH - 4}
                         height="23"
-                        fill={p1?.is_winner ? '#ecfdf5' : 'transparent'}
+                        fill={p1?.is_winner ? (isDark ? 'rgba(4, 120, 87, 0.2)' : '#ecfdf5') : 'transparent'}
                         rx="4"
                         ry="4"
                       />
@@ -252,14 +253,14 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ matches, o
                         <SvgText x={NODE_WIDTH - 20} y={34} fontSize="9">🏆</SvgText>
                       )}
 
-                      <Path d={`M 4 43 H ${NODE_WIDTH - 4}`} stroke="#f1f5f9" strokeWidth="1" />
+                      <Path d={`M 4 43 H ${NODE_WIDTH - 4}`} stroke={isDark ? '#0f172a' : '#f1f5f9'} strokeWidth="1" />
 
                       <Rect
                         x="2"
                         y="44"
                         width={NODE_WIDTH - 4}
                         height="24"
-                        fill={p2?.is_winner ? '#ecfdf5' : 'transparent'}
+                        fill={p2?.is_winner ? (isDark ? 'rgba(4, 120, 87, 0.2)' : '#ecfdf5') : 'transparent'}
                         rx="4"
                         ry="4"
                       />
@@ -296,5 +297,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(226, 232, 240, 0.5)',
     paddingVertical: 12,
+  },
+  containerDark: {
+    backgroundColor: '#0f172a',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
 });

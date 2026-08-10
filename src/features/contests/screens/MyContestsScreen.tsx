@@ -6,6 +6,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { contestsApi } from '../api/contests.api';
 import { MyRegistrationCard } from '../components/MyRegistrationCard';
 import type { ContestRegistration } from '../types/contests.types';
+import { useColorScheme } from 'nativewind';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -16,6 +17,8 @@ const MOCK_BYOC_PHOTOS = [
 ];
 
 export const MyContestsScreen: React.FC = () => {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const router = useRouter();
   
   const [registrations, setRegistrations] = useState<ContestRegistration[]>([]);
@@ -152,10 +155,10 @@ export const MyContestsScreen: React.FC = () => {
   const renderEmptyComponent = () => {
     if (loading) return null;
     return (
-      <View className="py-20 px-8 items-center justify-center">
-        <Trophy size={48} color="#cbd5e1" style={{ marginBottom: 12 }} />
-        <Text className="text-base font-extrabold text-gray-700 text-center mb-1">Bạn chưa đăng ký giải đấu nào</Text>
-        <Text className="text-xs font-semibold text-gray-400 text-center">
+      <View className="py-20 px-8 items-center justify-center bg-white dark:bg-[#0b0f19]">
+        <Trophy size={48} color={isDark ? '#475569' : '#cbd5e1'} style={{ marginBottom: 12 }} />
+        <Text className="text-base font-extrabold text-gray-700 dark:text-slate-350 text-center mb-1">Bạn chưa đăng ký giải đấu nào</Text>
+        <Text className="text-xs font-semibold text-gray-400 dark:text-slate-500 text-center">
           Khám phá danh sách giải đấu trong tab Giải đấu và tham gia tranh tài ngay.
         </Text>
       </View>
@@ -163,10 +166,10 @@ export const MyContestsScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <SafeAreaView className="flex-1 bg-white dark:bg-[#0b0f19]">
       {/* Header */}
-      <View className="px-5 py-3 border-b border-gray-50 flex-row justify-between items-center">
-        <Text className="text-xl font-extrabold text-gray-900">Giải Đấu Của Tôi</Text>
+      <View className="px-5 py-3 border-b border-gray-50 dark:border-slate-800/80 flex-row justify-between items-center bg-white dark:bg-[#0b0f19]">
+        <Text className="text-xl font-extrabold text-gray-900 dark:text-white">Giải Đấu Của Tôi</Text>
       </View>
 
       {/* List */}
@@ -198,15 +201,15 @@ export const MyContestsScreen: React.FC = () => {
       {/* MODAL EDIT BYOC */}
       <Modal visible={editModalOpen} animationType="slide" transparent>
         <View className="flex-1 bg-black/50 justify-end">
-          <View className="bg-white rounded-t-3xl h-[85%] p-5">
+          <View className="bg-white dark:bg-[#0f172a] rounded-t-3xl h-[85%] p-5 border-t border-gray-100 dark:border-slate-800">
             {/* Header Modal */}
-            <View className="flex-row justify-between items-center border-b border-gray-100 pb-3 mb-4">
+            <View className="flex-row justify-between items-center border-b border-gray-100 dark:border-slate-800 pb-3 mb-4">
               <View className="flex-row items-center">
                 <Edit size={18} color="#ea580c" style={{ marginRight: 8 }} />
-                <Text className="text-base font-extrabold text-gray-900">Chỉnh sửa xe BYOC</Text>
+                <Text className="text-base font-extrabold text-gray-900 dark:text-white">Chỉnh sửa xe BYOC</Text>
               </View>
               <TouchableOpacity activeOpacity={0.8} onPress={() => setEditModalOpen(false)}>
-                <X size={20} className="text-gray-400" />
+                <X size={20} className="text-gray-400 dark:text-slate-500" />
               </TouchableOpacity>
             </View>
 
@@ -214,47 +217,51 @@ export const MyContestsScreen: React.FC = () => {
             <ScrollView className="flex-1 space-y-4 pr-1" showsVerticalScrollIndicator={false}>
               {/* Tên xe */}
               <View className="mb-3">
-                <Text className="text-xs font-bold text-gray-700 mb-1.5">Tên xe / Model</Text>
+                <Text className="text-xs font-bold text-gray-700 dark:text-slate-300 mb-1.5">Tên xe / Model</Text>
                 <TextInput
                   value={editName}
                   onChangeText={setEditName}
                   placeholder="Nhập tên xe..."
-                  className="w-full px-4 py-3 rounded-xl border border-gray-100 text-xs font-semibold text-gray-800 bg-gray-50/20"
+                  placeholderTextColor="#94a3b8"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-100 dark:border-slate-800 text-xs font-semibold text-gray-850 dark:text-white bg-gray-50/20 dark:bg-slate-900/50"
                 />
               </View>
 
               {/* Hãng xe */}
               <View className="mb-3">
-                <Text className="text-xs font-bold text-gray-700 mb-1.5">Hãng xe</Text>
+                <Text className="text-xs font-bold text-gray-700 dark:text-slate-300 mb-1.5">Hãng xe</Text>
                 <TextInput
                   value={editBrand}
                   onChangeText={setEditBrand}
                   placeholder="Nhập hãng xe..."
-                  className="w-full px-4 py-3 rounded-xl border border-gray-100 text-xs font-semibold text-gray-800 bg-gray-50/20"
+                  placeholderTextColor="#94a3b8"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-100 dark:border-slate-800 text-xs font-semibold text-gray-850 dark:text-white bg-gray-50/20 dark:bg-slate-900/50"
                 />
               </View>
 
               {/* Phân khúc */}
               <View className="mb-3">
-                <Text className="text-xs font-bold text-gray-700 mb-1.5">Phân khúc xe (Class)</Text>
+                <Text className="text-xs font-bold text-gray-700 dark:text-slate-300 mb-1.5">Phân khúc xe (Class)</Text>
                 <TextInput
                   value={editClass}
                   onChangeText={setEditClass}
                   placeholder="Ví dụ: 1/10 Drift RWD..."
-                  className="w-full px-4 py-3 rounded-xl border border-gray-100 text-xs font-semibold text-gray-800 bg-gray-50/20"
+                  placeholderTextColor="#94a3b8"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-100 dark:border-slate-800 text-xs font-semibold text-gray-850 dark:text-white bg-gray-50/20 dark:bg-slate-900/50"
                 />
               </View>
 
               {/* Ghi chú */}
               <View className="mb-3">
-                <Text className="text-xs font-bold text-gray-700 mb-1.5">Mô tả cấu hình độ / Nâng cấp (Ghi chú)</Text>
+                <Text className="text-xs font-bold text-gray-700 dark:text-slate-300 mb-1.5">Mô tả cấu hình độ / Nâng cấp (Ghi chú)</Text>
                 <TextInput
                   value={editNotes}
                   onChangeText={setEditNotes}
                   multiline
                   numberOfLines={3}
                   placeholder="Ví dụ: Nâng cấp servo, bộ lốp mới..."
-                  className="w-full px-4 py-3 rounded-xl border border-gray-100 text-xs font-semibold text-gray-800 bg-gray-50/20"
+                  placeholderTextColor="#94a3b8"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-100 dark:border-slate-800 text-xs font-semibold text-gray-850 dark:text-white bg-gray-50/20 dark:bg-slate-900/50"
                   style={{ textAlignVertical: 'top' }}
                 />
               </View>
@@ -263,7 +270,7 @@ export const MyContestsScreen: React.FC = () => {
               <View className="mb-4">
                 <View className="flex-row items-center mb-1.5">
                   <Camera size={14} color="#6b7280" style={{ marginRight: 6 }} />
-                  <Text className="text-xs font-bold text-gray-700">Tải lên ảnh chụp xe (Chọn tối thiểu 2 ảnh)</Text>
+                  <Text className="text-xs font-bold text-gray-700 dark:text-slate-300">Tải lên ảnh chụp xe (Chọn tối thiểu 2 ảnh)</Text>
                 </View>
                 
                 <View className="flex-row gap-3">
@@ -274,7 +281,7 @@ export const MyContestsScreen: React.FC = () => {
                         key={idx}
                         activeOpacity={0.8}
                         onPress={() => handlePhotoToggle(url)}
-                        className="relative flex-1 h-20 rounded-xl overflow-hidden border border-gray-100 bg-gray-100"
+                        className="relative flex-1 h-20 rounded-xl overflow-hidden border border-gray-100 dark:border-slate-800 bg-gray-100 dark:bg-slate-900"
                       >
                         <Image source={{ uri: url }} className="h-full w-full object-cover" />
                         {isSelected && (
@@ -292,13 +299,13 @@ export const MyContestsScreen: React.FC = () => {
             </ScrollView>
 
             {/* Save Button */}
-            <View className="border-t border-gray-50 pt-4 flex-row gap-3">
+            <View className="border-t border-gray-50 dark:border-slate-800/80 pt-4 flex-row gap-3">
               <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={() => setEditModalOpen(false)}
-                className="flex-1 py-3 rounded-xl border border-gray-200 items-center justify-center"
+                className="flex-1 py-3 rounded-xl border border-gray-200 dark:border-slate-700 items-center justify-center bg-white dark:bg-slate-900"
               >
-                <Text className="text-xs font-bold text-gray-500">Đóng</Text>
+                <Text className="text-xs font-bold text-gray-500 dark:text-slate-400">Đóng</Text>
               </TouchableOpacity>
               
               <TouchableOpacity

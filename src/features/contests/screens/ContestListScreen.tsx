@@ -5,6 +5,7 @@ import { Trophy, AlertCircle, Search } from 'lucide-react-native';
 import { contestsApi } from '../api/contests.api';
 import { ContestCard } from '../components/ContestCard';
 import type { Contest } from '../types/contests.types';
+import { useColorScheme } from 'nativewind';
 
 type ContestTabKey = 'ALL' | 'OPEN_RUNNING' | 'UPCOMING' | 'PAST';
 
@@ -30,6 +31,8 @@ const FORMAT_OPTIONS = [
 type FormatKey = typeof FORMAT_OPTIONS[number]['key'];
 
 export const ContestListScreen: React.FC = () => {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const handleScroll = useRef(createScrollHandler()).current;
   const [activeTab, setActiveTab] = useState<ContestTabKey>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
@@ -145,12 +148,12 @@ export const ContestListScreen: React.FC = () => {
   const renderEmptyComponent = () => {
     if (loading) return null;
     return (
-      <View className="py-20 px-8 items-center justify-center">
-        <Trophy size={48} color="#cbd5e1" style={{ marginBottom: 12 }} />
-        <Text className="text-base font-extrabold text-gray-700 text-center mb-1">
+      <View className="py-20 px-8 items-center justify-center bg-white dark:bg-[#0b0f19]">
+        <Trophy size={48} color={isDark ? '#475569' : '#cbd5e1'} style={{ marginBottom: 12 }} />
+        <Text className="text-base font-extrabold text-gray-700 dark:text-slate-300 text-center mb-1">
           {getEmptyMessage()}
         </Text>
-        <Text className="text-xs font-semibold text-gray-400 text-center mt-1">
+        <Text className="text-xs font-semibold text-gray-400 dark:text-slate-500 text-center mt-1">
           Hãy quay lại kiểm tra sau hoặc theo dõi thông báo từ RC Field.
         </Text>
       </View>
@@ -158,21 +161,21 @@ export const ContestListScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <SafeAreaView className="flex-1 bg-white dark:bg-[#0b0f19]">
       {/* Header Title */}
-      <View className="px-5 py-3 border-b border-gray-50 flex-row justify-between items-center">
-        <Text className="text-xl font-extrabold text-gray-900">Giải Đấu RC Field</Text>
+      <View className="px-5 py-3 border-b border-gray-50 dark:border-slate-800/80 flex-row justify-between items-center bg-white dark:bg-[#0b0f19]">
+        <Text className="text-xl font-extrabold text-gray-900 dark:text-white">Giải Đấu RC Field</Text>
       </View>
 
       {/* Search Bar & Dropdown Row */}
-      <View style={styles.filterRow}>
+      <View style={[styles.filterRow, isDark && styles.filterRowDark]}>
         {/* Search Bar */}
-        <View style={styles.searchBar}>
+        <View style={[styles.searchBar, isDark && styles.searchBarDark]}>
           <Search color="#94a3b8" size={15} />
           <TextInput
             placeholder="Tìm tên giải đấu..."
             placeholderTextColor="#94a3b8"
-            style={styles.searchInput}
+            style={[styles.searchInput, isDark && styles.searchInputDark]}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
@@ -186,9 +189,9 @@ export const ContestListScreen: React.FC = () => {
         {/* Dropdown Button */}
         <Pressable
           onPress={() => setFormatModalVisible(true)}
-          style={styles.dropdownButton}
+          style={[styles.dropdownButton, isDark && styles.dropdownButtonDark]}
         >
-          <Text style={styles.dropdownText} numberOfLines={1}>
+          <Text style={[styles.dropdownText, isDark && styles.dropdownTextDark]} numberOfLines={1}>
             {FORMAT_OPTIONS.find((opt) => opt.key === selectedFormat)?.label}
           </Text>
           <Text style={styles.dropdownIcon}>▾</Text>
@@ -199,7 +202,7 @@ export const ContestListScreen: React.FC = () => {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        style={styles.tabScroll}
+        style={[styles.tabScroll, isDark && styles.tabScrollDark]}
         contentContainerStyle={styles.tabScrollContent}
       >
         {CONTEST_TABS.map((tab) => {
@@ -210,13 +213,15 @@ export const ContestListScreen: React.FC = () => {
               onPress={() => setActiveTab(tab.key)}
               style={[
                 styles.tabItem,
-                isActive ? styles.tabItemActive : styles.tabItemInactive
+                isActive ? styles.tabItemActive : styles.tabItemInactive,
+                isDark && (isActive ? styles.tabItemActiveDark : styles.tabItemInactiveDark)
               ]}
             >
               <Text
                 style={[
                   styles.tabText,
-                  isActive ? styles.tabTextActive : styles.tabTextInactive
+                  isActive ? styles.tabTextActive : styles.tabTextInactive,
+                  isDark && !isActive && styles.tabTextInactiveDark
                 ]}
               >
                 {tab.label}
@@ -228,15 +233,15 @@ export const ContestListScreen: React.FC = () => {
 
       {/* Error Message */}
       {error && (
-        <View className="m-4 flex-row items-center bg-red-50 border border-red-100 p-3 rounded-xl">
+        <View className="m-4 flex-row items-center bg-red-50 dark:bg-red-950/20 border border-red-100 dark:border-red-900/30 p-3 rounded-xl">
           <AlertCircle size={16} color="#ef4444" style={{ marginRight: 8 }} />
-          <Text className="text-xs font-bold text-red-600 flex-1">{error}</Text>
+          <Text className="text-xs font-bold text-red-600 dark:text-red-400 flex-1">{error}</Text>
         </View>
       )}
 
       {/* Content List */}
       {loading && contests.length === 0 ? (
-        <View className="flex-1 items-center justify-center">
+        <View className="flex-1 items-center justify-center bg-white dark:bg-[#0b0f19]">
           <ActivityIndicator size="large" color="#ea580c" />
         </View>
       ) : (
@@ -265,9 +270,9 @@ export const ContestListScreen: React.FC = () => {
           style={styles.modalOverlay}
           onPress={() => setFormatModalVisible(false)}
         >
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Chọn thể thức thi đấu</Text>
+          <View style={[styles.modalContent, isDark && styles.modalContentDark]}>
+            <View style={[styles.modalHeader, isDark && styles.modalHeaderDark]}>
+              <Text style={[styles.modalTitle, isDark && styles.modalTitleDark]}>Chọn thể thức thi đấu</Text>
             </View>
             <View style={styles.modalOptions}>
               {FORMAT_OPTIONS.map((opt) => {
@@ -277,7 +282,8 @@ export const ContestListScreen: React.FC = () => {
                     key={opt.key}
                     style={[
                       styles.modalOption,
-                      isSelected && styles.modalOptionActive
+                      isSelected && styles.modalOptionActive,
+                      isDark && isSelected && styles.modalOptionActiveDark
                     ]}
                     onPress={() => {
                       setSelectedFormat(opt.key);
@@ -287,7 +293,9 @@ export const ContestListScreen: React.FC = () => {
                     <Text 
                       style={[
                         styles.modalOptionText,
-                        isSelected && styles.modalOptionTextActive
+                        isDark && styles.modalOptionTextDark,
+                        isSelected && styles.modalOptionTextActive,
+                        isDark && isSelected && styles.modalOptionTextActiveDark
                       ]}
                     >
                       {opt.label}
@@ -462,5 +470,59 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#ea580c',
     fontWeight: 'bold',
+  },
+  // Các style mới cho Dark Mode
+  filterRowDark: {
+    backgroundColor: '#0b0f19',
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  searchBarDark: {
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: 'rgba(30, 41, 59, 0.4)',
+  },
+  searchInputDark: {
+    color: '#ffffff',
+  },
+  dropdownButtonDark: {
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: 'rgba(30, 41, 59, 0.4)',
+  },
+  dropdownTextDark: {
+    color: '#cbd5e1',
+  },
+  tabScrollDark: {
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#0b0f19',
+  },
+  tabItemActiveDark: {
+    backgroundColor: '#2c1a0e',
+    borderColor: '#432611',
+  },
+  tabItemInactiveDark: {
+    backgroundColor: 'rgba(30, 41, 59, 0.4)',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  tabTextInactiveDark: {
+    color: '#94a3b8',
+  },
+  modalContentDark: {
+    backgroundColor: '#0f172a',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 1,
+  },
+  modalHeaderDark: {
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  modalTitleDark: {
+    color: '#ffffff',
+  },
+  modalOptionActiveDark: {
+    backgroundColor: '#2c1a0e',
+  },
+  modalOptionTextDark: {
+    color: '#94a3b8',
+  },
+  modalOptionTextActiveDark: {
+    color: '#ea580c',
   },
 });

@@ -114,12 +114,12 @@ export const MyRegistrationCard: React.FC<MyRegistrationCardProps> = ({
   const showPayButton = registration.payment_status === 'PENDING_PAYMENT' && registration.status !== 'CANCELLED';
 
   return (
-    <View className="mb-4 overflow-hidden rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+    <View className="mb-4 overflow-hidden rounded-2xl border border-gray-100 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-4 shadow-sm">
       {/* Header Info */}
       <TouchableOpacity 
         activeOpacity={0.7} 
         onPress={() => onPressCard(contest.id)}
-        className="flex-row items-center border-b border-gray-50 pb-3"
+        className="flex-row items-center border-b border-gray-50 dark:border-slate-800/60 pb-3"
       >
         <Image
           source={contest.banner_image_url ? { uri: contest.banner_image_url } : { uri: defaultBanner }}
@@ -127,12 +127,12 @@ export const MyRegistrationCard: React.FC<MyRegistrationCardProps> = ({
           resizeMode="cover"
         />
         <View className="ml-3 flex-1">
-          <Text className="text-sm font-extrabold text-gray-900 leading-tight mb-1" numberOfLines={2}>
+          <Text className="text-sm font-extrabold text-gray-900 dark:text-white leading-tight mb-1" numberOfLines={2}>
             {contest.name}
           </Text>
           <View className="flex-row items-center">
             <Calendar color="#94a3b8" size={12} style={{ marginRight: 4 }} />
-            <Text className="text-[11px] font-semibold text-gray-500">
+            <Text className="text-[11px] font-semibold text-gray-500 dark:text-slate-400">
               {formatDate(contest.starts_at)}
             </Text>
           </View>
@@ -151,30 +151,30 @@ export const MyRegistrationCard: React.FC<MyRegistrationCardProps> = ({
       {/* Detail Grid */}
       <View className="my-3 space-y-2">
         <View className="flex-row justify-between items-center">
-          <Text className="text-xs font-semibold text-gray-500">Hình thức xe:</Text>
-          <Text className="text-xs font-bold text-gray-800">
+          <Text className="text-xs font-semibold text-gray-500 dark:text-slate-450">Hình thức xe:</Text>
+          <Text className="text-xs font-bold text-gray-800 dark:text-slate-200">
             {registration.vehicle_source === 'RENTAL' ? 'Thuê xe của cơ sở' : 'Xe cá nhân tự mang (BYOC)'}
           </Text>
         </View>
 
         {registration.vehicle_source === 'BYOC' && registration.metadata?.byoc_declaration && (
           <View className="flex-row justify-between items-center">
-            <Text className="text-xs font-semibold text-gray-500">Xe đăng ký:</Text>
-            <Text className="text-xs font-bold text-gray-800" numberOfLines={1}>
+            <Text className="text-xs font-semibold text-gray-500 dark:text-slate-450">Xe đăng ký:</Text>
+            <Text className="text-xs font-bold text-gray-800 dark:text-slate-200" numberOfLines={1}>
               {registration.metadata.byoc_declaration.vehicle_brand} - {registration.metadata.byoc_declaration.vehicle_name}
             </Text>
           </View>
         )}
 
         <View className="flex-row justify-between items-center">
-          <Text className="text-xs font-semibold text-gray-500">Lệ phí giải:</Text>
-          <Text className="text-xs font-extrabold text-gray-800">
+          <Text className="text-xs font-semibold text-gray-500 dark:text-slate-450">Lệ phí giải:</Text>
+          <Text className="text-xs font-extrabold text-gray-800 dark:text-slate-200">
             {contest.entry_fee === 0 ? 'Miễn phí' : `${contest.entry_fee.toLocaleString('vi-VN')} VND`}
           </Text>
         </View>
 
         <View className="flex-row justify-between items-center">
-          <Text className="text-xs font-semibold text-gray-500">Trạng thái phí:</Text>
+          <Text className="text-xs font-semibold text-gray-500 dark:text-slate-450">Trạng thái phí:</Text>
           <Text className={`text-xs ${getPaymentStatusColor(registration.payment_status)}`}>
             {getPaymentStatusText(registration.payment_status)}
           </Text>
@@ -183,18 +183,18 @@ export const MyRegistrationCard: React.FC<MyRegistrationCardProps> = ({
 
       {/* QR Code and checkInCode (Only when confirmed or checked in) */}
       {registration.status !== 'CANCELLED' && (
-        <View className="my-2 items-center justify-center rounded-xl bg-gray-50 p-4 border border-gray-100/60">
+        <View className="my-2 items-center justify-center rounded-xl bg-gray-50 dark:bg-slate-900/30 p-4 border border-gray-100/60 dark:border-slate-800/80">
           <Image
             source={{ uri: qrCodeUrl }}
             className="h-32 w-32 mb-2 bg-white p-1 rounded-lg"
           />
           <View className="flex-row items-center">
             <QrCode size={14} color="#94a3b8" style={{ marginRight: 4 }} />
-            <Text className="text-xs font-extrabold tracking-wider text-gray-700">
+            <Text className="text-xs font-extrabold tracking-wider text-gray-700 dark:text-slate-350">
               Mã Check-in: {registration.check_in_code}
             </Text>
           </View>
-          <Text className="text-[10px] font-medium text-gray-400 mt-1">
+          <Text className="text-[10px] font-medium text-gray-400 dark:text-slate-500 mt-1">
             Đưa mã này cho nhân viên quét điểm danh ngày thi đấu
           </Text>
         </View>
@@ -207,10 +207,10 @@ export const MyRegistrationCard: React.FC<MyRegistrationCardProps> = ({
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={() => onEditByocPress(registration)}
-            className="flex-1 flex-row items-center justify-center rounded-xl border border-gray-200 py-2.5"
+            className="flex-1 flex-row items-center justify-center rounded-xl border border-gray-200 dark:border-slate-700 py-2.5 bg-white dark:bg-slate-900/40"
           >
             <Edit size={14} color="#4b5563" style={{ marginRight: 6 }} />
-            <Text className="text-xs font-bold text-gray-700">Sửa xe BYOC</Text>
+            <Text className="text-xs font-bold text-gray-700 dark:text-slate-350">Sửa xe BYOC</Text>
           </TouchableOpacity>
         )}
 
