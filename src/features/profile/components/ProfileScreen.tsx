@@ -692,17 +692,17 @@ export function ProfileScreen() {
           )}
 
           {isCustomer && (
-            /* Section: Tiện ích của bạn (Lịch chơi & Giải đấu) */
+            /* Section: Hoạt động & Dịch vụ (Lịch chơi, Giải đấu, Hội viên & Cơ sở yêu thích) */
             <View className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-5 shadow-2xl mb-6">
               <View className="flex-row items-center mb-4 gap-2 border-b border-slate-200 dark:border-slate-800/80 pb-2">
                 <Trophy color="#f97316" size={16} />
                 <Text className="text-[15px] font-bold text-slate-900 dark:text-white uppercase tracking-wider">
-                  Hoạt động của bạn
+                  Hoạt động & Dịch vụ
                 </Text>
               </View>
 
               <View className="gap-3">
-                {/* Lịch chơi */}
+                {/* Lịch chơi của tôi */}
                 <Pressable
                   onPress={() => {
                     const { requestMainTab } = require('@/shared/ui/main-tab-events');
@@ -722,7 +722,7 @@ export function ProfileScreen() {
                   <ChevronRight color="#94a3b8" size={16} />
                 </Pressable>
 
-                {/* Giải đấu tham gia */}
+                {/* Giải đấu đã tham gia */}
                 <Pressable
                   onPress={() => {
                     router.push('/customer/my-contests');
@@ -736,6 +736,40 @@ export function ProfileScreen() {
                     <View className="flex-1 pr-6">
                       <Text className="text-xs font-bold text-slate-800 dark:text-slate-200">Giải đấu đã tham gia</Text>
                       <Text className="text-[10px] font-semibold text-slate-400 mt-0.5" numberOfLines={1}>Theo dõi lịch thi đấu, vé QR giải và kết quả đấu</Text>
+                    </View>
+                  </View>
+                  <ChevronRight color="#94a3b8" size={16} />
+                </Pressable>
+
+                {/* Gói hội viên của tôi */}
+                <Pressable
+                  onPress={() => router.push('/customer/packages' as any)}
+                  className="flex-row items-center justify-between p-3.5 rounded-xl border border-slate-100 dark:border-slate-800/45 bg-slate-50/50 dark:bg-slate-900/40 active:bg-slate-100 dark:active:bg-slate-900"
+                >
+                  <View className="flex-row items-center gap-3">
+                    <View className="size-8 rounded-lg bg-purple-50 dark:bg-purple-950/20 items-center justify-center">
+                      <Gem color="#a855f7" size={16} />
+                    </View>
+                    <View className="flex-1 pr-6">
+                      <Text className="text-xs font-bold text-slate-800 dark:text-slate-250">Gói hội viên của tôi</Text>
+                      <Text className="text-[10px] font-semibold text-slate-400 mt-0.5" numberOfLines={1}>Xem thông tin gói hội viên và đặc quyền tích lũy</Text>
+                    </View>
+                  </View>
+                  <ChevronRight color="#94a3b8" size={16} />
+                </Pressable>
+
+                {/* Cơ sở yêu thích */}
+                <Pressable
+                  onPress={() => router.push('/favorites')}
+                  className="flex-row items-center justify-between p-3.5 rounded-xl border border-slate-100 dark:border-slate-800/45 bg-slate-50/50 dark:bg-slate-900/40 active:bg-slate-100 dark:active:bg-slate-900"
+                >
+                  <View className="flex-row items-center gap-3">
+                    <View className="size-8 rounded-lg bg-red-50 dark:bg-red-950/20 items-center justify-center">
+                      <Heart color="#ef4444" size={16} />
+                    </View>
+                    <View className="flex-1 pr-6">
+                      <Text className="text-xs font-bold text-slate-800 dark:text-slate-250">Cơ sở yêu thích</Text>
+                      <Text className="text-[10px] font-semibold text-slate-400 mt-0.5" numberOfLines={1}>Các chi nhánh RC Field bạn thường xuyên ghé chơi</Text>
                     </View>
                   </View>
                   <ChevronRight color="#94a3b8" size={16} />
@@ -1063,28 +1097,6 @@ export function ProfileScreen() {
 
           {/* Section: Hành động khác */}
           <View className="gap-3.5">
-            <Pressable
-              className="h-12 flex-row items-center justify-center rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 active:bg-slate-100 dark:active:bg-slate-900/60 gap-2.5"
-              onPress={() => router.push('/customer/packages' as any)}
-            >
-              <Gem color="#a855f7" fill="#a855f7" size={18} />
-              <Text className="text-[14px] text-slate-800 dark:text-slate-200 font-bold">
-                Gói hội viên của tôi
-              </Text>
-            </Pressable>
-
-            {isCustomer ? (
-              <Pressable
-                className="h-12 flex-row items-center justify-center rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 active:bg-slate-100 dark:active:bg-slate-900/60 gap-2.5"
-                onPress={() => router.push('/favorites')}
-              >
-                <Heart color="#ef4444" fill="#ef4444" size={18} />
-                <Text className="text-[14px] text-slate-800 dark:text-slate-200 font-bold">
-                  Cơ sở yêu thích
-                </Text>
-              </Pressable>
-            ) : null}
-
             <Pressable
               className="h-12 flex-row items-center justify-center rounded-xl border border-red-200 dark:border-red-900/20 bg-red-50 dark:bg-red-950/10 active:bg-red-100 dark:active:bg-red-950/20 gap-2.5"
               onPress={handleDeleteAccount}
