@@ -131,6 +131,15 @@ export interface Contest {
     [key: string]: any;
   } | null;
   prize_structure?: any[] | null;
+  contest_format?: {
+    id: string;
+    code: 'KNOCKOUT' | 'TIME_TRIAL';
+    name: string;
+    description: string | null;
+    supports_bracket: boolean;
+    supports_time_attack: boolean;
+    supports_multi_round: boolean;
+  } | null;
   
   host_branch: HostBranch | null;
   participating_branches: HostBranch[];
