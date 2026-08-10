@@ -20,8 +20,7 @@ import * as SecureStore from 'expo-secure-store';
 import Svg, { Path } from 'react-native-svg';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
-import * as AuthSession from 'expo-auth-session';
-import * as Google from 'expo-auth-session/providers/google';
+
 
 import { loginSchema, type LoginPayload } from '@/shared/schemas/auth';
 import { useAuthStore } from '@/shared/store/auth-store';

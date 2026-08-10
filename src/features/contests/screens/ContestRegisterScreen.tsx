@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, Image, ActivityIndicator, Alert, SafeAreaView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Shield, ChevronRight, Car, Check, Camera, Info } from 'lucide-react-native';
+import { Shield, Car, Check, Camera } from 'lucide-react-native';
 import { contestsApi, type ContestRentalOption } from '../api/contests.api';
 import type { Contest } from '../types/contests.types';
 

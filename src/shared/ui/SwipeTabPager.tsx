@@ -133,6 +133,7 @@ export function SwipeTabPager() {
       // Chiều cao dịch chuyển xuống = chiều cao tab bar + safe area bottom + padding
       translateY.value = withTiming(visible ? 0 : 120, { duration: 250 });
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const animatedBottomBarStyle = useAnimatedStyle(() => {

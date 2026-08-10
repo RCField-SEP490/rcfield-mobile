@@ -3,7 +3,7 @@ import { View, Text, Image, ScrollView, ActivityIndicator, Pressable, Alert, Sty
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from 'nativewind';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Calendar, MapPin, Award, ShieldAlert, BadgeInfo, Trophy, CreditCard, Flag, Users } from 'lucide-react-native';
+import { Calendar, MapPin, ShieldAlert, Trophy, CreditCard, Flag } from 'lucide-react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { contestsApi } from '../api/contests.api';
 import { TournamentBracket } from '../components/TournamentBracket';
@@ -48,6 +48,7 @@ export const ContestDetailScreen: React.FC = () => {
 
   useEffect(() => {
     fetchContestData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const handleRegisterPress = () => {

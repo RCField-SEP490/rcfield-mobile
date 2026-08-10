@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, ActivityIndicator, RefreshControl, Modal, TextInput, TouchableOpacity, Alert, SafeAreaView, Image, ScrollView } from 'react-native';
-import { Trophy, ShieldAlert, Edit, X, Camera, Check } from 'lucide-react-native';
+import { Trophy, Edit, X, Camera, Check } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { contestsApi } from '../api/contests.api';

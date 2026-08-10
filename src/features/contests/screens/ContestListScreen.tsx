@@ -122,6 +122,7 @@ export const ContestListScreen: React.FC = () => {
 
   useEffect(() => {
     fetchContests();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, selectedFormat, searchQuery]);
 
   const onRefresh = () => {

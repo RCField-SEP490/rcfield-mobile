@@ -39,7 +39,7 @@ import { useColorScheme } from 'nativewind';
 import * as SecureStore from 'expo-secure-store';
 
 import { getMe, updateMe, changePassword, uploadImage } from '@/features/auth/api/auth.api';
-import { createScrollHandler, setTabBarVisibility } from '@/shared/ui/main-tab-events';
+import { createScrollHandler, setTabBarVisibility, requestMainTab } from '@/shared/ui/main-tab-events';
 import { getMyBookings } from '@/features/bookings/api/booking.api';
 import { getCafeById } from '@/features/explore/api/explore.api';
 import { NotificationBellButton } from '@/features/notifications/components/NotificationBellButton';
@@ -705,7 +705,6 @@ export function ProfileScreen() {
                 {/* Lịch chơi của tôi */}
                 <Pressable
                   onPress={() => {
-                    const { requestMainTab } = require('@/shared/ui/main-tab-events');
                     requestMainTab(2);
                   }}
                   className="flex-row items-center justify-between p-3.5 rounded-xl border border-slate-100 dark:border-slate-800/45 bg-slate-50/50 dark:bg-slate-900/40 active:bg-slate-100 dark:active:bg-slate-900"
