@@ -17,8 +17,11 @@ import {
   Award,
   ShieldCheck,
   Heart,
+  ChevronRight,
+  CalendarDays,
+  Trophy,
 } from 'lucide-react-native';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -36,6 +39,7 @@ import { useColorScheme } from 'nativewind';
 import * as SecureStore from 'expo-secure-store';
 
 import { getMe, updateMe, changePassword, uploadImage } from '@/features/auth/api/auth.api';
+import { createScrollHandler, setTabBarVisibility } from '@/shared/ui/main-tab-events';
 import { getMyBookings } from '@/features/bookings/api/booking.api';
 import { getCafeById } from '@/features/explore/api/explore.api';
 import { NotificationBellButton } from '@/features/notifications/components/NotificationBellButton';
@@ -51,6 +55,12 @@ export function ProfileScreen() {
   const setUser = useAuthStore((state) => state.setUser);
   const logout = useAuthStore((state) => state.logout);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+
+  const handleScroll = useRef(createScrollHandler()).current;
+
+  useEffect(() => {
+    setTabBarVisibility(true);
+  }, []);
 
   // Hooks được gọi không điều kiện ở đây
   const [isDarkMode, setIsDarkMode] = useState(colorScheme === 'dark');
@@ -477,6 +487,8 @@ export function ProfileScreen() {
           contentContainerClassName="flex-grow px-5 py-6 pb-12"
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
         >
           {/* Header Màn hình */}
           <View className="mb-6 flex-row items-start justify-between gap-3">
@@ -675,6 +687,59 @@ export function ProfileScreen() {
                     Nhận xe theo lịch hôm nay, cập nhật đơn đồ ăn, thức uống và xem chi tiết phiên chạy.
                   </Text>
                 </View>
+              </View>
+            </View>
+          )}
+
+          {isCustomer && (
+            /* Section: Tiện ích của bạn (Lịch chơi & Giải đấu) */
+            <View className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-5 shadow-2xl mb-6">
+              <View className="flex-row items-center mb-4 gap-2 border-b border-slate-200 dark:border-slate-800/80 pb-2">
+                <Trophy color="#f97316" size={16} />
+                <Text className="text-[15px] font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                  Hoạt động của bạn
+                </Text>
+              </View>
+
+              <View className="gap-3">
+                {/* Lịch chơi */}
+                <Pressable
+                  onPress={() => {
+                    const { requestMainTab } = require('@/shared/ui/main-tab-events');
+                    requestMainTab(2);
+                  }}
+                  className="flex-row items-center justify-between p-3.5 rounded-xl border border-slate-100 dark:border-slate-800/45 bg-slate-50/50 dark:bg-slate-900/40 active:bg-slate-100 dark:active:bg-slate-900"
+                >
+                  <View className="flex-row items-center gap-3">
+                    <View className="size-8 rounded-lg bg-orange-50 dark:bg-orange-950/20 items-center justify-center">
+                      <CalendarDays color="#ea580c" size={16} />
+                    </View>
+                    <View className="flex-1 pr-6">
+                      <Text className="text-xs font-bold text-slate-800 dark:text-slate-200">Lịch chơi của tôi</Text>
+                      <Text className="text-[10px] font-semibold text-slate-400 mt-0.5" numberOfLines={1}>Quản lý lịch đặt và quét mã check-in vào sân</Text>
+                    </View>
+                  </View>
+                  <ChevronRight color="#94a3b8" size={16} />
+                </Pressable>
+
+                {/* Giải đấu tham gia */}
+                <Pressable
+                  onPress={() => {
+                    router.push('/customer/my-contests');
+                  }}
+                  className="flex-row items-center justify-between p-3.5 rounded-xl border border-slate-100 dark:border-slate-800/45 bg-slate-50/50 dark:bg-slate-900/40 active:bg-slate-100 dark:active:bg-slate-900"
+                >
+                  <View className="flex-row items-center gap-3">
+                    <View className="size-8 rounded-lg bg-orange-50 dark:bg-orange-950/20 items-center justify-center">
+                      <Trophy color="#ea580c" size={16} />
+                    </View>
+                    <View className="flex-1 pr-6">
+                      <Text className="text-xs font-bold text-slate-800 dark:text-slate-200">Giải đấu đã tham gia</Text>
+                      <Text className="text-[10px] font-semibold text-slate-400 mt-0.5" numberOfLines={1}>Theo dõi lịch thi đấu, vé QR giải và kết quả đấu</Text>
+                    </View>
+                  </View>
+                  <ChevronRight color="#94a3b8" size={16} />
+                </Pressable>
               </View>
             </View>
           )}

@@ -46,9 +46,10 @@ export const ContestRegisterScreen: React.FC = () => {
         if (detail && (detail.vehicle_rule?.vehicle_policy === 'RENTAL_ONLY' || detail.vehicle_rule?.vehicle_policy === 'MIXED')) {
           setVehicleSource('RENTAL');
           const options = await contestsApi.getRentalOptions(id);
-          setRentalOptions(options);
-          if (options.length > 0) {
-            setSelectedCatalogId(options[0].id);
+          const safeOptions = Array.isArray(options) ? options : [];
+          setRentalOptions(safeOptions);
+          if (safeOptions.length > 0) {
+            setSelectedCatalogId(safeOptions[0].id);
           }
         } else {
           setVehicleSource('BYOC');
@@ -218,7 +219,7 @@ export const ContestRegisterScreen: React.FC = () => {
         {vehicleSource === 'RENTAL' && (
           <View className="mb-6">
             <Text className="text-sm font-extrabold text-gray-900 mb-3">Chọn dòng xe muốn thuê</Text>
-            {rentalOptions.length === 0 ? (
+            {!rentalOptions || rentalOptions.length === 0 ? (
               <View className="p-4 bg-gray-50 rounded-xl border border-gray-100 items-center">
                 <Text className="text-xs font-bold text-gray-400 italic">Cơ sở hiện tại hết xe thi đấu phù hợp.</Text>
               </View>
