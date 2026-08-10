@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -27,7 +27,7 @@ import {
 
 import { useAuthStore } from '@/shared/store/auth-store';
 import { Text } from '@/shared/ui/Text';
-import { requestMainTab } from '@/shared/ui/main-tab-events';
+import { requestMainTab, createScrollHandler } from '@/shared/ui/main-tab-events';
 import { getMyBookings, type BookingListItem } from '@/features/bookings/api/booking.api';
 import { getMyPackages, type MyPackageResponse } from '@/features/packages/api/package.api';
 import { getCafes } from '@/features/explore/api/explore.api';
@@ -136,6 +136,7 @@ const STEPS = [
 
 export function HomeScreen() {
   const router = useRouter();
+  const handleScroll = useRef(createScrollHandler()).current;
   const user = useAuthStore((state) => state.user);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
@@ -227,8 +228,10 @@ export function HomeScreen() {
         </View>
       ) : (
         <ScrollView
-          contentContainerClassName="flex-grow px-5 py-6 pb-16"
+          contentContainerClassName="flex-grow px-5 py-6 pb-28"
           showsVerticalScrollIndicator={false}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
           refreshControl={
             <RefreshControl
               refreshing={loading}

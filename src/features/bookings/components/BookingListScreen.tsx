@@ -7,7 +7,7 @@ import {
   AlertTriangle,
   RotateCcw,
 } from 'lucide-react-native';
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -25,6 +25,7 @@ import { NotificationBellButton } from '@/features/notifications/components/Noti
 import { Text } from '@/shared/ui/Text';
 import { cn } from '@/shared/lib/utils';
 import { useAuthStore } from '@/shared/store/auth-store';
+import { createScrollHandler } from '@/shared/ui/main-tab-events';
 
 // ── 6 category filter theo yêu cầu ──────────────────────────────────────────
 type FilterKey = 'ALL' | BookingStatus;
@@ -82,6 +83,7 @@ function resolveIconColor(textClass: string): string {
 
 export function BookingListScreen() {
   const router = useRouter();
+  const handleScroll = useRef(createScrollHandler()).current;
   const { colorScheme } = useColorScheme();
   const role = useAuthStore((state) => state.role);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -466,8 +468,10 @@ export function BookingListScreen() {
           data={filteredBookings}
           renderItem={renderBookingItem}
           keyExtractor={(item) => item.id}
-          contentContainerClassName="px-5 pb-10"
+          contentContainerClassName="px-5 pb-28"
           showsVerticalScrollIndicator={false}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
