@@ -43,6 +43,7 @@ export const ContestCard: React.FC<ContestCardProps> = ({ contest, registeredCou
   };
 
   const formatPrice = (price: number) => {
+    if (price === undefined || price === null) return 'Miễn phí';
     if (price === 0) return 'Miễn phí';
     return `${price.toLocaleString('vi-VN')} VND`;
   };
@@ -60,6 +61,7 @@ export const ContestCard: React.FC<ContestCardProps> = ({ contest, registeredCou
   };
 
   const defaultBanner = 'https://images.unsplash.com/photo-1568605117036-5fecc6207a71?auto=format&fit=crop&w=600&q=80';
+  const branchName = contest.host_branch?.cafe?.name || 'RC Field Branch';
 
   return (
     <TouchableOpacity
@@ -70,7 +72,7 @@ export const ContestCard: React.FC<ContestCardProps> = ({ contest, registeredCou
       {/* Banner */}
       <View className="relative h-44 w-full">
         <Image
-          source={contest.bannerImageUrl ? { uri: contest.bannerImageUrl } : { uri: defaultBanner }}
+          source={contest.banner_image_url ? { uri: contest.banner_image_url } : { uri: defaultBanner }}
           className="h-full w-full object-cover"
           resizeMode="cover"
         />
@@ -94,32 +96,31 @@ export const ContestCard: React.FC<ContestCardProps> = ({ contest, registeredCou
         {/* Info Rows */}
         <View className="space-y-1.5 mb-4">
           <View className="flex-row items-center">
-            <Calendar className="mr-2 text-gray-400" size={14} />
+            <Calendar color="#94a3b8" size={14} style={{ marginRight: 8 }} />
             <Text className="text-xs font-semibold text-gray-600">
-              {formatDate(contest.startsAt)}
+              {formatDate(contest.starts_at)}
             </Text>
           </View>
 
           <View className="flex-row items-center">
-            <MapPin className="mr-2 text-gray-400" size={14} />
-            {/* Vì BE trả về cafeId và cafeInfo, tạm hiển thị Host Cafe đại diện */}
+            <MapPin color="#94a3b8" size={14} style={{ marginRight: 8 }} />
             <Text className="text-xs font-semibold text-gray-600" numberOfLines={1}>
-              {contest.cafeId ? 'RC Field Branch' : 'Nhiều địa điểm'}
+              {branchName}
             </Text>
           </View>
 
           <View className="flex-row items-center justify-between mt-1">
             <View className="flex-row items-center">
-              <Users className="mr-2 text-gray-400" size={14} />
+              <Users color="#94a3b8" size={14} style={{ marginRight: 8 }} />
               <Text className="text-xs font-semibold text-gray-600">
                 Sức chứa: {contest.capacity ? `${contest.capacity} tay đua` : 'Không giới hạn'}
               </Text>
             </View>
             
             <View className="flex-row items-center">
-              <Ticket className="mr-1 text-orange-500" size={14} />
+              <Ticket color="#f97316" size={14} style={{ marginRight: 4 }} />
               <Text className="text-sm font-extrabold text-orange-600">
-                {formatPrice(contest.entryFee)}
+                {formatPrice(contest.entry_fee)}
               </Text>
             </View>
           </View>

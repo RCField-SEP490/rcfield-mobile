@@ -55,17 +55,11 @@ export const ContestDetailScreen: React.FC = () => {
 
     setActionLoading(true);
     try {
-      // Gọi API tạo link thanh toán VNPay
-      // URL return được định cấu hình sâu trong Expo Linking (ví dụ: rcfield://payment-return)
       const returnUrl = 'rcfield://payment-return';
       const result = await contestsApi.createEntryFeePayment(regId, returnUrl);
       
       if (result && result.payment_url) {
-        // Mở cổng thanh toán trên trình duyệt web bảo mật tích hợp
-        const response = await WebBrowser.openBrowserAsync(result.payment_url);
-        
-        // Sau khi khách hàng đóng trình duyệt (hoặc VNPay redirect quay lại app)
-        // Chúng ta reload lại dữ liệu giải đấu để cập nhật trạng thái
+        await WebBrowser.openBrowserAsync(result.payment_url);
         fetchContestData();
       } else {
         Alert.alert('Thất bại', 'Không thể tạo liên kết thanh toán VNPay.');
@@ -79,6 +73,7 @@ export const ContestDetailScreen: React.FC = () => {
   };
 
   const formatPrice = (price: number) => {
+    if (price === undefined || price === null) return 'Miễn phí';
     if (price === 0) return 'Miễn phí';
     return `${price.toLocaleString('vi-VN')} VND`;
   };
@@ -106,7 +101,7 @@ export const ContestDetailScreen: React.FC = () => {
   if (!contest) {
     return (
       <View className="flex-1 items-center justify-center bg-white p-6">
-        <ShieldAlert size={48} className="text-red-500 mb-3" />
+        <ShieldAlert size={48} color="#ef4444" style={{ marginBottom: 12 }} />
         <Text className="text-base font-extrabold text-gray-800 text-center">Không tìm thấy giải đấu</Text>
         <Text className="text-xs font-semibold text-gray-400 text-center mt-1">Giải đấu có thể đã bị xóa hoặc không khả dụng.</Text>
       </View>
@@ -115,13 +110,14 @@ export const ContestDetailScreen: React.FC = () => {
 
   const defaultBanner = 'https://images.unsplash.com/photo-1568605117036-5fecc6207a71?auto=format&fit=crop&w=600&q=80';
   const myReg = contest.my_registration;
+  const branchName = contest.host_branch?.cafe?.name || 'RC Field Branch';
 
   return (
     <SafeAreaView className="flex-1 bg-white">
       {/* Banner */}
       <View className="relative h-48 w-full bg-gray-100">
         <Image
-          source={contest.bannerImageUrl ? { uri: contest.bannerImageUrl } : { uri: defaultBanner }}
+          source={contest.banner_image_url ? { uri: contest.banner_image_url } : { uri: defaultBanner }}
           className="h-full w-full object-cover"
           resizeMode="cover"
         />
@@ -141,14 +137,14 @@ export const ContestDetailScreen: React.FC = () => {
           {contest.name}
         </Text>
         
-        <View className="flex-row items-center mb-1">
-          <MapPin size={12} className="text-gray-400 mr-1.5" />
-          <Text className="text-xs font-semibold text-gray-600">Địa điểm tổ chức: RC Field Chi nhánh chính</Text>
+        <View className="flex-row items-center mb-1.5">
+          <MapPin size={12} color="#94a3b8" style={{ marginRight: 6 }} />
+          <Text className="text-xs font-semibold text-gray-600">Địa điểm tổ chức: {branchName}</Text>
         </View>
 
         <View className="flex-row items-center">
-          <Calendar size={12} className="text-gray-400 mr-1.5" />
-          <Text className="text-xs font-semibold text-gray-600">Thời gian bắt đầu: {formatDate(contest.startsAt)}</Text>
+          <Calendar size={12} color="#94a3b8" style={{ marginRight: 6 }} />
+          <Text className="text-xs font-semibold text-gray-600">Thời gian bắt đầu: {formatDate(contest.starts_at)}</Text>
         </View>
       </View>
 
@@ -206,27 +202,27 @@ export const ContestDetailScreen: React.FC = () => {
             {/* Rules */}
             <View className="mb-4 p-3 rounded-xl bg-orange-50/50 border border-orange-100/50">
               <View className="flex-row items-center mb-1.5">
-                <BadgeInfo size={14} className="text-orange-600 mr-1.5" />
+                <BadgeInfo size={14} color="#ea580c" style={{ marginRight: 6 }} />
                 <Text className="text-xs font-extrabold text-orange-900">Quy chế & Dòng xe thi đấu</Text>
               </View>
               <Text className="text-[11px] font-semibold text-orange-800 leading-relaxed">
                 • Thể thức thi đấu: Đấu loại trực tiếp 1v1 (Knockout).{'\n'}
                 • Quy định xe: {
-                  contest.vehicleRule?.vehicle_policy === 'RENTAL_ONLY' ? 'Chỉ sử dụng xe thuê của cơ sở.' :
-                  contest.vehicleRule?.vehicle_policy === 'BYOC_ONLY' ? 'Chỉ sử dụng xe cá nhân (BYOC).' :
+                  contest.vehicle_rule?.vehicle_policy === 'RENTAL_ONLY' ? 'Chỉ sử dụng xe thuê của cơ sở.' :
+                  contest.vehicle_rule?.vehicle_policy === 'BYOC_ONLY' ? 'Chỉ sử dụng xe cá nhân (BYOC).' :
                   'Tùy chọn: Sử dụng xe thuê hoặc xe cá nhân tự mang (MIXED).'
                 }
               </Text>
             </View>
 
             {/* Prize list */}
-            {contest.config?.prizes && contest.config.prizes.length > 0 && (
+            {contest.prize_structure && contest.prize_structure.length > 0 && (
               <View className="mb-4">
                 <Text className="text-sm font-extrabold text-gray-900 mb-2">Cơ cấu giải thưởng</Text>
                 <View className="space-y-2">
-                  {contest.config.prizes.map((prize, idx) => (
+                  {contest.prize_structure.map((prize: any, idx: number) => (
                     <View key={idx} className="flex-row items-center p-3 rounded-xl border border-gray-100 bg-gray-50/30">
-                      <Award size={18} className="text-amber-500 mr-2.5" />
+                      <Award size={18} color="#f59e0b" style={{ marginRight: 10 }} />
                       <View className="flex-1">
                         <Text className="text-xs font-extrabold text-gray-800">{prize.title}</Text>
                         <Text className="text-[10px] font-semibold text-gray-500">{prize.description}</Text>
@@ -252,9 +248,9 @@ export const ContestDetailScreen: React.FC = () => {
           <ScrollView className="flex-1 p-4" showsVerticalScrollIndicator={false}>
             <Text className="text-sm font-extrabold text-gray-900 mb-3">Kết quả chung cuộc</Text>
             
-            {contest.config?.published_leaderboard?.entries && contest.config.published_leaderboard.entries.length > 0 ? (
+            {contest.published_leaderboard?.entries && contest.published_leaderboard.entries.length > 0 ? (
               <View className="border border-gray-100 rounded-2xl overflow-hidden divide-y divide-gray-50">
-                {contest.config.published_leaderboard.entries.map((entry) => (
+                {contest.published_leaderboard.entries.map((entry) => (
                   <View key={entry.registration_id} className="flex-row items-center p-3 bg-white">
                     {/* Rank Number */}
                     <View className="h-6 w-6 rounded-full bg-gray-100 items-center justify-center mr-3">
@@ -264,17 +260,23 @@ export const ContestDetailScreen: React.FC = () => {
                     </View>
                     {/* Driver Name */}
                     <View className="flex-1">
-                      <Text className="text-xs font-extrabold text-gray-800">{entry.display_name}</Text>
-                      <Text className="text-[10px] font-semibold text-gray-400">Wins: {entry.wins} trận</Text>
+                      <Text className="text-xs font-extrabold text-gray-800">
+                        {entry.display_name || entry.driver_handle || `Tay đua #${entry.registration_id.substring(0, 6).toUpperCase()}`}
+                      </Text>
+                      <Text className="text-[10px] font-semibold text-gray-400">
+                        {contest.config?.format === 'TIME_TRIAL'
+                          ? `Best Lap: ${((entry.best_lap_ms || (entry.best_lap_seconds ? entry.best_lap_seconds * 1000 : 0)) / 1000).toFixed(2)}s`
+                          : `Wins: ${entry.wins} trận`}
+                      </Text>
                     </View>
                     {/* Badge Trophy */}
-                    {entry.rank === 1 && <Trophy size={16} className="text-amber-500" />}
+                    {entry.rank === 1 && <Trophy size={16} color="#f59e0b" />}
                   </View>
                 ))}
               </View>
             ) : (
               <View className="py-12 items-center justify-center">
-                <Trophy size={36} className="text-gray-300 mb-2" />
+                <Trophy size={36} color="#d1d5db" style={{ marginBottom: 8 }} />
                 <Text className="text-xs font-bold text-gray-400 italic text-center">Bảng xếp hạng sẽ được công bố khi giải đấu kết thúc.</Text>
               </View>
             )}
@@ -291,12 +293,12 @@ export const ContestDetailScreen: React.FC = () => {
             onPress={handleRegisterPress}
             className="w-full bg-orange-600 py-3.5 rounded-xl items-center justify-center shadow-sm"
           >
-            <Text className="text-sm font-extrabold text-white">ĐĂNG KÝ THAM GIA ({formatPrice(contest.entryFee)})</Text>
+            <Text className="text-sm font-extrabold text-white">ĐĂNG KÝ THAM GIA ({formatPrice(contest.entry_fee)})</Text>
           </TouchableOpacity>
         )}
 
         {/* Trường hợp Đã đăng ký nhưng Chưa đóng lệ phí */}
-        {myReg && myReg.status !== 'CANCELLED' && myReg.paymentStatus === 'PENDING_PAYMENT' && (
+        {myReg && myReg.status !== 'CANCELLED' && myReg.payment_status === 'PENDING_PAYMENT' && (
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={handlePaymentPress}
@@ -307,7 +309,7 @@ export const ContestDetailScreen: React.FC = () => {
               <ActivityIndicator size="small" color="#ffffff" />
             ) : (
               <>
-                <CreditCard size={16} className="text-white mr-2" />
+                <CreditCard size={16} color="#ffffff" style={{ marginRight: 8 }} />
                 <Text className="text-sm font-extrabold text-white">THANH TOÁN LỆ PHÍ VNPAY</Text>
               </>
             )}
@@ -315,7 +317,7 @@ export const ContestDetailScreen: React.FC = () => {
         )}
 
         {/* Trường hợp Đã xác nhận / Đang thi đấu */}
-        {myReg && myReg.status !== 'CANCELLED' && myReg.paymentStatus !== 'PENDING_PAYMENT' && (
+        {myReg && myReg.status !== 'CANCELLED' && myReg.payment_status !== 'PENDING_PAYMENT' && (
           <View className="w-full bg-gray-50 border border-gray-100 p-3 rounded-xl flex-row justify-between items-center">
             <View>
               <Text className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Trạng thái của bạn</Text>

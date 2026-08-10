@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, FlatList, ActivityIndicator, RefreshControl, Modal, TextInput, TouchableOpacity, Alert, SafeAreaView, Image, ScrollView } from 'react-native';
 import { Trophy, ShieldAlert, Edit, X, Camera, Check } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
@@ -37,7 +37,7 @@ export const MyContestsScreen: React.FC = () => {
     try {
       const data = await contestsApi.listMyRegistrations();
       // Sắp xếp đăng ký mới nhất lên đầu
-      data.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      data.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       setRegistrations(data);
     } catch (error) {
       console.error('[MyContestsScreen] Load registrations error:', error);
@@ -153,7 +153,7 @@ export const MyContestsScreen: React.FC = () => {
     if (loading) return null;
     return (
       <View className="py-20 px-8 items-center justify-center">
-        <Trophy size={48} className="text-gray-300 mb-3" />
+        <Trophy size={48} color="#cbd5e1" style={{ marginBottom: 12 }} />
         <Text className="text-base font-extrabold text-gray-700 text-center mb-1">Bạn chưa đăng ký giải đấu nào</Text>
         <Text className="text-xs font-semibold text-gray-400 text-center">
           Khám phá danh sách giải đấu trong tab Giải đấu và tham gia tranh tài ngay.
@@ -202,7 +202,7 @@ export const MyContestsScreen: React.FC = () => {
             {/* Header Modal */}
             <View className="flex-row justify-between items-center border-b border-gray-100 pb-3 mb-4">
               <View className="flex-row items-center">
-                <Edit size={18} className="text-orange-500 mr-2" />
+                <Edit size={18} color="#ea580c" style={{ marginRight: 8 }} />
                 <Text className="text-base font-extrabold text-gray-900">Chỉnh sửa xe BYOC</Text>
               </View>
               <TouchableOpacity activeOpacity={0.8} onPress={() => setEditModalOpen(false)}>
@@ -262,7 +262,7 @@ export const MyContestsScreen: React.FC = () => {
               {/* Chọn ảnh chụp xe */}
               <View className="mb-4">
                 <View className="flex-row items-center mb-1.5">
-                  <Camera size={14} className="text-gray-500 mr-1.5" />
+                  <Camera size={14} color="#6b7280" style={{ marginRight: 6 }} />
                   <Text className="text-xs font-bold text-gray-700">Tải lên ảnh chụp xe (Chọn tối thiểu 2 ảnh)</Text>
                 </View>
                 
@@ -279,7 +279,7 @@ export const MyContestsScreen: React.FC = () => {
                         <Image source={{ uri: url }} className="h-full w-full object-cover" />
                         {isSelected && (
                           <View className="absolute inset-0 bg-orange-600/70 items-center justify-center">
-                            <Check size={20} className="text-white" />
+                            <Check size={20} color="#ffffff" />
                           </View>
                         )}
                       </TouchableOpacity>

@@ -22,31 +22,33 @@ export interface ByocDeclaration {
 
 export interface ContestRegistration {
   id: string;
-  contestId: string;
-  userId: string;
-  participantRoleSnapshot: UserRole;
-  vehicleSource: VehicleSource;
-  rentalCatalogId: string | null;
-  rentalCafeId: string | null;
-  vehicleId: string | null;
-  bookingId: string | null;
+  contest_id: string;
+  user_id: string;
+  participant_role_snapshot?: UserRole;
+  vehicle_source: VehicleSource;
+  rental_catalog_id: string | null;
+  rental_cafe_id: string | null;
+  vehicle_id: string | null;
+  customer_vehicle_id?: string | null;
+  booking_id: string | null;
   status: ContestRegistrationStatus;
-  checkInCode: string;
-  entryFeeAmount: number;
-  paymentStatus: ContestEntryFeePaymentStatus;
+  check_in_code: string;
+  entry_fee_amount: number;
+  payment_status: ContestEntryFeePaymentStatus;
   metadata: {
     byoc_declaration?: ByocDeclaration | null;
     fee_note?: string | null;
     [key: string]: any;
   } | null;
-  createdAt: string;
+  created_at: string;
+  updated_at: string;
   
   contest?: Contest;
   participant?: {
     id: string;
-    fullName: string;
+    full_name: string;
     email: string;
-    avatarUrl: string | null;
+    avatar_url: string | null;
   };
   customer_journey_status?: string;
 }
@@ -60,6 +62,7 @@ export interface LeaderboardEntry {
   driver_title_label: string | null;
   wins: number;
   best_lap_seconds: number | null;
+  best_lap_ms?: number | null;
   total_time_seconds: number | null;
   latest_finish_position: number | null;
   matches_completed: number;
@@ -78,25 +81,39 @@ export interface PublishedLeaderboard {
   published_by: string;
 }
 
+export interface HostBranch {
+  id: string;
+  cafe_id: string;
+  role: string;
+  display_order: number;
+  check_in_enabled: boolean;
+  cafe: {
+    id: string;
+    name: string;
+    district: string;
+    city: string;
+    status: string;
+  } | null;
+}
+
 export interface Contest {
   id: string;
-  cafeId: string;
-  providerId: string;
+  provider_id: string;
   name: string;
   description: string | null;
-  trackTypeId: string;
-  contestTypeId: string;
-  contestFormatId: string;
-  contestTemplateId: string;
-  registrationOpensAt: string | null;
-  registrationClosesAt: string | null;
-  startsAt: string | null;
-  endsAt: string | null;
+  track_type_id: string;
+  contest_type_id: string;
+  contest_format_id: string;
+  contest_template_id: string;
+  registration_opens_at: string | null;
+  registration_closes_at: string | null;
+  starts_at: string | null;
+  ends_at: string | null;
   capacity: number | null;
-  entryFee: number;
+  entry_fee: number;
   status: ContestStatus;
-  bannerImageUrl: string | null;
-  vehicleRule: {
+  banner_image_url: string | null;
+  vehicle_rule: {
     vehicle_policy: 'RENTAL_ONLY' | 'BYOC_ONLY' | 'MIXED';
     assignment_policy?: string;
     byoc_require_tech_inspection?: boolean;
@@ -113,48 +130,51 @@ export interface Contest {
     published_leaderboard?: PublishedLeaderboard | null;
     [key: string]: any;
   } | null;
+  prize_structure?: any[] | null;
   
+  host_branch: HostBranch | null;
+  participating_branches: HostBranch[];
   my_registration?: ContestRegistration | null;
   published_leaderboard?: PublishedLeaderboard | null;
 }
 
 export interface ContestMatchParticipant {
-  registrationId: string;
-  fullName: string;
+  registration_id: string;
+  fullName: string; // Tên VĐV hiển thị (được map từ join)
   status: ContestParticipantStatus;
-  isWinner: boolean;
-  slotNo: number;
+  is_winner: boolean;
+  slot_no: number;
   lane: string | null;
-  seedNo: number | null;
-  finishPosition: number | null;
-  bestLapMs: number | null;
-  totalTimeMs: number | null;
-  resultNote?: string | null;
+  seed_no: number | null;
+  finish_position: number | null;
+  best_lap_seconds: number | null;
+  total_time_seconds: number | null;
+  result_note?: string | null;
   registration?: ContestRegistration | null;
 }
 
 export interface ContestMatch {
   id: string;
-  contestId: string;
-  cafeId: string;
-  roundNo: number;
-  matchNo: number;
+  contest_id: string;
+  cafe_id: string;
+  round_no: number;
+  match_no: number;
   name: string | null;
-  matchType: string;
+  match_type: string;
   status: ContestMatchStatus;
-  nextMatchId: string | null;
-  scheduledAt: string;
-  startedAt: string | null;
-  endedAt: string | null;
-  createdBy: string;
-  decidedBy: string | null;
-  decidedAt: string | null;
-  advancementRule: {
+  next_match_id: string | null;
+  scheduled_at: string;
+  started_at: string | null;
+  ended_at: string | null;
+  created_by: string;
+  decided_by: string | null;
+  decided_at: string | null;
+  advancement_rule: {
     winners_to_advance?: number;
     format?: string;
     [key: string]: any;
   } | null;
-  resultSummary: {
+  result_summary: {
     winner_registration_id?: string | null;
     participants_count?: number;
     bye?: boolean;

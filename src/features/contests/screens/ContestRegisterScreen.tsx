@@ -43,7 +43,7 @@ export const ContestRegisterScreen: React.FC = () => {
         setContest(detail);
         
         // Nếu chính sách giải cho phép thuê xe (RENTAL_ONLY hoặc MIXED)
-        if (detail && (detail.vehicleRule?.vehicle_policy === 'RENTAL_ONLY' || detail.vehicleRule?.vehicle_policy === 'MIXED')) {
+        if (detail && (detail.vehicle_rule?.vehicle_policy === 'RENTAL_ONLY' || detail.vehicle_rule?.vehicle_policy === 'MIXED')) {
           setVehicleSource('RENTAL');
           const options = await contestsApi.getRentalOptions(id);
           setRentalOptions(options);
@@ -95,6 +95,12 @@ export const ContestRegisterScreen: React.FC = () => {
       }
     }
 
+    const hostCafeId = contest.host_branch?.cafe_id;
+    if (vehicleSource === 'RENTAL' && !hostCafeId) {
+      Alert.alert('Lỗi', 'Không xác định được chi nhánh đăng ký.');
+      return;
+    }
+
     setSubmitting(true);
     try {
       const payload: any = {
@@ -103,7 +109,7 @@ export const ContestRegisterScreen: React.FC = () => {
 
       if (vehicleSource === 'RENTAL') {
         payload.rental = {
-          cafe_id: contest.cafeId, // Đăng ký tại chi nhánh Host của giải đấu
+          cafe_id: hostCafeId,
           vehicle_catalog_id: selectedCatalogId,
         };
       } else {
@@ -114,13 +120,12 @@ export const ContestRegisterScreen: React.FC = () => {
         payload.byoc_vehicle_photos = selectedPhotos;
       }
 
-      const registration = await contestsApi.registerContest(contest.id, payload);
+      await contestsApi.registerContest(contest.id, payload);
       
       Alert.alert('Đăng ký thành công', 'Hồ sơ đăng ký của bạn đã được khởi tạo thành công.', [
         {
           text: 'Tiếp tục thanh toán',
           onPress: () => {
-            // Chuyển hướng sang trang chi tiết giải để chạy cổng thanh toán VNPay
             router.replace(`/customer/contest-detail/${contest.id}` as any);
           },
         },
@@ -134,6 +139,12 @@ export const ContestRegisterScreen: React.FC = () => {
     }
   };
 
+  const formatPrice = (price: number) => {
+    if (price === undefined || price === null) return 'Miễn phí';
+    if (price === 0) return 'Miễn phí';
+    return `${price.toLocaleString('vi-VN')} VND`;
+  };
+
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center bg-white">
@@ -143,7 +154,7 @@ export const ContestRegisterScreen: React.FC = () => {
   }
 
   if (!contest) return null;
-  const policy = contest.vehicleRule?.vehicle_policy || 'MIXED';
+  const policy = contest.vehicle_rule?.vehicle_policy || 'MIXED';
 
   return (
     <SafeAreaView className="flex-1 bg-white">
@@ -160,11 +171,11 @@ export const ContestRegisterScreen: React.FC = () => {
       <ScrollView className="flex-1 p-4" showsVerticalScrollIndicator={false}>
         {/* Step Header */}
         <View className="mb-6 flex-row items-center bg-gray-50 p-4 rounded-2xl border border-gray-100">
-          <Shield size={20} className="text-orange-500 mr-3" />
+          <Shield size={20} color="#f97316" style={{ marginRight: 12 }} />
           <View className="flex-1">
             <Text className="text-xs font-extrabold text-gray-800">Quy định giải đấu</Text>
             <Text className="text-[10px] font-semibold text-gray-400 mt-0.5">
-              Giải đấu áp dụng phí tham gia {contest.entryFee.toLocaleString('vi-VN')} VND. Bạn cần thanh toán giữ chỗ.
+              Giải đấu áp dụng phí tham gia {formatPrice(contest.entry_fee)}. Bạn cần thanh toán giữ chỗ.
             </Text>
           </View>
         </View>
@@ -181,7 +192,7 @@ export const ContestRegisterScreen: React.FC = () => {
                   vehicleSource === 'RENTAL' ? 'border-orange-500 bg-orange-50/10' : 'border-gray-100 bg-white'
                 }`}
               >
-                <Car size={24} className={vehicleSource === 'RENTAL' ? 'text-orange-500' : 'text-gray-400'} />
+                <Car size={24} color={vehicleSource === 'RENTAL' ? '#ea580c' : '#94a3b8'} />
                 <Text className={`text-xs mt-2 ${vehicleSource === 'RENTAL' ? 'font-extrabold text-gray-900' : 'font-bold text-gray-500'}`}>
                   Thuê xe của quán
                 </Text>
@@ -194,7 +205,7 @@ export const ContestRegisterScreen: React.FC = () => {
                   vehicleSource === 'BYOC' ? 'border-orange-500 bg-orange-50/10' : 'border-gray-100 bg-white'
                 }`}
               >
-                <Shield size={24} className={vehicleSource === 'BYOC' ? 'text-orange-500' : 'text-gray-400'} />
+                <Shield size={24} color={vehicleSource === 'BYOC' ? '#ea580c' : '#94a3b8'} />
                 <Text className={`text-xs mt-2 ${vehicleSource === 'BYOC' ? 'font-extrabold text-gray-900' : 'font-bold text-gray-500'}`}>
                   Tự mang xe (BYOC)
                 </Text>
@@ -234,7 +245,7 @@ export const ContestRegisterScreen: React.FC = () => {
                       <Text className="text-[11px] font-extrabold text-orange-600 mt-1">Phí thuê: Miễn phí trong giải</Text>
                     </View>
                     <View className="h-6 w-6 rounded-full border border-gray-100 items-center justify-center bg-gray-50">
-                      {selectedCatalogId === opt.id && <Check size={14} className="text-orange-600" />}
+                      {selectedCatalogId === opt.id && <Check size={14} color="#ea580c" />}
                     </View>
                   </TouchableOpacity>
                 ))}
@@ -298,7 +309,7 @@ export const ContestRegisterScreen: React.FC = () => {
             {/* Ảnh chụp xe */}
             <View>
               <View className="flex-row items-center mb-1">
-                <Camera size={14} className="text-gray-500 mr-1.5" />
+                <Camera size={14} color="#6b7280" style={{ marginRight: 6 }} />
                 <Text className="text-xs font-bold text-gray-700">Tải lên ảnh chụp xe (Chọn tối thiểu 2 ảnh)</Text>
               </View>
               <Text className="text-[10px] font-semibold text-gray-400 mb-3">
@@ -319,7 +330,7 @@ export const ContestRegisterScreen: React.FC = () => {
                       {/* Check Overlay */}
                       {isSelected ? (
                         <View className="absolute inset-0 bg-orange-600/70 items-center justify-center">
-                          <Check size={20} className="text-white" />
+                          <Check size={20} color="#ffffff" />
                         </View>
                       ) : (
                         <View className="absolute bottom-1 right-1 h-4 w-4 rounded-full bg-black/40 items-center justify-center border border-white/50">

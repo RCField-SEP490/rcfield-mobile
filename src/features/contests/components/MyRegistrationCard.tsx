@@ -95,7 +95,7 @@ export const MyRegistrationCard: React.FC<MyRegistrationCardProps> = ({
     });
   };
 
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${registration.checkInCode}`;
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${registration.check_in_code}`;
   const defaultBanner = 'https://images.unsplash.com/photo-1568605117036-5fecc6207a71?auto=format&fit=crop&w=600&q=80';
 
   const showCancelConfirm = () => {
@@ -110,8 +110,8 @@ export const MyRegistrationCard: React.FC<MyRegistrationCardProps> = ({
   };
 
   const canCancel = registration.status !== 'CANCELLED' && contest.status === 'OPEN';
-  const canEditByoc = registration.vehicleSource === 'BYOC' && registration.status === 'PENDING';
-  const showPayButton = registration.paymentStatus === 'PENDING_PAYMENT' && registration.status !== 'CANCELLED';
+  const canEditByoc = registration.vehicle_source === 'BYOC' && registration.status === 'PENDING';
+  const showPayButton = registration.payment_status === 'PENDING_PAYMENT' && registration.status !== 'CANCELLED';
 
   return (
     <View className="mb-4 overflow-hidden rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
@@ -122,7 +122,7 @@ export const MyRegistrationCard: React.FC<MyRegistrationCardProps> = ({
         className="flex-row items-center border-b border-gray-50 pb-3"
       >
         <Image
-          source={contest.bannerImageUrl ? { uri: contest.bannerImageUrl } : { uri: defaultBanner }}
+          source={contest.banner_image_url ? { uri: contest.banner_image_url } : { uri: defaultBanner }}
           className="h-16 w-16 rounded-xl object-cover"
           resizeMode="cover"
         />
@@ -131,9 +131,9 @@ export const MyRegistrationCard: React.FC<MyRegistrationCardProps> = ({
             {contest.name}
           </Text>
           <View className="flex-row items-center">
-            <Calendar className="mr-1 text-gray-400" size={12} />
+            <Calendar color="#94a3b8" size={12} style={{ marginRight: 4 }} />
             <Text className="text-[11px] font-semibold text-gray-500">
-              {formatDate(contest.startsAt)}
+              {formatDate(contest.starts_at)}
             </Text>
           </View>
         </View>
@@ -153,11 +153,11 @@ export const MyRegistrationCard: React.FC<MyRegistrationCardProps> = ({
         <View className="flex-row justify-between items-center">
           <Text className="text-xs font-semibold text-gray-500">Hình thức xe:</Text>
           <Text className="text-xs font-bold text-gray-800">
-            {registration.vehicleSource === 'RENTAL' ? 'Thuê xe của cơ sở' : 'Xe cá nhân tự mang (BYOC)'}
+            {registration.vehicle_source === 'RENTAL' ? 'Thuê xe của cơ sở' : 'Xe cá nhân tự mang (BYOC)'}
           </Text>
         </View>
 
-        {registration.vehicleSource === 'BYOC' && registration.metadata?.byoc_declaration && (
+        {registration.vehicle_source === 'BYOC' && registration.metadata?.byoc_declaration && (
           <View className="flex-row justify-between items-center">
             <Text className="text-xs font-semibold text-gray-500">Xe đăng ký:</Text>
             <Text className="text-xs font-bold text-gray-800" numberOfLines={1}>
@@ -169,14 +169,14 @@ export const MyRegistrationCard: React.FC<MyRegistrationCardProps> = ({
         <View className="flex-row justify-between items-center">
           <Text className="text-xs font-semibold text-gray-500">Lệ phí giải:</Text>
           <Text className="text-xs font-extrabold text-gray-800">
-            {contest.entryFee === 0 ? 'Miễn phí' : `${contest.entryFee.toLocaleString('vi-VN')} VND`}
+            {contest.entry_fee === 0 ? 'Miễn phí' : `${contest.entry_fee.toLocaleString('vi-VN')} VND`}
           </Text>
         </View>
 
         <View className="flex-row justify-between items-center">
           <Text className="text-xs font-semibold text-gray-500">Trạng thái phí:</Text>
-          <Text className={`text-xs ${getPaymentStatusColor(registration.paymentStatus)}`}>
-            {getPaymentStatusText(registration.paymentStatus)}
+          <Text className={`text-xs ${getPaymentStatusColor(registration.payment_status)}`}>
+            {getPaymentStatusText(registration.payment_status)}
           </Text>
         </View>
       </View>
@@ -189,9 +189,9 @@ export const MyRegistrationCard: React.FC<MyRegistrationCardProps> = ({
             className="h-32 w-32 mb-2 bg-white p-1 rounded-lg"
           />
           <View className="flex-row items-center">
-            <QrCode size={14} className="text-gray-400 mr-1" />
+            <QrCode size={14} color="#94a3b8" style={{ marginRight: 4 }} />
             <Text className="text-xs font-extrabold tracking-wider text-gray-700">
-              Mã Check-in: {registration.checkInCode}
+              Mã Check-in: {registration.check_in_code}
             </Text>
           </View>
           <Text className="text-[10px] font-medium text-gray-400 mt-1">
@@ -209,7 +209,7 @@ export const MyRegistrationCard: React.FC<MyRegistrationCardProps> = ({
             onPress={() => onEditByocPress(registration)}
             className="flex-1 flex-row items-center justify-center rounded-xl border border-gray-200 py-2.5"
           >
-            <Edit size={14} className="text-gray-600 mr-1.5" />
+            <Edit size={14} color="#4b5563" style={{ marginRight: 6 }} />
             <Text className="text-xs font-bold text-gray-700">Sửa xe BYOC</Text>
           </TouchableOpacity>
         )}
@@ -221,7 +221,7 @@ export const MyRegistrationCard: React.FC<MyRegistrationCardProps> = ({
             onPress={() => onPayPress(registration.id)}
             className="flex-1 flex-row items-center justify-center rounded-xl bg-emerald-600 py-2.5"
           >
-            <CreditCard size={14} className="text-white mr-1.5" />
+            <CreditCard size={14} color="#ffffff" style={{ marginRight: 6 }} />
             <Text className="text-xs font-extrabold text-white">Thanh toán VNPay</Text>
           </TouchableOpacity>
         )}
@@ -233,7 +233,7 @@ export const MyRegistrationCard: React.FC<MyRegistrationCardProps> = ({
             onPress={showCancelConfirm}
             className="flex-row items-center justify-center rounded-xl border border-red-100 bg-red-50/50 px-4 py-2.5"
           >
-            <Trash2 size={14} className="text-red-500 mr-1" />
+            <Trash2 size={14} color="#ef4444" style={{ marginRight: 4 }} />
             <Text className="text-xs font-bold text-red-500">Hủy</Text>
           </TouchableOpacity>
         )}
