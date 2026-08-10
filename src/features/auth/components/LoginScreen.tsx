@@ -19,6 +19,7 @@ import { useColorScheme } from 'nativewind';
 import * as SecureStore from 'expo-secure-store';
 import Svg, { Path } from 'react-native-svg';
 import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
 import * as AuthSession from 'expo-auth-session';
 import * as Google from 'expo-auth-session/providers/google';
 
@@ -40,70 +41,7 @@ export function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
 
-  // Tránh lỗi cấu hình khi người dùng điền trùng Web Client ID cho Android/iOS Client ID
-  const androidClientId = env.googleClientIdAndroid && env.googleClientIdAndroid !== env.googleClientId
-    ? env.googleClientIdAndroid
-    : undefined;
-  const iosClientId = env.googleClientIdIos && env.googleClientIdIos !== env.googleClientId
-    ? env.googleClientIdIos
-    : undefined;
 
-  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
-    clientId: env.googleClientId,
-    androidClientId,
-    iosClientId,
-    scopes: ['openid', 'profile', 'email'],
-    redirectUri: AuthSession.makeRedirectUri({
-      scheme: 'rcfieldmobile',
-      preferLocalhost: false,
-    }),
-  });
-
-  // Lắng nghe kết quả đăng nhập Google
-  useEffect(() => {
-    if (response?.type === 'success' && response.authentication?.idToken) {
-      const idToken = response.authentication.idToken;
-      const grantedScopes = response.authentication.scope?.split(' ') || [];
-
-      // Kiểm tra xem người dùng có cấp đủ các scopes cơ bản (email) không
-      const hasEmailScope = grantedScopes.some((s) => s.includes('email'));
-      
-      if (!hasEmailScope) {
-        Alert.alert(
-          'Thiếu quyền truy cập',
-          'RCField cần quyền truy cập Email của bạn để đăng ký/đăng nhập. Vui lòng cấp quyền và thử lại.'
-        );
-        return;
-      }
-      
-      const performGoogleLogin = async () => {
-        try {
-          const user = await loginGoogle(idToken);
-          if (user.role === 'customer' || user.role === 'staff') {
-            router.replace('/(tabs)');
-          } else {
-            Alert.alert(
-              'Truy cập bị từ chối',
-              'Ứng dụng di động chỉ hỗ trợ Customer và Staff vận hành.'
-            );
-            useAuthStore.getState().logout();
-          }
-        } catch (error: any) {
-          let errMsg = 'Không thể xác thực Google ID Token với Server.';
-          if (error?.response) {
-            errMsg = error.response.data?.message || error.response.data?.error || errMsg;
-          } else if (error?.request) {
-            errMsg = 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng của thiết bị di động.';
-          } else {
-            errMsg = error.message || errMsg;
-          }
-          Alert.alert('Đăng nhập Google thất bại', errMsg);
-        }
-      };
-      
-      void performGoogleLogin();
-    }
-  }, [response, loginGoogle, router]);
 
   const {
     control,
@@ -176,18 +114,80 @@ export function LoginScreen() {
 
   const handleGoogleLogin = async () => {
     try {
-      if (!request) {
+      // 1. Tạo returnUrl động thích ứng với cả Expo Go và Standalone Build
+      const returnUrl = Linking.createURL('expo-auth-session', {
+        scheme: 'rcfieldmobile',
+      });
+
+      // 2. Tạo Google Auth URL trực tiếp
+      const googleParams = new URLSearchParams({
+        client_id: env.googleClientId,
+        redirect_uri: 'https://auth.expo.io/@tomishere0712/rcfield-mobile',
+        response_type: 'id_token',
+        scope: 'openid profile email',
+        nonce: 'rcfield_nonce',
+        state: 'rcfield_state',
+        prompt: 'select_account', // Ép buộc hiển thị màn hình chọn tài khoản Google
+      });
+      const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?${googleParams.toString()}`;
+
+      // 3. Tạo startUrl chuyển tiếp qua Expo Auth Proxy
+      const proxyParams = new URLSearchParams({
+        authUrl: googleAuthUrl,
+        returnUrl: returnUrl,
+      });
+      const startUrl = `https://auth.expo.io/@tomishere0712/rcfield-mobile/start?${proxyParams.toString()}`;
+
+      // 4. Mở trình duyệt xác thực hệ thống (Bypass disallowed_useragent)
+      const result = await WebBrowser.openAuthSessionAsync(startUrl, returnUrl);
+
+      if (result.type === 'success' && result.url) {
+        // 5. Giải mã deep link callback
+        const parsed = Linking.parse(result.url);
+        // ID Token có thể nằm trong query parameters hoặc fragment hash của callback url
+        let idToken = parsed.queryParams?.id_token;
+        if (!idToken) {
+          const match = result.url.match(/id_token=([^&]+)/);
+          if (match) {
+            idToken = match[1];
+          }
+        }
+
+        if (!idToken) {
+          Alert.alert('Đăng nhập Google thất bại', 'Không lấy được thông tin ID Token từ Google.');
+          return;
+        }
+
+        const tokenStr = Array.isArray(idToken) ? idToken[0] : idToken;
+
+        // 6. Gửi token lên backend xác thực
+        try {
+          const user = await loginGoogle(tokenStr);
+          if (user.role === 'customer' || user.role === 'staff') {
+            router.replace('/(tabs)');
+          } else {
+            Alert.alert(
+              'Truy cập bị từ chối',
+              `Tài khoản của bạn có vai trò là "${user.role.toUpperCase()}". Ứng dụng di động chỉ hỗ trợ Customer và Staff vận hành.`
+            );
+            useAuthStore.getState().logout();
+          }
+        } catch (error: any) {
+          let errMsg = 'Không thể xác thực Google ID Token với Server.';
+          if (error?.response) {
+            errMsg = error.response.data?.message || error.response.data?.error || errMsg;
+          } else if (error?.request) {
+            errMsg = 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng của thiết bị di động.';
+          } else {
+            errMsg = error.message || errMsg;
+          }
+          Alert.alert('Đăng nhập Google thất bại', errMsg);
+        }
+      } else {
+        // Cho phép dùng tài khoản test nếu huỷ/lỗi giống logic cũ
         Alert.alert(
           'Đăng nhập Google',
-          'Đang khởi tạo cấu hình đăng nhập Google. Vui lòng thử lại sau giây lát.'
-        );
-        return;
-      }
-      const result = await promptAsync();
-      if (result.type === 'error') {
-        Alert.alert(
-          'Lỗi đăng nhập Google',
-          'Không thể mở popup Google. Bạn có muốn sử dụng tài khoản thử nghiệm thay thế?',
+          'Quá trình đăng nhập đã bị hủy hoặc gặp sự cố. Bạn có muốn sử dụng tài khoản thử nghiệm thay thế?',
           [
             { text: 'Hủy', style: 'cancel' },
             {
