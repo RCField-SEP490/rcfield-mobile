@@ -9,9 +9,11 @@ import {
   Compass,
   Home,
   UserRound,
+  Trophy,
   type LucideIcon,
 } from 'lucide-react-native';
 import { usePathname } from 'expo-router';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 
 import { BookingListScreen } from '@/features/bookings/components/BookingListScreen';
 import { ExploreScreen } from '@/features/explore/components/ExploreScreen';
@@ -20,13 +22,12 @@ import { ProfileScreen } from '@/features/profile/components/ProfileScreen';
 import { StaffBookingsScreen } from '@/features/staff/components/StaffBookingsScreen';
 import { StaffFnbOrdersScreen } from '@/features/staff/components/StaffFnbOrdersScreen';
 import { StaffHomeScreen } from '@/features/staff/components/StaffHomeScreen';
+import { ContestListScreen } from '@/features/contests/screens/ContestListScreen';
 import { useAuthStore } from '@/shared/store/auth-store';
-import { subscribeMainTabRequests } from '@/shared/ui/main-tab-events';
+import { subscribeMainTabRequests, subscribeTabBarVisibility } from '@/shared/ui/main-tab-events';
 
-const ACTIVE_COLOR = '#10b981';
+const ACTIVE_COLOR = '#ea580c'; // Đổi sang màu cam thương hiệu
 const INACTIVE_COLOR = '#64748b';
-
-const TAB_BAR_HEIGHT = 56;
 
 type MainTab = {
   key: string;
@@ -41,6 +42,7 @@ const CUSTOMER_TABS: MainTab[] = [
   { key: 'explore', title: 'Khám phá', href: '/explore', Icon: Compass, Screen: ExploreScreen },
   { key: 'bookings', title: 'Lịch đặt', href: '/bookings', Icon: CalendarDays, Screen: BookingListScreen },
   { key: 'profile', title: 'Cá nhân', href: '/profile', Icon: UserRound, Screen: ProfileScreen },
+  { key: 'contest', title: 'Giải đấu', href: '/contests', Icon: Trophy, Screen: ContestListScreen },
 ];
 
 const STAFF_TABS: MainTab[] = [
@@ -50,7 +52,6 @@ const STAFF_TABS: MainTab[] = [
   { key: 'profile', title: 'Cá nhân', href: '/profile', Icon: UserRound, Screen: ProfileScreen },
 ];
 
-// Biến toàn cục lưu giữ tab đang active để khôi phục chính xác khi Back từ trang con về
 let globalActiveTabIdx = 0;
 
 const PagerScreen = memo(function PagerScreen({
@@ -90,8 +91,16 @@ const TabBarItem = memo(function TabBarItem({
       onPress={handlePress}
       style={styles.tabButton}
     >
-      <View style={styles.tabIconWrap}>
-        <Icon color={String(color)} size={23} strokeWidth={2.15} />
+      <View style={[
+        styles.tabIconWrap,
+        isActive && {
+          backgroundColor: 'rgba(234, 88, 12, 0.2)', // Màu cam trong suốt
+          borderRadius: 22,
+          width: '90%',
+          height: '80%',
+        }
+      ]}>
+        <Icon color={String(color)} size={18} strokeWidth={2.2} />
         <Text numberOfLines={1} style={[styles.tabLabel, { color: String(color) }]}>
           {title}
         </Text>
@@ -110,20 +119,33 @@ export function SwipeTabPager() {
   const activeIndexRef = useRef(globalActiveTabIdx);
   const pathname = usePathname();
 
+  // Animation values cho việc ẩn/hiện TabBar khi cuộn
+  const translateY = useSharedValue(0);
+
+  useEffect(() => {
+    // Đăng ký nhận sự kiện ẩn/hiện từ các Screen con
+    return subscribeTabBarVisibility((visible) => {
+      // Chiều cao dịch chuyển xuống = chiều cao tab bar + safe area bottom + padding
+      translateY.value = withTiming(visible ? 0 : 120, { duration: 250 });
+    });
+  }, []);
+
+  const animatedBottomBarStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ translateY: translateY.value }],
+    };
+  });
+
   // Lắng nghe thay đổi của route để đồng bộ hóa tab hiện tại
   useEffect(() => {
-    console.log('[SwipeTabPager] Pathname changed to:', pathname);
     const matchedIndex = tabs.findIndex((tab) => {
       if (tab.href === '/') {
         return pathname === '/' || pathname === '/(tabs)' || pathname === '/(tabs)/';
       }
       return pathname === tab.href || pathname === `/(tabs)${tab.href}`;
     });
-    console.log('[SwipeTabPager] Matched index:', matchedIndex, 'Active index ref:', activeIndexRef.current, 'Global active index:', globalActiveTabIdx);
 
     if (matchedIndex !== -1 && matchedIndex !== activeIndexRef.current) {
-      // Nếu matchedIndex là 0 (Home tab) nhưng globalActiveTabIdx đang ở tab khác (do back từ subpage về),
-      // thì giữ nguyên tab hiện tại bằng cách khôi phục lại globalActiveTabIdx
       let targetIndex = matchedIndex;
       if (matchedIndex === 0 && globalActiveTabIdx !== 0) {
         targetIndex = globalActiveTabIdx;
@@ -151,7 +173,6 @@ export function SwipeTabPager() {
       if (previous.has(index)) {
         return previous;
       }
-
       const next = new Set(previous);
       next.add(index);
       return next;
@@ -189,7 +210,7 @@ export function SwipeTabPager() {
     activeIndexRef.current = index;
     setActiveIndex(index);
     markTabLoaded(index);
-    globalActiveTabIdx = index; // Cập nhật biến global
+    globalActiveTabIdx = index;
   }, [markTabLoaded]);
 
   const handlePageSelected = useCallback(
@@ -210,11 +231,12 @@ export function SwipeTabPager() {
     activeIndexRef.current = index;
     setActiveIndex(index);
     markTabLoaded(index);
-    globalActiveTabIdx = index; // Cập nhật biến global
-
-    // Bấm bottom tab thì xuất hiện liền lập tức không có animation trượt theo yêu cầu
+    globalActiveTabIdx = index;
     pagerRef.current?.setPageWithoutAnimation(index);
   }, [markTabLoaded]);
+
+  // Layout 5 tabs chia thành: 4 tab bên trái và 1 tab "Giải đấu" tròn tách biệt bên phải
+  const isCustomerWithContest = tabs.length === 5;
 
   return (
     <View className="flex-1 bg-[#f8fafc] dark:bg-[#0b0f19]">
@@ -231,21 +253,63 @@ export function SwipeTabPager() {
         ))}
       </PagerView>
 
-      <View
-        className="flex-row items-center border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0b0f19]"
-        style={{ height: TAB_BAR_HEIGHT + insets.bottom, paddingBottom: insets.bottom }}
+      {/* Floating Bottom Navigation Bar (Xanh SM style) */}
+      <Animated.View
+        style={[
+          animatedBottomBarStyle,
+          styles.bottomBarWrapper,
+          { bottom: Math.max(insets.bottom, 12) },
+        ]}
       >
-        {tabs.map(({ key, title, Icon }, index) => (
-          <TabBarItem
-            key={key}
-            index={index}
-            title={title}
-            Icon={Icon}
-            isActive={activeIndex === index}
-            onPress={handleTabPress}
-          />
-        ))}
-      </View>
+        {isCustomerWithContest ? (
+          <>
+            {/* Section A: Main 4-item pill container */}
+            <View style={styles.sectionAPill}>
+              {tabs.slice(0, 4).map(({ key, title, Icon }, index) => (
+                <TabBarItem
+                  key={key}
+                  index={index}
+                  title={title}
+                  Icon={Icon}
+                  isActive={activeIndex === index}
+                  onPress={handleTabPress}
+                />
+              ))}
+            </View>
+
+            {/* Section B: Separated Floating Button for "Contest" */}
+            <Pressable
+              onPress={() => handleTabPress(4)}
+              style={[
+                styles.sectionBButton,
+                activeIndex === 4 ? styles.sectionBActive : styles.sectionBInactive,
+              ]}
+              android_ripple={{ color: '#ffedd5', borderless: true, radius: 26 }}
+            >
+              <Trophy 
+                color={activeIndex === 4 ? '#ea580c' : '#fbbf24'} 
+                fill="#f59e0b" 
+                size={22} 
+                strokeWidth={2} 
+              />
+            </Pressable>
+          </>
+        ) : (
+          /* Staff Layout: 4 tab floating hợp nhất */
+          <View style={[styles.sectionAPill, { marginRight: 0 }]}>
+            {tabs.map(({ key, title, Icon }, index) => (
+              <TabBarItem
+                key={key}
+                index={index}
+                title={title}
+                Icon={Icon}
+                isActive={activeIndex === index}
+                onPress={handleTabPress}
+              />
+            ))}
+          </View>
+        )}
+      </Animated.View>
     </View>
   );
 }
@@ -257,23 +321,72 @@ const styles = StyleSheet.create({
   page: {
     flex: 1,
   },
+  bottomBarWrapper: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'transparent',
+    pointerEvents: 'box-none', // Cho phép bấm xuyên qua vùng khoảng trống
+  },
+  sectionAPill: {
+    flex: 1,
+    flexDirection: 'row',
+    height: 60,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)', // Trong suốt hơi mờ
+    borderRadius: 30,
+    marginRight: 10,
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.8)',
+    // Shadow nhẹ mờ
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  sectionBButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#ffffff', // Nền luôn màu trắng
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2.5,
+    // Shadow
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  sectionBInactive: {
+    borderColor: 'rgba(226, 232, 240, 0.9)', // Viền xám nhẹ mờ khi không active
+  },
+  sectionBActive: {
+    borderColor: '#ea580c', // Viền cam khi active
+    shadowColor: '#ea580c',
+    shadowOpacity: 0.2,
+  },
   tabButton: {
     flex: 1,
     height: '100%',
-    minWidth: 0,
     alignItems: 'center',
     justifyContent: 'center',
   },
   tabIconWrap: {
     width: '100%',
-    minHeight: 44,
+    height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
   },
   tabLabel: {
-    maxWidth: '100%',
-    marginTop: 1,
-    fontSize: 11,
-    fontWeight: '600',
+    marginTop: 2,
+    fontSize: 9,
+    fontWeight: '700',
   },
 });

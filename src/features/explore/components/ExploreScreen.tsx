@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -20,6 +20,7 @@ import { useLocation } from '@/shared/hooks/useLocation';
 import { useAuthStore } from '@/shared/store/auth-store';
 import { NotificationBellButton } from '@/features/notifications/components/NotificationBellButton';
 import { Text } from '@/shared/ui/Text';
+import { createScrollHandler } from '@/shared/ui/main-tab-events';
 
 // Hàm tính khoảng cách Haversine (km)
 function getHaversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -41,6 +42,7 @@ const TRACK_TYPES = ['Tất cả', 'Drift', 'Off-Road', 'Speed'];
 
 export function ExploreScreen() {
   const router = useRouter();
+  const handleScroll = useRef(createScrollHandler()).current;
   const { location: userLocation } = useLocation();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
@@ -430,8 +432,10 @@ export function ExploreScreen() {
           data={filteredCafes}
           renderItem={renderCafeItem}
           keyExtractor={(item) => item.id}
-          contentContainerClassName="pb-24"
+          contentContainerClassName="pb-28"
           showsVerticalScrollIndicator={false}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
           onRefresh={fetchCafes}
           refreshing={loading}
         />
