@@ -56,12 +56,35 @@ export interface TodayBookingItem {
   sessions: StaffSessionSummary[];
 }
 
+/** Minimal detail returned by GET /bookings/:id for a scanned booking QR. */
+export interface StaffQrBookingLookup {
+  id: string;
+  status: StaffBookingStatus;
+  slotStart: string;
+  slotEnd: string;
+  playMode?: TodayBookingItem['playMode'];
+  session?: {
+    id: string;
+    status?: string;
+    plannedEndAt?: string;
+  } | null;
+}
+
 export interface StaffSessionSummary {
   sessionId?: string;
   id?: string;
   status?: string;
   plannedEnd?: string;
   plannedEndAt?: string;
+  operationalTiming?: {
+    state: 'NOT_APPLICABLE' | 'ON_TIME' | 'DUE_FOR_CHECKOUT' | 'OVERDUE';
+    minutesUntilPlannedEnd: number;
+    minutesPastPlannedEnd: number;
+    isOverdue: boolean;
+    shouldAlert: boolean;
+    graceMinutes?: number;
+    alertAfterMinutes?: number;
+  };
 }
 
 export interface TodayFnbOrderItem {
@@ -94,6 +117,7 @@ export interface StaffSessionDetail {
   actualStart?: string;
   actualEnd?: string;
   plannedEnd: string;
+  operationalTiming?: StaffSessionSummary['operationalTiming'];
   participants: { name: string; type: string; avatarUrl?: string }[];
   vehicles: {
     vehicleId: string;
@@ -167,15 +191,27 @@ export interface SubmitInspectionPayload {
   damageLineItems?: DamageLineItemInput[];
 }
 
+export interface StaffMenuVariant {
+  id: string;
+  name: string;
+  price: number | string;
+  displayOrder?: number;
+  isAvailable?: boolean;
+}
+
 export interface StaffMenuItem {
   id: string;
   name: string;
   price: number | string;
+  description?: string | null;
+  categoryId?: string | null;
+  categoryName?: string | null;
   image?: string | null;
   imageUrl?: string | null;
   image_url?: string | null;
   available?: boolean;
   isAvailable?: boolean;
+  variants?: StaffMenuVariant[];
 }
 
 export interface StaffVehicleUnit {
@@ -191,6 +227,50 @@ export interface StaffVehicleUnit {
     tier?: string;
     cover_image_url?: string | null;
   } | null;
+}
+
+function normalizeStaffMenuItems(value: unknown): StaffMenuItem[] {
+  if (!Array.isArray(value)) return [];
+
+  return value.flatMap((rawItem) => {
+    if (!rawItem || typeof rawItem !== 'object') return [];
+
+    const item = rawItem as Record<string, unknown>;
+    if (typeof item.id !== 'string' || typeof item.name !== 'string') return [];
+
+    const variants = Array.isArray(item.variants)
+      ? item.variants.flatMap((rawVariant) => {
+          if (!rawVariant || typeof rawVariant !== 'object') return [];
+          const variant = rawVariant as Record<string, unknown>;
+          if (typeof variant.id !== 'string' || typeof variant.name !== 'string') return [];
+
+          return [{
+            id: variant.id,
+            name: variant.name,
+            price: Number(variant.price ?? 0),
+            displayOrder:
+              typeof variant.displayOrder === 'number' ? variant.displayOrder : undefined,
+            isAvailable:
+              typeof variant.isAvailable === 'boolean' ? variant.isAvailable : true,
+          }];
+        })
+      : [];
+
+    return [{
+      id: item.id,
+      name: item.name,
+      price: Number(item.price ?? 0),
+      description: typeof item.description === 'string' ? item.description : null,
+      categoryId: typeof item.categoryId === 'string' ? item.categoryId : null,
+      categoryName: typeof item.categoryName === 'string' ? item.categoryName : null,
+      image: typeof item.image === 'string' ? item.image : null,
+      imageUrl: typeof item.imageUrl === 'string' ? item.imageUrl : null,
+      image_url: typeof item.image_url === 'string' ? item.image_url : null,
+      available: typeof item.available === 'boolean' ? item.available : undefined,
+      isAvailable: typeof item.isAvailable === 'boolean' ? item.isAvailable : undefined,
+      variants,
+    }];
+  });
 }
 
 export const staffApi = {
@@ -211,6 +291,17 @@ export const staffApi = {
   async checkIn(bookingId: string): Promise<any> {
     const response = await api.post<{ success: boolean; data: any }>(
       `/staff/bookings/${bookingId}/check-in`
+    );
+    return response.data.data;
+  },
+
+  /**
+   * QR data is the booking UUID, not a short code. This endpoint also applies
+   * the backend's cafe-assignment authorization before a check-in is started.
+   */
+  async getBookingForQrCheckIn(bookingId: string): Promise<StaffQrBookingLookup> {
+    const response = await api.get<{ success: boolean; data: StaffQrBookingLookup }>(
+      `/bookings/${bookingId}`
     );
     return response.data.data;
   },
@@ -281,7 +372,14 @@ export const staffApi = {
 
   async addSessionFnbOrder(
     sessionId: string,
-    payload: { items: { name: string; qty: number; price: number }[] }
+    payload: {
+      items: {
+        menu_item_id: string;
+        variant_id?: string;
+        quantity: number;
+        notes?: string;
+      }[];
+    }
   ): Promise<any> {
     const response = await api.post<{ success: boolean; data: any }>(
       `/staff/sessions/${sessionId}/fnb-orders`,
@@ -302,11 +400,11 @@ export const staffApi = {
   },
 
   async getCafeMenu(cafeId: string): Promise<StaffMenuItem[]> {
-    const response = await api.get<{ success: boolean; data: StaffMenuItem[] }>(
+    const response = await api.get<{ success: boolean; data: unknown }>(
       `/cafes/${cafeId}/menu`,
       { params: { available: true, limit: 100 } }
     );
-    return response.data.data || [];
+    return normalizeStaffMenuItems(response.data.data);
   },
 
   async getCafeVehicles(cafeId: string): Promise<StaffVehicleUnit[]> {
