@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
+  AlertTriangle,
   ArrowLeft,
   Car,
   CheckCircle2,
@@ -26,6 +27,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { staffApi, type StaffInspectionType, type StaffSessionDetail } from '@/features/staff/api/staff.api';
 import { getStatusLabel } from '@/features/bookings/lib/status-label';
 import { StaffSessionTools } from '@/features/staff/components/StaffSessionTools';
+import {
+  getSessionOperationalTiming,
+  type SessionOperationalTiming,
+} from '@/features/staff/lib/session-operational-timing';
 import { wsClient } from '@/shared/lib/websocket';
 import { ImageZoomModal } from '@/shared/ui/ImageZoomModal';
 import { Text } from '@/shared/ui/Text';
@@ -68,8 +73,23 @@ const PHOTO_ANGLE_LABELS: Record<string, string> = {
   DETAIL: 'Cận cảnh',
 };
 
+const PART_TYPE_LABELS: Record<string, string> = {
+  TIRE_WHEEL: 'Bánh xe / Lốp',
+  SPOILER: 'Cánh gió',
+  CHASSIS: 'Khung gầm',
+  MOTOR: 'Motor / Động cơ',
+  SHELL: 'Vỏ nhựa (Shell)',
+  SERVO: 'Servo / Tay lái',
+  REMOTE: 'Remote / Điều khiển',
+  OTHER: 'Khác',
+};
+
 function getPhotoAngleLabel(angle?: string) {
   return angle ? PHOTO_ANGLE_LABELS[angle] : undefined;
+}
+
+function getPartTypeLabel(type?: string) {
+  return type ? PART_TYPE_LABELS[type] || type : 'Hư hỏng';
 }
 
 function getFnbOrderStatusLabel(status?: string) {
@@ -147,6 +167,7 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
   const [settling, setSettling] = useState(false);
   const [confirmingCheckout, setConfirmingCheckout] = useState(false);
   const [previewPhoto, setPreviewPhoto] = useState<{ url: string; title: string } | null>(null);
+  const [now, setNow] = useState(() => Date.now());
 
   const loadSession = useCallback(async (isRefresh = false) => {
     if (!sessionId) {
@@ -177,6 +198,11 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
   }, [loadSession]);
 
   useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
     const unsubscribe = wsClient.subscribe((event, data) => {
       if (
         ![
@@ -186,6 +212,7 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
           'CUSTOMER_PAYMENT_CONFIRMED',
           'CUSTOMER_EXTENSION_APPROVED',
           'CUSTOMER_EXTENSION_REJECTED',
+          'SESSION_EXTENSION_EXPIRED',
           'SESSION_FNB_ORDER_ADDED',
         ].includes(event)
       ) {
@@ -224,11 +251,19 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
     [session?.inspections]
   );
 
+  const checkOutDisputed = Boolean(
+    checkOutInspection &&
+      !checkOutInspection.customerConfirmed &&
+      checkOutInspection.customerConfirmedAt &&
+      ['ACTIVE', 'EXTENDING'].includes(session?.status || '')
+  );
+
   const isByoc = useMemo(
     () => !!session?.vehicles?.length && session.vehicles.every((vehicle) => vehicle.type === 'BYOC'),
     [session?.vehicles]
   );
   const paymentSummary = session?.paymentSummary;
+  const operationalTiming = getSessionOperationalTiming(session?.plannedEnd, session?.status, now);
   const canSettlePayments = !!paymentSummary?.requiresSettlement;
   const settlementDescription = paymentSummary?.outstandingAmount
     ? `Cần thu thêm: ${formatCurrency(paymentSummary.outstandingAmount)}`
@@ -374,18 +409,47 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
             </View>
           </View>
 
+          {(operationalTiming.state === 'DUE_FOR_CHECKOUT' || operationalTiming.state === 'OVERDUE') && (
+            <View
+              className={`mb-5 rounded-2xl border p-4 ${
+                operationalTiming.state === 'OVERDUE'
+                  ? 'border-red-500/30 bg-red-500/10'
+                  : 'border-amber-500/30 bg-amber-500/10'
+              }`}
+            >
+              <Text
+                className={`text-[13px] ${operationalTiming.state === 'OVERDUE' ? 'text-red-500' : 'text-amber-600'}`}
+                weight="700"
+              >
+                {operationalTiming.state === 'OVERDUE'
+                  ? `Phiên đã quá giờ ${operationalTiming.minutesPastPlannedEnd} phút`
+                  : 'Đã đến giờ trả xe'}
+              </Text>
+              <Text className="mt-1 text-[11px] leading-4 text-slate-500">
+                Xe vẫn được giữ trong phiên cho đến khi hoàn tất biên bản trả xe và xác nhận checkout.
+              </Text>
+            </View>
+          )}
+
           <SessionOperations
             status={session.status}
             isByoc={isByoc}
             hasCheckInInspection={!!checkInInspection}
             hasCheckOutInspection={!!checkOutInspection}
             checkOutConfirmed={!!checkOutInspection?.customerConfirmed}
+            checkOutDisputed={checkOutDisputed}
+            disputedNote={checkOutInspection?.staffNotes}
             onStartInspection={handleStartInspection}
             onConfirmCheckout={handleConfirmCheckout}
             confirmingCheckout={confirmingCheckout}
+            operationalTiming={operationalTiming}
           />
 
-          <StaffSessionTools session={session} onUpdated={() => loadSession(true)} />
+          <StaffSessionTools
+            session={session}
+            onUpdated={() => loadSession(true)}
+            operationalTiming={operationalTiming}
+          />
 
           <SectionTitle title="Người chơi" />
           <View className="mb-5 gap-3">
@@ -448,7 +512,7 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
                     {inspection.damageLineItems?.map((item, index) => (
                       <View key={item.id || `${item.partType}-${index}`} className="mt-2 flex-row justify-between gap-3">
                         <Text className="flex-1 text-[10px] text-red-100/60" numberOfLines={1}>
-                          {item.customPartName || item.partType}
+                          {item.customPartName || getPartTypeLabel(item.partType)}
                         </Text>
                         <Text className="text-[10px] text-red-100" weight="700">
                           {formatCurrency(item.lineTotal)}
@@ -468,22 +532,30 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
                     className={`mt-3 rounded-xl border p-3 ${
                       inspection.customerConfirmed
                         ? 'border-emerald-500/20 bg-emerald-500/10'
+                        : inspection.customerConfirmedAt
+                        ? 'border-red-500/20 bg-red-500/10'
                         : 'border-amber-500/20 bg-amber-500/10'
                     }`}
                   >
                     <Text
                       className={`text-[11px] ${
-                        inspection.customerConfirmed ? 'text-emerald-300' : 'text-amber-300'
+                        inspection.customerConfirmed 
+                          ? 'text-emerald-300' 
+                          : inspection.customerConfirmedAt 
+                            ? 'text-red-300' 
+                            : 'text-amber-300'
                       }`}
                       weight="700"
                     >
                       {inspection.customerConfirmed
                         ? 'Khách đã xác nhận biên bản trả xe'
-                        : 'Đang chờ khách xác nhận biên bản trả xe'}
+                        : inspection.customerConfirmedAt
+                          ? 'Khách từ chối biên bản'
+                          : 'Đang chờ khách xác nhận biên bản trả xe'}
                     </Text>
                     {inspection.customerConfirmedAt ? (
                       <Text className="mt-1 text-[10px] text-slate-500">
-                        Xác nhận lúc {formatDateTime(inspection.customerConfirmedAt)}
+                        {inspection.customerConfirmed ? 'Xác nhận' : 'Phản hồi'} lúc {formatDateTime(inspection.customerConfirmedAt)}
                       </Text>
                     ) : null}
                   </View>
@@ -662,21 +734,28 @@ function SessionOperations({
   hasCheckInInspection,
   hasCheckOutInspection,
   checkOutConfirmed,
+  checkOutDisputed,
+  disputedNote,
   onStartInspection,
   onConfirmCheckout,
   confirmingCheckout,
+  operationalTiming,
 }: {
   status: string;
   isByoc: boolean;
   hasCheckInInspection: boolean;
   hasCheckOutInspection: boolean;
   checkOutConfirmed: boolean;
+  checkOutDisputed?: boolean;
+  disputedNote?: string;
   onStartInspection: (type: StaffInspectionType) => void;
   onConfirmCheckout: () => void;
   confirmingCheckout: boolean;
+  operationalTiming: SessionOperationalTiming;
 }) {
   const canSubmitCheckIn = status === 'CHECKED_IN' && !hasCheckInInspection;
-  const canSubmitCheckOut = ['ACTIVE', 'EXTENDING'].includes(status) && !hasCheckOutInspection;
+  const canSubmitCheckOut =
+    ['ACTIVE', 'EXTENDING'].includes(status) && (!hasCheckOutInspection || checkOutDisputed);
 
   return (
     <View className="mb-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-4 shadow-sm">
@@ -693,10 +772,29 @@ function SessionOperations({
       </View>
 
       <View className="gap-3">
+        {checkOutDisputed ? (
+          <View className="rounded-xl border border-red-500/30 bg-red-500/10 p-3">
+            <View className="flex-row items-center gap-2">
+              <AlertTriangle color="#ef4444" size={15} />
+              <Text className="flex-1 text-[12px] text-red-400" weight="700">
+                Khách phản hồi sai lệch biên bản trả xe
+              </Text>
+            </View>
+            {disputedNote ? (
+              <Text className="mt-1.5 text-[11px] leading-4 text-red-300/90">
+                {disputedNote}
+              </Text>
+            ) : null}
+            <Text className="mt-1 text-[10px] text-slate-400">
+              Cần đối chiếu lại ảnh, tình trạng xe và lập lại biên bản trả xe mới trước khi đóng phiên.
+            </Text>
+          </View>
+        ) : null}
+
         {canSubmitCheckIn ? (
           <Pressable
             onPress={() => onStartInspection('CHECK_IN')}
-            className="h-11 flex-row items-center justify-center gap-2 rounded-xl bg-emerald-600"
+            className="h-11 flex-row items-center justify-center gap-2 rounded-xl bg-emerald-600 active:bg-emerald-700"
           >
             <CheckCircle2 color="#ffffff" size={16} />
             <Text className="text-[12px] text-white" weight="700">
@@ -708,11 +806,17 @@ function SessionOperations({
         {canSubmitCheckOut ? (
           <Pressable
             onPress={() => onStartInspection('CHECK_OUT')}
-            className="h-11 flex-row items-center justify-center gap-2 rounded-xl bg-[#ea580c]"
+            className="h-11 flex-row items-center justify-center gap-2 rounded-xl bg-[#ea580c] active:bg-[#c2410c]"
           >
             <ReceiptText color="#ffffff" size={16} />
             <Text className="text-[12px] text-white" weight="700">
-              {isByoc ? 'Tạo biên bản trả xe khách tự mang' : 'Tạo biên bản trả xe'}
+              {checkOutDisputed
+                ? 'Lập lại biên bản trả xe'
+                : operationalTiming.state === 'ON_TIME'
+                  ? isByoc
+                    ? 'Tạo biên bản trả xe khách tự mang'
+                    : 'Tạo biên bản trả xe'
+                  : 'Xử lý trả xe'}
             </Text>
           </Pressable>
         ) : null}

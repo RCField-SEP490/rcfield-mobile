@@ -23,10 +23,11 @@ import {
   ScanLine,
   type LucideIcon,
 } from 'lucide-react-native';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 
 import { staffApi, type TodayBookingItem, type TodayFnbOrderItem } from '@/features/staff/api/staff.api';
+import { getBookingIdFromQrPayload } from '@/features/staff/lib/booking-qr';
 import { isCheckInWindowExpired } from '@/features/bookings/lib/check-in-window';
 import { getStatusLabel } from '@/features/bookings/lib/status-label';
 import { useAuthStore } from '@/shared/store/auth-store';
@@ -62,6 +63,7 @@ export function StaffHomeScreen() {
   const [checkingInId, setCheckingInId] = useState<string | null>(null);
   const [scannerVisible, setScannerVisible] = useState(false);
   const [hasScanned, setHasScanned] = useState(false);
+  const scanLockedRef = useRef(false);
   const [cameraReady, setCameraReady] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [cameraInstanceKey, setCameraInstanceKey] = useState(0);
@@ -161,7 +163,7 @@ export function StaffHomeScreen() {
     }
   };
 
-  const handleBookingCode = (rawCode: string) => {
+  const handleBookingCode = async (rawCode: string) => {
     const normalized = rawCode.trim().replace(/^#/, '').toUpperCase();
     if (!normalized) return;
 
@@ -173,14 +175,62 @@ export function StaffHomeScreen() {
     );
 
     if (!matched) {
-      Alert.alert('Không tìm thấy', `Không có lịch hôm nay khớp mã "${rawCode}".`);
+      const bookingId = getBookingIdFromQrPayload(rawCode);
+      if (!bookingId) {
+        Alert.alert(
+          'Mã không hợp lệ',
+          'QR này không phải mã đặt lịch RCField. Hãy quét lại mã trên chi tiết đơn đặt.'
+        );
+        return;
+      }
+
+      try {
+        const booking = await staffApi.getBookingForQrCheckIn(bookingId);
+        const lookupBooking: TodayBookingItem = {
+          bookingId: booking.id,
+          shortCode: booking.id.slice(0, 8).toUpperCase(),
+          cafeId: '',
+          cafeName: '',
+          cafeAddress: '',
+          trackName: '',
+          trackType: '',
+          playMode: booking.playMode ?? 'RENTAL',
+          source: 'APP',
+          status: booking.status,
+          slotStart: booking.slotStart,
+          slotEnd: booking.slotEnd,
+          totalAmount: 0,
+          paymentStatus: 'UNPAID',
+          plannedParticipants: [],
+          plannedVehicles: [],
+          sessions: booking.session
+            ? [
+                {
+                  id: booking.session.id,
+                  sessionId: booking.session.id,
+                  status: booking.session.status,
+                  plannedEndAt: booking.session.plannedEndAt,
+                },
+              ]
+            : [],
+        };
+        await handleCheckIn(lookupBooking);
+      } catch (error: any) {
+        const message = error?.response?.data?.message;
+        Alert.alert(
+          'Không thể mở đơn từ QR',
+          message || 'Không tìm thấy đơn, hoặc đơn này không thuộc chi nhánh bạn được phân công.'
+        );
+      }
       return;
     }
 
-    void handleCheckIn(matched);
+    await handleCheckIn(matched);
   };
 
-  const handleScanSubmit = () => handleBookingCode(scanCode);
+  const handleScanSubmit = () => {
+    void handleBookingCode(scanCode);
+  };
 
   const openQrScanner = async () => {
     const permission = cameraPermission?.granted ? cameraPermission : await requestCameraPermission();
@@ -191,6 +241,7 @@ export function StaffHomeScreen() {
       );
       return;
     }
+    scanLockedRef.current = false;
     setHasScanned(false);
     setCameraReady(false);
     setCameraError(null);
@@ -199,11 +250,12 @@ export function StaffHomeScreen() {
   };
 
   const handleQrScanned = ({ data }: { data: string }) => {
-    if (hasScanned || !data) return;
+    if (scanLockedRef.current || !data) return;
+    scanLockedRef.current = true;
     setHasScanned(true);
     setScannerVisible(false);
     setScanCode(data);
-    handleBookingCode(data);
+    void handleBookingCode(data);
   };
 
   if (!assignedCafeId) {
@@ -217,7 +269,7 @@ export function StaffHomeScreen() {
             Chưa được gán chi nhánh
           </Text>
           <Text className="mt-2 text-center text-[12px] leading-5 text-slate-500 dark:text-slate-400">
-            Tài khoản staff cần được provider phân công vào một RC Cafe trước khi trực ca.
+            Tài khoản nhân viên cần được chủ sân phân công vào một chi nhánh trước khi trực ca.
           </Text>
         </View>
       </SafeAreaView>
@@ -279,7 +331,7 @@ export function StaffHomeScreen() {
                 value={scanCode}
                 onChangeText={setScanCode}
                 autoCapitalize="characters"
-                placeholder="Nhập shortcode hoặc booking ID"
+                placeholder="Nhập mã đặt lịch hoặc mã ca"
                 placeholderTextColor="#94a3b8"
                 className="h-11 flex-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0b0f19] px-3 text-[13px] text-slate-900 dark:text-white"
               />

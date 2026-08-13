@@ -19,6 +19,7 @@ import {
   type TodayBookingItem,
 } from '@/features/staff/api/staff.api';
 import { getDisplayBookingStatus, isCheckInWindowExpired } from '@/features/bookings/lib/check-in-window';
+import { getSessionOperationalTiming } from '@/features/staff/lib/session-operational-timing';
 import { getStatusLabel } from '@/features/bookings/lib/status-label';
 import { wsClient } from '@/shared/lib/websocket';
 import { Text } from '@/shared/ui/Text';
@@ -80,6 +81,7 @@ export function StaffBookingsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [checkingInId, setCheckingInId] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
 
   const loadBookings = useCallback(async (isRefresh = false) => {
     if (isRefresh) {
@@ -105,8 +107,20 @@ export function StaffBookingsScreen() {
   }, [loadBookings]);
 
   useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
     const unsubscribe = wsClient.subscribe((event) => {
-      if (['NEW_BOOKING', 'CUSTOMER_PAYMENT_CONFIRMED', 'CUSTOMER_CHECKOUT_CONFIRMED'].includes(event)) {
+      if (
+        [
+          'NEW_BOOKING',
+          'CUSTOMER_PAYMENT_CONFIRMED',
+          'CUSTOMER_CHECKOUT_CONFIRMED',
+          'SESSION_EXTENSION_EXPIRED',
+        ].includes(event)
+      ) {
         loadBookings(true);
       }
     });
@@ -273,6 +287,7 @@ export function StaffBookingsScreen() {
           renderItem={({ item }) => (
             <BookingCard
               booking={item}
+              now={now}
               checkingIn={checkingInId === item.bookingId}
               onOpen={() => handleOpenBooking(item)}
               onCheckIn={() => handleCheckIn(item)}
@@ -296,11 +311,13 @@ export function StaffBookingsScreen() {
 
 function BookingCard({
   booking,
+  now,
   checkingIn,
   onCheckIn,
   onOpen,
 }: {
   booking: TodayBookingItem;
+  now: number;
   checkingIn: boolean;
   onCheckIn: () => void;
   onOpen: () => void;
@@ -310,6 +327,11 @@ function BookingCard({
   const end = formatDateTime(booking.slotEnd);
   const sessionId = getSessionId(booking);
   const session = booking.sessions?.[0];
+  const timing = getSessionOperationalTiming(
+    session?.plannedEnd ?? session?.plannedEndAt ?? booking.slotEnd,
+    session?.status,
+    now,
+  );
   const checkInExpired = isCheckInWindowExpired(booking.status, booking.slotStart, session);
   const displayStatus =
     booking.status === 'CANCELLED'
@@ -323,7 +345,11 @@ function BookingCard({
   const canOpenSession = !!sessionId;
   const canCheckIn = !sessionId && !checkInExpired && booking.status === 'CONFIRMED';
   const actionLabel = canOpenSession
-    ? 'Xem chi tiết'
+    ? session?.status === 'CHECKING_OUT'
+      ? 'Tiếp tục trả xe'
+      : timing.state === 'DUE_FOR_CHECKOUT' || timing.state === 'OVERDUE'
+        ? 'Xử lý trả xe'
+        : 'Xem chi tiết'
     : checkInExpired
       ? 'Quá giờ'
       : booking.status === 'CANCELLED'
@@ -359,6 +385,25 @@ function BookingCard({
         <InfoRow Icon={Car} text={`${booking.playMode === 'RENTAL' ? 'Thuê xe' : 'Mang xe riêng'} • ${booking.trackName || booking.trackType || 'Đường đua'}`} colorScheme={colorScheme} />
         <InfoRow Icon={UserRound} text={`${booking.plannedParticipants?.length || 1} người chơi`} colorScheme={colorScheme} />
       </View>
+
+      {timing.state === 'DUE_FOR_CHECKOUT' || timing.state === 'OVERDUE' ? (
+        <View
+          className={`mt-3 rounded-xl border px-3 py-2 ${
+            timing.state === 'OVERDUE'
+              ? 'border-red-500/30 bg-red-500/10'
+              : 'border-amber-500/30 bg-amber-500/10'
+          }`}
+        >
+          <Text
+            className={`text-[11px] ${timing.state === 'OVERDUE' ? 'text-red-500' : 'text-amber-600'}`}
+            weight="700"
+          >
+            {timing.state === 'OVERDUE'
+              ? `Quá giờ ${timing.minutesPastPlannedEnd} phút${timing.shouldAlert ? ' · Cần xử lý trả xe' : ''}`
+              : 'Đã đến giờ trả xe · Vui lòng hoàn tất biên bản trả xe'}
+          </Text>
+        </View>
+      ) : null}
 
       <View className="mt-4 flex-row items-center justify-between border-t border-slate-200 dark:border-slate-800 pt-3">
         <Text className="text-[12px] text-[#f97316]" weight="700">
