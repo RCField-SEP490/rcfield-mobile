@@ -650,7 +650,7 @@ export function ProfileScreen() {
                     Vai trò tài khoản
                   </Text>
                   <Text className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-                    Hồ sơ vận hành dùng cho ứng dụng staff mobile.
+                    Hồ sơ vận hành dùng cho ứng dụng nhân viên.
                   </Text>
                 </View>
                 <View className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1">
@@ -724,7 +724,7 @@ export function ProfileScreen() {
                 {/* Giải đấu đã tham gia */}
                 <Pressable
                   onPress={() => {
-                    router.push('/customer/my-contests');
+                    router.push('/customer/my-contests' as any);
                   }}
                   className="flex-row items-center justify-between p-3.5 rounded-xl border border-slate-100 dark:border-slate-800/45 bg-slate-50/50 dark:bg-slate-900/40 active:bg-slate-100 dark:active:bg-slate-900"
                 >

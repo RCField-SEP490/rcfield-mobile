@@ -75,6 +75,7 @@ export function getRouteFromNotificationData(data: Record<string, unknown>) {
       'CUSTOMER_INSPECTION_DISPUTED',
       'CUSTOMER_EXTENSION_APPROVED',
       'CUSTOMER_EXTENSION_REJECTED',
+      'SESSION_OVERDUE_ALERT',
     ].includes(type) &&
     sessionId
   ) {

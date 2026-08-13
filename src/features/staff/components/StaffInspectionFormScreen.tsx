@@ -15,18 +15,16 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
-  AlertTriangle,
-  ArrowLeft,
   Camera,
-  Car,
   CheckCircle2,
+  ChevronLeft,
+  FileCheck,
   ImagePlus,
+  Info,
   Plus,
-  ReceiptText,
   ShieldCheck,
   Trash2,
   UploadCloud,
-  XCircle,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
@@ -35,50 +33,71 @@ import {
   staffApi,
   type DamageLineItemInput,
   type DamagePartType,
-  type StaffInspectionItemStatus,
   type StaffInspectionType,
   type StaffSessionDetail,
 } from '@/features/staff/api/staff.api';
-import { getStatusLabel } from '@/features/bookings/lib/status-label';
 import { ImageZoomModal } from '@/shared/ui/ImageZoomModal';
 import { Text } from '@/shared/ui/Text';
 
-type PhotoSlot = {
-  key: string;
-  label: string;
-  angle: string;
-  notes: string;
-  uri?: string;
-  url?: string;
-  uploading: boolean;
-};
-
-type ChecklistItem = {
-  itemKey: string;
-  itemLabel: string;
-  status: StaffInspectionItemStatus;
-  note: string;
-};
-
-const MAX_INSPECTION_PHOTOS = 6;
-const INSPECTION_ANGLES = ['FRONT', 'BACK', 'LEFT', 'RIGHT', 'TOP', 'BOTTOM'] as const;
+const MIN_RENTAL_INSPECTION_PHOTOS = 4;
+const MAX_RENTAL_INSPECTION_PHOTOS = 6;
 const INSPECTION_IMAGE_MAX_EDGE = 1280;
 const INSPECTION_IMAGE_COMPRESS = 0.55;
 const INSPECTION_UPLOAD_TIMEOUT_MS = 90000;
+
+export const PART_TYPE_LABELS: Record<string, string> = {
+  TIRE_WHEEL: 'Bánh xe / Lốp',
+  SPOILER: 'Cánh gió',
+  CHASSIS: 'Khung gầm',
+  MOTOR: 'Motor / Động cơ',
+  SHELL: 'Vỏ nhựa (Shell)',
+  SERVO: 'Servo / Tay lái',
+  REMOTE: 'Remote / Điều khiển',
+  OTHER: 'Khác',
+};
+
+type RentalPhotoItem = {
+  id: string;
+  uri?: string;
+  url: string;
+  notes: string;
+  uploading?: boolean;
+};
+
+type ByocPhotoItem = {
+  participantName: string;
+  uri?: string;
+  url: string;
+  notes: string;
+  uploading?: boolean;
+};
+
+type ChecklistStateItem = {
+  id: string;
+  label: string;
+  checked: boolean;
+  notes?: string;
+};
+
+function formatCurrency(value: number) {
+  return `${Number(value || 0).toLocaleString('vi-VN')}đ`;
+}
+
+function isByocSession(session?: StaffSessionDetail | null) {
+  if (!session?.vehicles?.length) return false;
+  return session.vehicles.every((vehicle) => vehicle.type === 'BYOC');
+}
 
 function getInspectionUploadErrorMessage(error: any) {
   if (error?.code === 'ECONNABORTED') {
     return 'Upload ảnh quá lâu do mạng chậm hoặc ảnh quá nặng. Ảnh đã được nén, vui lòng thử lại.';
   }
-
   if (error?.response?.status === 413) {
     return 'Ảnh vẫn quá lớn sau khi nén. Vui lòng chụp lại gần hơn hoặc chọn ảnh nhẹ hơn.';
   }
-
   if (!error?.response && error?.message) {
     return 'Không kết nối được máy chủ upload. Kiểm tra Wi-Fi/4G và địa chỉ API rồi thử lại.';
   }
-
   return error?.response?.data?.message || 'Không thể upload ảnh kiểm xe.';
 }
 
@@ -100,123 +119,6 @@ async function optimizeInspectionImage(asset: ImagePicker.ImagePickerAsset) {
   });
 }
 
-function createPhotoSlot(index: number): PhotoSlot {
-  const angle = INSPECTION_ANGLES[index] ?? 'OTHER';
-  return {
-    key: `PHOTO_${Date.now()}_${index}_${Math.random().toString(36).slice(2, 7)}`,
-    label: `Ảnh ${index + 1}`,
-    angle,
-    notes: '',
-    uploading: false,
-  };
-}
-
-function shortId(value?: string) {
-  if (!value) return '--';
-  return value.slice(0, 8).toUpperCase();
-}
-
-function formatCurrency(value: number) {
-  return `${Number(value || 0).toLocaleString('vi-VN')}đ`;
-}
-
-function buildChecklist(type: StaffInspectionType, isByoc: boolean): ChecklistItem[] {
-  if (isByoc) {
-    return [
-      {
-        itemKey: 'byoc_shell',
-        itemLabel: 'Xe BYOC đúng người chơi và đúng mô tả ban đầu',
-        status: 'OK',
-        note: '',
-      },
-      {
-        itemKey: 'byoc_battery',
-        itemLabel: 'Pin/nguồn BYOC an toàn, không phồng rộp hoặc nóng bất thường',
-        status: 'OK',
-        note: '',
-      },
-      {
-        itemKey: 'byoc_track_safe',
-        itemLabel: 'Xe BYOC đủ điều kiện chạy trên sân',
-        status: 'OK',
-        note: '',
-      },
-    ];
-  }
-
-  if (type === 'CHECK_IN') {
-    return [
-      {
-        itemKey: 'body_shell',
-        itemLabel: 'Vỏ xe và khung gầm không nứt/gãy trước bàn giao',
-        status: 'OK',
-        note: '',
-      },
-      {
-        itemKey: 'steering',
-        itemLabel: 'Hệ thống lái phản hồi ổn định',
-        status: 'OK',
-        note: '',
-      },
-      {
-        itemKey: 'battery',
-        itemLabel: 'Pin và nguồn điện hoạt động bình thường',
-        status: 'OK',
-        note: '',
-      },
-      {
-        itemKey: 'tires',
-        itemLabel: 'Bánh xe, lốp và hệ truyền động sẵn sàng',
-        status: 'OK',
-        note: '',
-      },
-    ];
-  }
-
-  return [
-    {
-      itemKey: 'return_body_shell',
-      itemLabel: 'Vỏ xe và khung gầm sau phiên chạy',
-      status: 'OK',
-      note: '',
-    },
-    {
-      itemKey: 'return_steering',
-      itemLabel: 'Hệ thống lái sau phiên chạy',
-      status: 'OK',
-      note: '',
-    },
-    {
-      itemKey: 'return_battery',
-      itemLabel: 'Pin, nguồn điện và nhiệt độ xe sau phiên chạy',
-      status: 'OK',
-      note: '',
-    },
-    {
-      itemKey: 'return_tires',
-      itemLabel: 'Bánh xe, lốp và hệ truyền động sau phiên chạy',
-      status: 'OK',
-      note: '',
-    },
-  ];
-}
-
-function isByocSession(session?: StaffSessionDetail | null) {
-  if (!session?.vehicles?.length) return false;
-  return session.vehicles.every((vehicle) => vehicle.type === 'BYOC');
-}
-
-const DAMAGE_PART_LABELS: Record<DamagePartType, string> = {
-  TIRE_WHEEL: 'Bánh xe / lốp',
-  SPOILER: 'Cánh gió',
-  CHASSIS: 'Khung gầm',
-  MOTOR: 'Motor / động cơ',
-  SHELL: 'Vỏ xe',
-  SERVO: 'Servo / tay lái',
-  REMOTE: 'Remote / điều khiển',
-  OTHER: 'Khác',
-};
-
 export function StaffInspectionFormScreen({
   sessionId,
   type,
@@ -228,34 +130,102 @@ export function StaffInspectionFormScreen({
   const [session, setSession] = useState<StaffSessionDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [photos, setPhotos] = useState<PhotoSlot[]>([]);
-  const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
+  const [isClosingByoc, setIsClosingByoc] = useState(false);
+
+  // RENTAL photos
+  const [rentalPhotos, setRentalPhotos] = useState<RentalPhotoItem[]>([]);
+  const [isUploadingRentalPhotos, setIsUploadingRentalPhotos] = useState(false);
+
+  // BYOC photos (1 slot per participant)
+  const [byocPhotos, setByocPhotos] = useState<ByocPhotoItem[]>([]);
+
+  // Checklist
+  const [checklist, setChecklist] = useState<ChecklistStateItem[]>([]);
   const [staffNotes, setStaffNotes] = useState('');
+
+  // Damage items (RENTAL CHECK_OUT only)
   const [damageFlagged, setDamageFlagged] = useState(false);
   const [damageLineItems, setDamageLineItems] = useState<DamageLineItemInput[]>([]);
+
+  // Baseline comparison for CHECK_OUT
+  const [showCheckInBaselines, setShowCheckInBaselines] = useState(false);
+
+  // Photo Zoom preview
   const [previewPhoto, setPreviewPhoto] = useState<{ url: string; title: string } | null>(null);
 
   const isByoc = useMemo(() => isByocSession(session), [session]);
+  const isCheckIn = type === 'CHECK_IN';
+
+  const checkInInspection = useMemo(() => {
+    return session?.inspections?.find((i) => i.type === 'CHECK_IN');
+  }, [session]);
+
   const totalDamageCharge = useMemo(
-    () => damageLineItems.reduce((sum, item) => sum + Number(item.partsPrice || 0) + Number(item.laborPrice || 0), 0),
+    () =>
+      damageLineItems.reduce(
+        (sum, item) => sum + Number(item.partsPrice || 0) + Number(item.laborPrice || 0),
+        0
+      ),
     [damageLineItems]
   );
-  const isCheckIn = type === 'CHECK_IN';
-  const requiresPhotos = !isByoc;
 
+  const remainingRentalPhotos = Math.max(0, MIN_RENTAL_INSPECTION_PHOTOS - rentalPhotos.length);
+
+  // Load session data
   const loadSession = useCallback(async () => {
     setLoading(true);
     try {
       const data = await staffApi.getSessionDetail(sessionId);
       setSession(data);
       const byoc = isByocSession(data);
-      setPhotos(byoc ? [] : [createPhotoSlot(0)]);
-      setChecklist(buildChecklist(type, byoc));
-      setStaffNotes(
-        type === 'CHECK_IN'
-          ? 'Biên bản nhận xe tạo từ staff mobile.'
-          : 'Biên bản trả xe tạo từ staff mobile.'
-      );
+
+      // Initialize Checklist according to Web standards
+      if (byoc) {
+        setChecklist([
+          { id: 'byoc-1', label: 'Khách đến đúng giờ và xuất trình xe cá nhân', checked: true },
+          {
+            id: 'byoc-2',
+            label: 'Xe của khách đã được kiểm tra an toàn cơ bản (pin, remote)',
+            checked: true,
+          },
+          {
+            id: 'byoc-3',
+            label: 'Khách đã xác nhận tự chịu trách nhiệm về xe cá nhân',
+            checked: true,
+          },
+        ]);
+
+        const participantNames =
+          data.participants && data.participants.length > 0
+            ? data.participants.map((p) => p.name || 'Người chơi')
+            : ['Người chơi 1'];
+
+        setByocPhotos(
+          participantNames.map((name) => ({
+            participantName: name,
+            url: '',
+            notes: '',
+          }))
+        );
+      } else if (type === 'CHECK_IN') {
+        setChecklist([
+          { id: 'ck-1', label: 'Pin đủ điện, đã sạc trước ca', checked: true },
+          { id: 'ck-2', label: 'Tay lái servo phản hồi tốt, bẻ cua bình thường', checked: true },
+          { id: 'ck-3', label: 'Lốp gắn chắc, không lung lay', checked: true },
+          { id: 'ck-4', label: 'Remote bắt sóng, xe phản hồi lệnh ổn định', checked: true },
+        ]);
+      } else if (type === 'CHECK_OUT') {
+        setChecklist([
+          { id: 'ck-o1', label: 'Đã kiểm tra khung gầm xe (nứt, gãy, biến dạng)', checked: true },
+          { id: 'ck-o2', label: 'Đã kiểm tra cánh gió (móp méo, rơi rụng)', checked: true },
+          {
+            id: 'ck-o3',
+            label: 'Đã kiểm tra động cơ điện / motor (hoạt động, mùi khét)',
+            checked: true,
+          },
+          { id: 'ck-o4', label: 'Đã kiểm tra vỏ nhựa / shell (xước sâu, móp rách)', checked: true },
+        ]);
+      }
     } catch (error: any) {
       const message = error?.response?.data?.message || 'Không thể tải thông tin phiên.';
       Alert.alert('Lỗi', message);
@@ -268,41 +238,33 @@ export function StaffInspectionFormScreen({
     loadSession();
   }, [loadSession]);
 
-  const updatePhotoSlot = (key: string, patch: Partial<PhotoSlot>) => {
-    setPhotos((current) => current.map((slot) => (slot.key === key ? { ...slot, ...patch } : slot)));
-  };
-
-  const addPhotoSlot = () => {
-    setPhotos((current) =>
-      current.length >= MAX_INSPECTION_PHOTOS ? current : [...current, createPhotoSlot(current.length)]
-    );
-  };
-
-  const removePhotoSlot = (key: string) => {
-    setPhotos((current) => {
-      const next = current.filter((slot) => slot.key !== key);
-      return next.length ? next : [createPhotoSlot(0)];
-    });
-  };
-
   const requestImagePermission = async (source: 'camera' | 'library') => {
     if (source === 'camera') {
       const result = await ImagePicker.requestCameraPermissionsAsync();
       return result.granted;
     }
-
     const result = await ImagePicker.requestMediaLibraryPermissionsAsync();
     return result.granted;
   };
 
-  const handlePickPhoto = async (slot: PhotoSlot, source: 'camera' | 'library') => {
+  // Upload rental photos
+  const handlePickRentalPhotos = async (source: 'camera' | 'library') => {
+    const remaining = MAX_RENTAL_INSPECTION_PHOTOS - rentalPhotos.length;
+    if (remaining <= 0) {
+      Alert.alert(
+        'Đã đạt giới hạn',
+        `Mỗi biên bản chỉ nhận tối đa ${MAX_RENTAL_INSPECTION_PHOTOS} ảnh.`
+      );
+      return;
+    }
+
     const granted = await requestImagePermission(source);
     if (!granted) {
       Alert.alert(
         'Thiếu quyền truy cập',
         source === 'camera'
-          ? 'Vui lòng cấp quyền camera để chụp ảnh kiểm xe.'
-          : 'Vui lòng cấp quyền thư viện ảnh để chọn ảnh kiểm xe.'
+          ? 'Vui lòng cấp quyền Camera để chụp ảnh kiểm xe.'
+          : 'Vui lòng cấp quyền Thư viện ảnh để chọn ảnh kiểm xe.'
       );
       return;
     }
@@ -320,119 +282,195 @@ export function StaffInspectionFormScreen({
               quality: 0.55,
               allowsEditing: false,
               allowsMultipleSelection: true,
-              selectionLimit: MAX_INSPECTION_PHOTOS,
+              selectionLimit: remaining,
             });
 
       if (result.canceled || !result.assets?.length) return;
 
-      const availableCount = MAX_INSPECTION_PHOTOS - photos.length + 1;
-      const selectedAssets = result.assets.slice(0, Math.max(1, availableCount));
-      const extraSlots = selectedAssets.slice(1).map((_, index) => createPhotoSlot(photos.length + index));
-      const uploadTargets = [slot, ...extraSlots];
+      const assetsToUpload = result.assets.slice(0, remaining);
+      setIsUploadingRentalPhotos(true);
 
-      setPhotos((current) => {
-        const slotIndex = current.findIndex((photo) => photo.key === slot.key);
-        if (slotIndex < 0) return current;
-        const firstAsset = selectedAssets[0];
-        const next = current.map((photo) =>
-          photo.key === slot.key ? { ...photo, uri: firstAsset.uri, url: undefined, uploading: true } : photo
-        );
-        return [...next, ...extraSlots.map((photo, index) => ({
-          ...photo,
-          uri: selectedAssets[index + 1]?.uri,
-          uploading: true,
-        }))].slice(0, MAX_INSPECTION_PHOTOS);
-      });
+      const newPhotos: RentalPhotoItem[] = assetsToUpload.map((asset, idx) => ({
+        id: `photo_${Date.now()}_${idx}_${Math.random().toString(36).slice(2, 6)}`,
+        uri: asset.uri,
+        url: '',
+        notes: '',
+        uploading: true,
+      }));
+
+      setRentalPhotos((prev) => [...prev, ...newPhotos]);
 
       await Promise.all(
-        selectedAssets.map(async (asset, index) => {
-          const target = uploadTargets[index];
+        assetsToUpload.map(async (asset, idx) => {
+          const itemKey = newPhotos[idx].id;
           try {
             const optimized = await optimizeInspectionImage(asset);
-            updatePhotoSlot(target.key, { uri: optimized.uri, uploading: true });
             const uploaded = await uploadImage(optimized.uri, 'inspection-photo', {
-              fileName: `inspection-${target.key.toLowerCase()}.jpg`,
+              fileName: `inspection-${itemKey}.jpg`,
               mimeType: 'image/jpeg',
               timeoutMs: INSPECTION_UPLOAD_TIMEOUT_MS,
             });
-            updatePhotoSlot(target.key, { uri: optimized.uri, url: uploaded.url, uploading: false });
-          } catch (error: any) {
-            updatePhotoSlot(target.key, { uploading: false });
-            throw error;
+
+            setRentalPhotos((prev) =>
+              prev.map((p) =>
+                p.id === itemKey
+                  ? { ...p, uri: optimized.uri, url: uploaded.url, uploading: false }
+                  : p
+              )
+            );
+          } catch (err) {
+            setRentalPhotos((prev) => prev.filter((p) => p.id !== itemKey));
+            throw err;
           }
         })
       );
     } catch (error: any) {
-      setPhotos((current) => current.map((photo) => ({ ...photo, uploading: false })));
-      const message = getInspectionUploadErrorMessage(error);
-      Alert.alert('Lỗi upload ảnh', message);
+      const msg = getInspectionUploadErrorMessage(error);
+      Alert.alert('Lỗi tải ảnh', msg);
+    } finally {
+      setIsUploadingRentalPhotos(false);
     }
   };
 
-  const updateChecklistStatus = (itemKey: string, ok: boolean) => {
-    setChecklist((current) =>
-      current.map((item) =>
-        item.itemKey === itemKey ? { ...item, status: ok ? 'OK' : 'BROKEN' } : item
-      )
+  // Upload BYOC photo for a specific participant
+  const handlePickByocPhoto = async (index: number, source: 'camera' | 'library') => {
+    const granted = await requestImagePermission(source);
+    if (!granted) {
+      Alert.alert(
+        'Thiếu quyền truy cập',
+        source === 'camera'
+          ? 'Vui lòng cấp quyền Camera để chụp ảnh xe khách.'
+          : 'Vui lòng cấp quyền Thư viện ảnh để chọn ảnh xe khách.'
+      );
+      return;
+    }
+
+    try {
+      const result =
+        source === 'camera'
+          ? await ImagePicker.launchCameraAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              quality: 0.55,
+              allowsEditing: false,
+            })
+          : await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              quality: 0.55,
+              allowsEditing: false,
+              allowsMultipleSelection: false,
+            });
+
+      if (result.canceled || !result.assets?.length) return;
+
+      const asset = result.assets[0];
+      setByocPhotos((prev) =>
+        prev.map((p, i) => (i === index ? { ...p, uri: asset.uri, uploading: true } : p))
+      );
+
+      const optimized = await optimizeInspectionImage(asset);
+      const uploaded = await uploadImage(optimized.uri, 'inspection-photo', {
+        fileName: `byoc-${Date.now()}-${index}.jpg`,
+        mimeType: 'image/jpeg',
+        timeoutMs: INSPECTION_UPLOAD_TIMEOUT_MS,
+      });
+
+      setByocPhotos((prev) =>
+        prev.map((p, i) =>
+          i === index ? { ...p, uri: optimized.uri, url: uploaded.url, uploading: false } : p
+        )
+      );
+    } catch (error: any) {
+      setByocPhotos((prev) =>
+        prev.map((p, i) => (i === index ? { ...p, uploading: false } : p))
+      );
+      const msg = getInspectionUploadErrorMessage(error);
+      Alert.alert('Lỗi tải ảnh', msg);
+    }
+  };
+
+  const toggleChecklistItem = (id: string) => {
+    setChecklist((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, checked: !item.checked } : item))
     );
   };
 
-  const updateChecklistNote = (itemKey: string, note: string) => {
-    setChecklist((current) =>
-      current.map((item) => (item.itemKey === itemKey ? { ...item, note } : item))
+  const handleChecklistNotes = (id: string, notes: string) => {
+    setChecklist((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, notes } : item))
     );
   };
 
-  const addDamageLineItem = () => {
-    setDamageLineItems((current) => [
-      ...current,
+  const addDamageItem = () => {
+    setDamageLineItems((prev) => [
+      ...prev,
       { partType: 'TIRE_WHEEL', partsPrice: 0, laborPrice: 0 },
     ]);
   };
 
-  const updateDamageLineItem = (
+  const removeDamageItem = (index: number) => {
+    setDamageLineItems((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const updateDamageItem = (
     index: number,
     field: keyof DamageLineItemInput,
     value: string | number
   ) => {
-    setDamageLineItems((current) =>
-      current.map((item, itemIndex) =>
-        itemIndex === index ? { ...item, [field]: value } : item
-      )
+    setDamageLineItems((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, [field]: value } : item))
     );
   };
 
-  const removeDamageLineItem = (index: number) => {
-    setDamageLineItems((current) => current.filter((_, itemIndex) => itemIndex !== index));
+  // Close session directly for BYOC CHECK_OUT (Identical to Web)
+  const handleCloseByocSession = async () => {
+    setIsClosingByoc(true);
+    try {
+      await staffApi.simulateClientCheckOut(sessionId);
+      Alert.alert('Thành công', 'Đã đóng phiên chơi xe tự mang thành công.');
+      router.replace(`/staff/session/${sessionId}` as any);
+    } catch (error: any) {
+      const msg = error?.response?.data?.message || 'Không thể đóng phiên chơi.';
+      Alert.alert('Lỗi', msg);
+    } finally {
+      setIsClosingByoc(false);
+    }
   };
 
+  // Form validation
   const validate = () => {
-    if (requiresPhotos) {
-      const uploadedPhotos = photos.filter((photo) => !!photo.url);
-      if (uploadedPhotos.length === 0) {
+    if (isByoc) {
+      const missing = byocPhotos.filter((p) => !p.url);
+      if (missing.length > 0) {
         Alert.alert(
-          'Thiếu ảnh kiểm xe',
-          'Vui lòng thêm ít nhất một ảnh thực tế của xe. Nên chụp đủ các góc để làm căn cứ bàn giao.'
+          'Thiếu ảnh xe khách',
+          `Vui lòng chụp ảnh xác nhận xe cho: ${missing.map((p) => p.participantName).join(', ')}`
         );
         return false;
       }
+    } else {
+      if (rentalPhotos.length < MIN_RENTAL_INSPECTION_PHOTOS) {
+        Alert.alert(
+          'Thiếu ảnh kiểm xe',
+          `Vui lòng thêm tối thiểu ${MIN_RENTAL_INSPECTION_PHOTOS} ảnh thực tế của xe để lập biên bản.`
+        );
+        return false;
+      }
+      if (rentalPhotos.some((p) => p.uploading)) {
+        Alert.alert('Đang tải ảnh', 'Vui lòng chờ ảnh tải lên hoàn tất trước khi lưu biên bản.');
+        return false;
+      }
+      if (damageFlagged && damageLineItems.length === 0) {
+        Alert.alert('Thiếu hạng mục hư hỏng', 'Vui lòng thêm ít nhất một hạng mục hư hỏng.');
+        return false;
+      }
+      if (
+        damageFlagged &&
+        damageLineItems.some((item) => item.partType === 'OTHER' && !item.customPartName?.trim())
+      ) {
+        Alert.alert('Thiếu tên hư hỏng', 'Vui lòng nhập tên hư hỏng cho mục “Khác”.');
+        return false;
+      }
     }
-
-    if (photos.some((photo) => photo.uploading)) {
-      Alert.alert('Đang upload ảnh', 'Vui lòng chờ tất cả ảnh upload xong trước khi gửi biên bản.');
-      return false;
-    }
-
-    if (damageFlagged && damageLineItems.length === 0) {
-      Alert.alert('Thiếu hạng mục hư hỏng', 'Vui lòng thêm ít nhất một hạng mục bồi thường.');
-      return false;
-    }
-
-    if (damageLineItems.some((item) => item.partType === 'OTHER' && !item.customPartName?.trim())) {
-      Alert.alert('Thiếu tên hư hỏng', 'Vui lòng nhập tên hư hỏng cho hạng mục “Khác”.');
-      return false;
-    }
-
     return true;
   };
 
@@ -441,38 +479,56 @@ export function StaffInspectionFormScreen({
 
     setSubmitting(true);
     try {
-      await staffApi.submitInspection(sessionId, {
-        type,
-        photos: requiresPhotos
-          ? photos.filter((photo) => !!photo.url).map((photo) => ({
-              angle: photo.angle,
-              url: photo.url || '',
-              notes: photo.notes,
-            }))
-          : [],
-        checklist: checklist.map((item) => ({
-          itemKey: item.itemKey,
-          itemLabel: item.itemLabel,
-          status: item.status,
-          note: item.note.trim(),
-        })),
-        staffNotes: staffNotes.trim(),
-        damageFlagged: type === 'CHECK_OUT' && damageFlagged,
-        damageLineItems:
-          type === 'CHECK_OUT' && damageFlagged
-            ? damageLineItems
-            : undefined,
-      });
+      if (isByoc) {
+        const directions = ['FRONT', 'BACK', 'LEFT', 'RIGHT'] as const;
+        await staffApi.submitInspection(sessionId, {
+          type,
+          photos: byocPhotos.map((p, i) => ({
+            angle: directions[i % directions.length],
+            url: p.url,
+            notes: p.notes || `Xe của ${p.participantName}`,
+          })),
+          checklist: checklist.map((item) => ({
+            itemKey: item.id,
+            itemLabel: item.label,
+            status: item.checked ? 'OK' : 'BROKEN',
+            note: item.notes || '',
+          })),
+          staffNotes: staffNotes.trim(),
+          damageFlagged: false,
+        });
+      } else {
+        const photosArray = rentalPhotos.map((photo) => ({
+          angle: 'OTHER',
+          url: photo.url,
+          notes: photo.notes || undefined,
+        }));
+
+        await staffApi.submitInspection(sessionId, {
+          type,
+          photos: photosArray,
+          checklist: checklist.map((item) => ({
+            itemKey: item.id,
+            itemLabel: item.label,
+            status: item.checked ? 'OK' : 'BROKEN',
+            note: item.notes || '',
+          })),
+          staffNotes: staffNotes.trim(),
+          damageFlagged: type === 'CHECK_OUT' && damageFlagged,
+          damageLineItems:
+            type === 'CHECK_OUT' && damageFlagged ? damageLineItems : undefined,
+        });
+      }
 
       Alert.alert(
-        'Đã gửi biên bản',
+        'Thành công',
         isCheckIn
-          ? 'Biên bản nhận xe đã được lưu và phiên có thể chuyển sang đang chạy.'
+          ? 'Biên bản nhận xe đã được lưu và phiên chuyển sang trạng thái đang chơi.'
           : 'Biên bản trả xe đã được gửi. Khách sẽ nhận thông báo để xác nhận hoàn tất phiên.'
       );
       router.replace(`/staff/session/${sessionId}` as any);
     } catch (error: any) {
-      const message = error?.response?.data?.message || 'Không thể gửi biên bản kiểm xe.';
+      const message = error?.response?.data?.message || 'Không thể lưu biên bản kiểm định.';
       Alert.alert('Lỗi', message);
     } finally {
       setSubmitting(false);
@@ -488,255 +544,652 @@ export function StaffInspectionFormScreen({
     );
   }
 
-  const title = isCheckIn ? 'Biên bản nhận xe' : 'Biên bản trả xe';
+  // BYOC check-out: matching FE Web layout directly
+  if (isByoc && type === 'CHECK_OUT') {
+    return (
+      <SafeAreaView className="flex-1 bg-[#f8fafc] dark:bg-[#0b0f19]" edges={['top', 'bottom']}>
+        <View className="flex-1 items-center justify-center px-6">
+          <View className="mb-4 h-16 w-16 items-center justify-center rounded-2xl border border-blue-500/20 bg-blue-500/10">
+            <Info color="#3b82f6" size={32} />
+          </View>
+          <Text className="text-center text-[18px] text-slate-900 dark:text-white" weight="700">
+            Không cần kiểm tra trả xe
+          </Text>
+          <Text className="mt-2 text-center text-[12px] leading-5 text-slate-500 dark:text-slate-400">
+            Chế độ mang xe riêng — khách tự chịu trách nhiệm với xe của họ, không cần biên bản trả xe.
+          </Text>
+
+          <View className="mt-8 w-full max-w-xs gap-3">
+            <Pressable
+              disabled={isClosingByoc}
+              onPress={handleCloseByocSession}
+              className={`h-12 flex-row items-center justify-center gap-2 rounded-xl bg-[#ea580c] ${
+                isClosingByoc ? 'opacity-70' : ''
+              }`}
+            >
+              {isClosingByoc ? (
+                <ActivityIndicator color="#ffffff" size="small" />
+              ) : (
+                <CheckCircle2 color="#ffffff" size={18} />
+              )}
+              <Text className="text-[13px] text-white" weight="700">
+                {isClosingByoc ? 'Đang đóng phiên...' : 'Đóng phiên chơi'}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => router.back()}
+              className="h-12 flex-row items-center justify-center gap-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]"
+            >
+              <ChevronLeft color="#94a3b8" size={18} />
+              <Text className="text-[13px] text-slate-700 dark:text-slate-200" weight="700">
+                Quay lại phiên chạy
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const pageTitle =
+    type === 'CHECK_IN'
+      ? isByoc
+        ? 'Xác nhận xe tự mang'
+        : 'Lập biên bản bàn giao'
+      : 'Lập biên bản trả xe';
 
   return (
-    <SafeAreaView className="flex-1 bg-[#f8fafc] dark:bg-[#0b0f19]" edges={['top', 'left', 'right']}>
+    <SafeAreaView className="flex-1 bg-[#f8fafc] dark:bg-[#0b0f19]" edges={['top', 'bottom']}>
       <KeyboardAvoidingView
         className="flex-1"
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View className="flex-row items-center gap-3 border-b border-slate-200 dark:border-slate-900 px-5 py-4">
+        {/* Header matching FE */}
+        <View className="flex-row items-center gap-3 border-b border-slate-200 dark:border-slate-900 bg-white dark:bg-[#0b0f19] px-5 py-3.5 shadow-sm">
           <Pressable
             onPress={() => router.back()}
             className="h-10 w-10 items-center justify-center rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]"
           >
-            <ArrowLeft color="#e2e8f0" size={19} />
+            <ChevronLeft color="#94a3b8" size={20} />
           </Pressable>
           <View className="flex-1">
-            <Text className="text-[12px] uppercase tracking-wider text-slate-500 dark:text-slate-400" weight="700">
-              Kiểm xe
+            <Text className="font-mono text-[11px] font-bold text-slate-500">
+              Phiên chạy: {sessionId.slice(0, 8).toUpperCase()}
             </Text>
-            <Text className="mt-1 text-[19px] text-slate-900 dark:text-white" weight="700" numberOfLines={1}>
-              {title}
+            <Text className="text-[17px] text-slate-900 dark:text-white" weight="700">
+              {pageTitle}
             </Text>
-          </View>
-        </View>
-
-        <ScrollView contentContainerClassName="px-5 py-5 pb-28" showsVerticalScrollIndicator={false}>
-          <View className="mb-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/70 p-4 shadow-sm">
-            <View className="flex-row items-start justify-between gap-3">
-              <View className="flex-1">
-                <Text className="text-[16px] text-slate-900 dark:text-white" weight="700">
-                  Phiên #{shortId(sessionId)}
-                </Text>
-                <Text className="mt-1 text-[11px] text-slate-500">
-                  Booking #{shortId(session?.bookingId)} • {session?.vehicles?.length || 0} xe •{' '}
-                  {session?.participants?.length || 0} người chơi
-                </Text>
-              </View>
-              <View className="rounded-lg border border-orange-500/20 bg-orange-500/10 px-2 py-1">
-                <Text className="text-[9px] uppercase text-[#fb923c]" weight="700">
-                  {getStatusLabel(type)}
-                </Text>
-              </View>
-            </View>
-
             {isByoc ? (
-              <View className="mt-4 rounded-xl border border-blue-500/20 bg-blue-500/10 p-3">
-                <Text className="text-[12px] text-blue-700 dark:text-blue-300" weight="700">
-                  Phiên khách mang xe riêng
-                </Text>
-                <Text className="mt-1 text-[11px] leading-4 text-blue-700/80 dark:text-blue-100/70">
-                  Vẫn lập biên bản trả xe để nhân viên xác nhận hoàn tất phiên theo quy trình chính thức.
+              <View className="mt-1 self-start rounded-full bg-blue-100 dark:bg-blue-900/40 px-2 py-0.5">
+                <Text className="text-[9px] uppercase text-blue-700 dark:text-blue-300" weight="700">
+                  Chế độ mang xe riêng
                 </Text>
               </View>
             ) : null}
           </View>
+        </View>
 
-          {session?.vehicles?.length ? (
-            <View className="mb-5">
-              <SectionTitle title="Xe trong phiên" />
-              <View className="gap-3">
-                {session.vehicles.map((vehicle) => (
-                  <View
-                  key={vehicle.vehicleId}
-                  className="flex-row items-center gap-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-3 shadow-sm"
-                >
-                  <View className="h-14 w-14 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-950">
-                    {vehicle.imageUrl ? (
-                      <Image source={{ uri: vehicle.imageUrl }} className="h-full w-full" resizeMode="cover" />
-                    ) : (
-                      <View className="h-full w-full items-center justify-center">
-                        <Car color="#64748b" size={22} />
-                      </View>
-                    )}
-                  </View>
-                  <View className="flex-1">
-                    <Text className="text-[13px] text-slate-900 dark:text-white" weight="700" numberOfLines={1}>
-                      {vehicle.name || 'Xe trong phiên'}
-                    </Text>
-                      <Text className="mt-1 text-[11px] text-slate-500">{vehicle.type}</Text>
-                    </View>
-                  </View>
-                ))}
-              </View>
-            </View>
-          ) : null}
-
-          {!isByoc ? (
-            <>
-              <View className="mb-3 flex-row items-start justify-between gap-3">
-                <View className="flex-1">
-                  <SectionTitle title="Ảnh kiểm xe" />
-                  <Text className="-mt-2 text-[11px] leading-4 text-slate-500">
-                    Thêm từ 1 đến 6 ảnh thực tế. Hãy chụp rõ các góc trước, sau, hai bên và điểm bất thường nếu có.
-                  </Text>
-                </View>
-                <Text className="text-[11px] text-slate-500" weight="700">
-                  {photos.filter((photo) => !!photo.url).length}/{MAX_INSPECTION_PHOTOS}
+        <ScrollView contentContainerClassName="px-4 py-4 pb-28" showsVerticalScrollIndicator={false}>
+          {/* PHOTO SECTION */}
+          <View className="mb-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-4 shadow-sm">
+            <View className="flex-row items-center justify-between gap-3">
+              <View className="flex-1 flex-row items-center gap-2">
+                <Camera color="#ea580c" size={18} />
+                <Text className="text-[13px] uppercase tracking-wider text-slate-900 dark:text-white" weight="700">
+                  {isByoc
+                    ? `Ảnh xác nhận xe khách (${byocPhotos.length} người — bắt buộc)`
+                    : `Ảnh bàn giao xe (${rentalPhotos.length}/${MAX_RENTAL_INSPECTION_PHOTOS})`}
                 </Text>
               </View>
-              <View className="mb-5 gap-3">
-                {photos.map((slot) => (
-                  <PhotoSlotCard
-                    key={slot.key}
-                    slot={slot}
-                    onPickCamera={() => handlePickPhoto(slot, 'camera')}
-                    onPickLibrary={() => handlePickPhoto(slot, 'library')}
-                    onRemove={() => removePhotoSlot(slot.key)}
-                    removable={photos.length > 1 || !!slot.url}
-                    onChangeNotes={(notes) => updatePhotoSlot(slot.key, { notes })}
-                    onPreview={() => {
-                      const url = slot.uri || slot.url;
-                      if (url) setPreviewPhoto({ url, title: `${slot.label} · ${slot.angle}` });
-                    }}
-                  />
-                ))}
-                {photos.length < MAX_INSPECTION_PHOTOS ? (
-                  <Pressable
-                    onPress={addPhotoSlot}
-                    className="h-11 flex-row items-center justify-center gap-2 rounded-xl border border-dashed border-orange-500/50 bg-orange-500/5"
+              {!isByoc && type === 'CHECK_OUT' && checkInInspection?.photos?.length ? (
+                <Pressable
+                  onPress={() => setShowCheckInBaselines(!showCheckInBaselines)}
+                  className="rounded-lg border border-orange-500/30 bg-orange-500/10 px-2.5 py-1.5"
+                >
+                  <Text className="text-[10px] text-[#ea580c]" weight="700">
+                    {showCheckInBaselines ? 'Ẩn ảnh nhận gốc' : 'So sánh ảnh nhận gốc'}
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
+
+            {isByoc ? (
+              /* BYOC Photo Slots: 1 slot per participant */
+              <View className="mt-3 gap-3">
+                {byocPhotos.map((slot, index) => (
+                  <View
+                    key={index}
+                    className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-3"
                   >
-                    <Plus color="#fb923c" size={16} />
-                    <Text className="text-[12px] text-[#fb923c]" weight="700">
-                      Thêm ảnh
+                    <View className="mb-2 flex-row items-center justify-between">
+                      <Text className="text-[12px] text-slate-900 dark:text-white" weight="700">
+                        {slot.participantName}
+                      </Text>
+                      {slot.url ? (
+                        <View className="rounded bg-emerald-500/10 px-1.5 py-0.5">
+                          <Text className="text-[9px] text-emerald-400" weight="700">
+                            ✓ Đã chụp
+                          </Text>
+                        </View>
+                      ) : (
+                        <View className="rounded bg-rose-500/10 px-1.5 py-0.5">
+                          <Text className="text-[9px] text-rose-400" weight="700">
+                            Bắt buộc
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+
+                    <View className="aspect-video w-full overflow-hidden rounded-xl border border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-[#0f172a]">
+                      {slot.url || slot.uri ? (
+                        <Pressable
+                          onPress={() => {
+                            if (slot.url || slot.uri) {
+                              setPreviewPhoto({
+                                url: slot.url || slot.uri || '',
+                                title: `Xe tự mang của ${slot.participantName}`,
+                              });
+                            }
+                          }}
+                          className="h-full w-full"
+                        >
+                          <Image
+                            source={{ uri: slot.url || slot.uri }}
+                            className="h-full w-full"
+                            resizeMode="cover"
+                          />
+                          {slot.uploading ? (
+                            <View className="absolute inset-0 items-center justify-center bg-black/60">
+                              <ActivityIndicator color="#ffffff" />
+                              <Text className="mt-1 text-[10px] text-white">Đang tải...</Text>
+                            </View>
+                          ) : null}
+                        </Pressable>
+                      ) : (
+                        <View className="h-full w-full items-center justify-center gap-1.5">
+                          <Camera color="#64748b" size={24} />
+                          <Text className="text-[11px] text-[#ea580c]" weight="700">
+                            + Chụp ảnh xe
+                          </Text>
+                          <Text className="text-[9px] text-slate-400">
+                            Toàn cảnh xe để xác nhận
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+
+                    <View className="mt-2.5 flex-row gap-2">
+                      <Pressable
+                        disabled={slot.uploading}
+                        onPress={() => handlePickByocPhoto(index, 'camera')}
+                        className="h-9 flex-1 flex-row items-center justify-center gap-1.5 rounded-lg border border-orange-500/30 bg-orange-500/10"
+                      >
+                        <Camera color="#ea580c" size={14} />
+                        <Text className="text-[11px] text-[#ea580c]" weight="700">
+                          {slot.url ? 'Chụp lại' : 'Chụp ảnh'}
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        disabled={slot.uploading}
+                        onPress={() => handlePickByocPhoto(index, 'library')}
+                        className="h-9 flex-1 flex-row items-center justify-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]"
+                      >
+                        <UploadCloud color="#94a3b8" size={14} />
+                        <Text className="text-[11px] text-slate-700 dark:text-slate-200" weight="700">
+                          Chọn từ máy
+                        </Text>
+                      </Pressable>
+                    </View>
+
+                    {slot.url ? (
+                      <TextInput
+                        value={slot.notes}
+                        onChangeText={(notes) =>
+                          setByocPhotos((prev) =>
+                            prev.map((p, i) => (i === index ? { ...p, notes } : p))
+                          )
+                        }
+                        placeholder="Màu, đặc điểm xe..."
+                        placeholderTextColor="#64748b"
+                        className="mt-2 h-9 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0b0f19] px-2.5 text-[11px] text-slate-900 dark:text-white"
+                      />
+                    ) : null}
+                  </View>
+                ))}
+              </View>
+            ) : (
+              /* RENTAL Photos Section */
+              <View className="mt-3 space-y-3">
+                <View className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-3">
+                  <Text className="text-[11px] leading-5 text-amber-700 dark:text-amber-200/90">
+                    Cần tối thiểu {MIN_RENTAL_INSPECTION_PHOTOS} và tối đa {MAX_RENTAL_INSPECTION_PHOTOS} ảnh. Hãy chụp tổng thể xe, phía trước, phía sau, hai bên và cận cảnh mọi vết xước hoặc hư hỏng hiện có để đối chiếu khi trả xe.
+                  </Text>
+                </View>
+
+                {rentalPhotos.length < MAX_RENTAL_INSPECTION_PHOTOS ? (
+                  <View className="flex-row gap-2">
+                    <Pressable
+                      disabled={isUploadingRentalPhotos}
+                      onPress={() => handlePickRentalPhotos('camera')}
+                      className="h-12 flex-1 flex-row items-center justify-center gap-2 rounded-xl border border-dashed border-orange-500/50 bg-orange-500/10"
+                    >
+                      <Camera color="#ea580c" size={16} />
+                      <Text className="text-[12px] text-[#ea580c]" weight="700">
+                        Chụp ảnh
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      disabled={isUploadingRentalPhotos}
+                      onPress={() => handlePickRentalPhotos('library')}
+                      className="h-12 flex-1 flex-row items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50"
+                    >
+                      <ImagePlus color="#94a3b8" size={16} />
+                      <Text className="text-[12px] text-slate-700 dark:text-slate-200" weight="700">
+                        Chọn nhiều ảnh
+                      </Text>
+                    </Pressable>
+                  </View>
+                ) : null}
+
+                {isUploadingRentalPhotos ? (
+                  <View className="flex-row items-center justify-center gap-2 py-2">
+                    <ActivityIndicator color="#ea580c" size="small" />
+                    <Text className="text-[11px] text-slate-500">Đang nén & tải ảnh lên...</Text>
+                  </View>
+                ) : null}
+
+                {remainingRentalPhotos > 0 && rentalPhotos.length > 0 ? (
+                  <Text className="text-[11px] font-bold text-amber-600 dark:text-amber-400">
+                    Cần thêm {remainingRentalPhotos} ảnh để đủ điều kiện lưu biên bản.
+                  </Text>
+                ) : null}
+
+                {rentalPhotos.length > 0 ? (
+                  <View className="gap-3">
+                    {rentalPhotos.map((photo, index) => (
+                      <View
+                        key={photo.id}
+                        className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-3"
+                      >
+                        <View className="mb-2 flex-row items-center justify-between">
+                          <Text className="text-[11px] uppercase tracking-wider text-slate-500" weight="700">
+                            Ảnh {index + 1}
+                          </Text>
+                          <Pressable
+                            onPress={() =>
+                              setRentalPhotos((prev) => prev.filter((item) => item.id !== photo.id))
+                            }
+                            className="h-7 w-7 items-center justify-center rounded-lg bg-rose-500/10"
+                          >
+                            <Trash2 color="#ef4444" size={13} />
+                          </Pressable>
+                        </View>
+
+                        <View className="aspect-video w-full overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]">
+                          <Pressable
+                            onPress={() => {
+                              const url = photo.url || photo.uri;
+                              if (url) setPreviewPhoto({ url, title: `Ảnh bàn giao xe ${index + 1}` });
+                            }}
+                            className="h-full w-full"
+                          >
+                            <Image
+                              source={{ uri: photo.url || photo.uri }}
+                              className="h-full w-full"
+                              resizeMode="cover"
+                            />
+                            {photo.uploading ? (
+                              <View className="absolute inset-0 items-center justify-center bg-black/60">
+                                <ActivityIndicator color="#ffffff" />
+                              </View>
+                            ) : null}
+                          </Pressable>
+                        </View>
+
+                        <TextInput
+                          value={photo.notes}
+                          onChangeText={(notes) =>
+                            setRentalPhotos((prev) =>
+                              prev.map((item) => (item.id === photo.id ? { ...item, notes } : item))
+                            )
+                          }
+                          placeholder="Ghi chú tùy chọn, ví dụ: vết xước cản trước"
+                          placeholderTextColor="#64748b"
+                          className="mt-2.5 h-9 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0b0f19] px-2.5 text-[11px] text-slate-900 dark:text-white"
+                        />
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+
+                {/* Show Baseline Photos Comparison */}
+                {showCheckInBaselines && checkInInspection?.photos?.length ? (
+                  <View className="mt-3 border-t border-slate-200 dark:border-slate-800 pt-3">
+                    <Text className="mb-2 text-[11px] uppercase tracking-wider text-blue-500 dark:text-blue-400" weight="700">
+                      Ảnh bàn giao lúc nhận xe
                     </Text>
-                  </Pressable>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                      <View className="flex-row gap-2">
+                        {checkInInspection.photos.map((photo, index) => (
+                          <Pressable
+                            key={index}
+                            onPress={() =>
+                              setPreviewPhoto({
+                                url: photo.url,
+                                title: `Ảnh nhận xe gốc ${index + 1}`,
+                              })
+                            }
+                            className="h-24 w-32 overflow-hidden rounded-xl border border-blue-500/30 bg-blue-500/5"
+                          >
+                            <Image source={{ uri: photo.url }} className="h-full w-full" resizeMode="cover" />
+                          </Pressable>
+                        ))}
+                      </View>
+                    </ScrollView>
+                  </View>
                 ) : null}
               </View>
-            </>
-          ) : null}
-
-          <SectionTitle title="Checklist kiểm tra" />
-          <View className="mb-5 gap-3">
-            {checklist.map((item) => (
-              <ChecklistCard
-                key={item.itemKey}
-                item={item}
-                onToggle={(ok) => updateChecklistStatus(item.itemKey, ok)}
-                onChangeNote={(note) => updateChecklistNote(item.itemKey, note)}
-              />
-            ))}
+            )}
           </View>
 
-          {type === 'CHECK_OUT' && !isByoc ? (
+          {/* CHECKLIST SECTION */}
+          <View className="mb-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-4 shadow-sm">
+            <View className="mb-3 flex-row items-center gap-2">
+              <ShieldCheck color="#ea580c" size={18} />
+              <Text className="text-[13px] uppercase tracking-wider text-slate-900 dark:text-white" weight="700">
+                {isByoc
+                  ? 'Xác nhận điều kiện tham gia'
+                  : type === 'CHECK_OUT'
+                  ? 'Xác nhận đã kiểm tra linh kiện'
+                  : 'Danh mục kiểm tra an toàn linh kiện'}
+              </Text>
+            </View>
+
+            <View className="gap-3">
+              {checklist.map((item) => (
+                <View
+                  key={item.id}
+                  className={`rounded-xl border p-3 ${
+                    item.checked
+                      ? 'border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/60'
+                      : 'border-rose-500/30 bg-rose-500/10'
+                  }`}
+                >
+                  <View className="flex-row items-center justify-between gap-3">
+                    <View className="flex-1">
+                      <Text
+                        className={`text-[12px] leading-5 ${
+                          item.checked
+                            ? 'text-slate-900 dark:text-white'
+                            : 'text-rose-600 dark:text-rose-400'
+                        }`}
+                        weight="700"
+                      >
+                        {item.label}
+                      </Text>
+                    </View>
+                    <Switch
+                      value={item.checked}
+                      onValueChange={() => toggleChecklistItem(item.id)}
+                      trackColor={{ false: '#991b1b', true: '#ea580c' }}
+                      thumbColor="#ffffff"
+                    />
+                  </View>
+
+                  {!item.checked ? (
+                    <TextInput
+                      value={item.notes || ''}
+                      onChangeText={(notes) => handleChecklistNotes(item.id, notes)}
+                      placeholder="Ghi chú thêm lý do không đạt..."
+                      placeholderTextColor="#64748b"
+                      className="mt-2 h-9 rounded-lg border border-rose-500/30 bg-white dark:bg-[#0b0f19] px-2.5 text-[11px] text-rose-800 dark:text-rose-200"
+                    />
+                  ) : null}
+                </View>
+              ))}
+            </View>
+          </View>
+
+          {/* DAMAGE LINE ITEMS (RENTAL CHECK_OUT ONLY) */}
+          {!isByoc && type === 'CHECK_OUT' ? (
             <View className="mb-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-4 shadow-sm">
               <View className="mb-3 flex-row items-center justify-between gap-3">
                 <View className="flex-1">
                   <Text className="text-[13px] text-slate-900 dark:text-white" weight="700">
-                    Ghi nhận hư hỏng/phí phát sinh
+                    Phát hiện hư hỏng do va chạm
                   </Text>
                   <Text className="mt-1 text-[11px] leading-4 text-slate-500">
-                    Bật mục này nếu xe có hư hỏng cần khách xác nhận khi trả xe.
+                    Yêu cầu bồi thường sửa chữa linh kiện xe
                   </Text>
                 </View>
                 <Switch
                   value={damageFlagged}
                   onValueChange={(enabled) => {
                     setDamageFlagged(enabled);
-                    setDamageLineItems((current) =>
-                      enabled && current.length === 0
-                        ? [{ partType: 'TIRE_WHEEL', partsPrice: 0, laborPrice: 0 }]
-                        : enabled
-                          ? current
-                          : []
-                    );
+                    if (enabled && damageLineItems.length === 0) {
+                      setDamageLineItems([{ partType: 'TIRE_WHEEL', partsPrice: 0, laborPrice: 0 }]);
+                    } else if (!enabled) {
+                      setDamageLineItems([]);
+                    }
                   }}
-                  trackColor={{ false: '#1e293b', true: '#f97316' }}
+                  trackColor={{ false: '#1e293b', true: '#ea580c' }}
                   thumbColor="#ffffff"
                 />
               </View>
 
               {damageFlagged ? (
-                <View className="gap-3">
-                  <Text className="text-[11px] leading-4 text-slate-500">
-                    Ghi từng hạng mục để khách xem rõ tiền linh kiện và công sửa. Không áp dụng hệ số giá tự động.
-                  </Text>
-                  {damageLineItems.map((item, index) => (
-                    <DamageLineItemCard
-                      key={`${item.partType}-${index}`}
-                      item={item}
-                      index={index}
-                      onChange={updateDamageLineItem}
-                      onRemove={() => removeDamageLineItem(index)}
-                    />
-                  ))}
-                  <Pressable
-                    onPress={addDamageLineItem}
-                    className="h-10 flex-row items-center justify-center gap-2 rounded-xl border border-orange-500/30 bg-orange-500/10"
-                  >
-                    <Plus color="#fb923c" size={15} />
-                    <Text className="text-[11px] text-[#fb923c]" weight="700">
-                      Thêm hạng mục
+                <View className="mt-2 gap-3 border-t border-slate-200 dark:border-slate-800 pt-3">
+                  <View className="flex-row items-center justify-between">
+                    <Text className="text-[11px] uppercase tracking-wider text-slate-500" weight="700">
+                      Danh sách hạng mục hư hỏng
                     </Text>
-                  </Pressable>
-                  <View className="rounded-xl border border-red-500/20 bg-red-500/10 p-3">
-                    <View className="flex-row items-center justify-between gap-3">
-                      <Text className="text-[11px] text-red-200" weight="700">
-                        Tổng phí bồi thường
+                    <Pressable
+                      onPress={addDamageItem}
+                      className="flex-row items-center gap-1 rounded-lg border border-orange-500/30 bg-orange-500/10 px-2.5 py-1"
+                    >
+                      <Plus color="#ea580c" size={13} />
+                      <Text className="text-[10px] text-[#ea580c]" weight="700">
+                        Thêm hạng mục
                       </Text>
-                      <Text className="text-[14px] text-red-200" weight="700">
-                        {formatCurrency(totalDamageCharge)}
+                    </Pressable>
+                  </View>
+
+                  {damageLineItems.length === 0 ? (
+                    <View className="rounded-xl border border-dashed border-slate-300 dark:border-slate-700 p-4 text-center">
+                      <Text className="text-center text-[11px] text-slate-500">
+                        {'Chưa có hạng mục nào. Nhấn "Thêm hạng mục" để bắt đầu ghi nhận.'}
                       </Text>
                     </View>
-                  </View>
+                  ) : null}
+
+                  {damageLineItems.map((item, index) => {
+                    const lineTotal = Number(item.partsPrice || 0) + Number(item.laborPrice || 0);
+                    return (
+                      <View
+                        key={index}
+                        className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-3"
+                      >
+                        <View className="mb-2 flex-row items-center justify-between">
+                          <Text className="text-[11px] text-slate-900 dark:text-white" weight="700">
+                            Hạng mục {index + 1}
+                          </Text>
+                          <Pressable
+                            onPress={() => removeDamageItem(index)}
+                            className="h-7 w-7 items-center justify-center rounded-lg bg-rose-500/10"
+                          >
+                            <Trash2 color="#ef4444" size={13} />
+                          </Pressable>
+                        </View>
+
+                        {/* Part Type Pills */}
+                        <View className="mb-2 flex-row flex-wrap gap-1.5">
+                          {(Object.keys(PART_TYPE_LABELS) as DamagePartType[]).map((pType) => {
+                            const isSelected = item.partType === pType;
+                            return (
+                              <Pressable
+                                key={pType}
+                                onPress={() => updateDamageItem(index, 'partType', pType)}
+                                className={`rounded-lg border px-2 py-1 ${
+                                  isSelected
+                                    ? 'border-orange-500 bg-orange-500/10'
+                                    : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]'
+                                }`}
+                              >
+                                <Text
+                                  className={`text-[9px] ${
+                                    isSelected ? 'text-[#ea580c]' : 'text-slate-500'
+                                  }`}
+                                  weight="700"
+                                >
+                                  {PART_TYPE_LABELS[pType]}
+                                </Text>
+                              </Pressable>
+                            );
+                          })}
+                        </View>
+
+                        {item.partType === 'OTHER' ? (
+                          <TextInput
+                            value={item.customPartName || ''}
+                            onChangeText={(value) => updateDamageItem(index, 'customPartName', value)}
+                            placeholder="Nhập tên hư hỏng cụ thể..."
+                            placeholderTextColor="#64748b"
+                            className="mb-2 h-9 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0b0f19] px-2.5 text-[11px] text-slate-900 dark:text-white"
+                          />
+                        ) : null}
+
+                        <View className="flex-row gap-2">
+                          <View className="flex-1">
+                            <Text className="mb-1 text-[9px] uppercase tracking-wider text-slate-500" weight="700">
+                              Giá linh kiện (đ)
+                            </Text>
+                            <TextInput
+                              value={item.partsPrice ? String(item.partsPrice) : ''}
+                              onChangeText={(val) =>
+                                updateDamageItem(index, 'partsPrice', Number(val.replace(/[^\d]/g, '') || 0))
+                              }
+                              keyboardType="number-pad"
+                              placeholder="0"
+                              placeholderTextColor="#64748b"
+                              className="h-9 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0b0f19] px-2.5 text-[11px] text-slate-900 dark:text-white"
+                            />
+                          </View>
+                          <View className="flex-1">
+                            <Text className="mb-1 text-[9px] uppercase tracking-wider text-slate-500" weight="700">
+                              Phí công sửa (đ)
+                            </Text>
+                            <TextInput
+                              value={item.laborPrice ? String(item.laborPrice) : ''}
+                              onChangeText={(val) =>
+                                updateDamageItem(index, 'laborPrice', Number(val.replace(/[^\d]/g, '') || 0))
+                              }
+                              keyboardType="number-pad"
+                              placeholder="0"
+                              placeholderTextColor="#64748b"
+                              className="h-9 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0b0f19] px-2.5 text-[11px] text-slate-900 dark:text-white"
+                            />
+                          </View>
+                        </View>
+
+                        <View className="mt-2 flex-row justify-end">
+                          <Text className="text-[10px] text-slate-500">
+                            Dòng này: <Text className="font-bold text-slate-900 dark:text-white">{formatCurrency(lineTotal)}</Text>
+                          </Text>
+                        </View>
+                      </View>
+                    );
+                  })}
+
+                  {damageLineItems.length > 0 ? (
+                    <View className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-3.5">
+                      <View className="flex-row items-center justify-between">
+                        <Text className="text-[12px] text-rose-700 dark:text-rose-300" weight="700">
+                          Tổng phí bồi thường:
+                        </Text>
+                        <Text className="text-[15px] text-rose-600 dark:text-rose-400" weight="700">
+                          {formatCurrency(totalDamageCharge)}
+                        </Text>
+                      </View>
+                      <Text className="mt-1.5 text-[10px] text-rose-600/80 dark:text-rose-300/80">
+                        Khách hàng sẽ xem bảng kê chi tiết và xác nhận trước khi thanh toán.
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
               ) : null}
             </View>
           ) : null}
 
-          <SectionTitle title="Ghi chú staff" />
-          <TextInput
-            value={staffNotes}
-            onChangeText={setStaffNotes}
-            multiline
-            placeholder="Ghi chú bổ sung cho biên bản..."
-            placeholderTextColor="#64748b"
-            className="mb-5 min-h-[96px] rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 px-4 py-3 text-[12px] text-slate-900 dark:text-white"
-            style={{ textAlignVertical: 'top' }}
-          />
-
-          <View className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4">
-            <View className="flex-row gap-2">
-              <AlertTriangle color="#f59e0b" size={16} />
-              <Text className="flex-1 text-[11px] leading-4 text-amber-100/80">
-                Sau khi gửi biên bản trả xe, khách sẽ nhận thông báo để xem ảnh, checklist và xác nhận
-                hoàn tất. Nếu khách từ chối, phiên sẽ quay lại trạng thái cần xử lý.
-              </Text>
-            </View>
+          {/* STAFF NOTES SECTION */}
+          <View className="mb-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-4 shadow-sm">
+            <Text className="mb-2 text-[13px] uppercase tracking-wider text-slate-900 dark:text-white" weight="700">
+              Ghi chú tổng quan biên bản
+            </Text>
+            <TextInput
+              value={staffNotes}
+              onChangeText={setStaffNotes}
+              multiline
+              placeholder={
+                isByoc
+                  ? 'Ghi chú về xe khách hoặc điều kiện đặc biệt...'
+                  : 'Nhập nhận xét chung của kiểm định viên...'
+              }
+              placeholderTextColor="#64748b"
+              className="min-h-[80px] rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0b0f19] p-3 text-[12px] text-slate-900 dark:text-white"
+              style={{ textAlignVertical: 'top' }}
+            />
           </View>
         </ScrollView>
 
-        <View className="border-t border-slate-200 dark:border-slate-900 bg-[#f8fafc] dark:bg-[#0b0f19] px-5 py-4">
-          <Pressable
-            disabled={submitting}
-            onPress={handleSubmit}
-            className={`h-12 flex-row items-center justify-center gap-2 rounded-xl bg-[#ea580c] ${
-              submitting ? 'opacity-70' : ''
-            }`}
-          >
-            {submitting ? (
-              <ActivityIndicator color="#ffffff" size="small" />
-            ) : (
-              <ReceiptText color="#ffffff" size={17} />
-            )}
-            <Text className="text-[13px] text-white" weight="700">
-              Gửi {title.toLowerCase()}
-            </Text>
-          </Pressable>
+        {/* BOTTOM ACTION BAR */}
+        <View className="border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0b0f19] px-4 py-3 shadow-lg">
+          <View className="flex-row items-center gap-3">
+            <Pressable
+              onPress={() => router.back()}
+              className="h-12 w-24 items-center justify-center rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]"
+            >
+              <Text className="text-[13px] text-slate-700 dark:text-slate-300" weight="700">
+                Hủy bỏ
+              </Text>
+            </Pressable>
+
+            <Pressable
+              disabled={
+                submitting ||
+                isUploadingRentalPhotos ||
+                (!isByoc && remainingRentalPhotos > 0)
+              }
+              onPress={handleSubmit}
+              className={`h-12 flex-1 flex-row items-center justify-center gap-2 rounded-xl bg-[#ea580c] px-3 ${
+                submitting || isUploadingRentalPhotos || (!isByoc && remainingRentalPhotos > 0)
+                  ? 'opacity-60'
+                  : ''
+              }`}
+            >
+              {submitting ? (
+                <ActivityIndicator color="#ffffff" size="small" />
+              ) : (
+                <FileCheck color="#ffffff" size={17} />
+              )}
+              <Text
+                numberOfLines={1}
+                className="text-[13px] text-white"
+                weight="700"
+              >
+                {submitting
+                  ? 'Đang lưu...'
+                  : isByoc
+                  ? 'Xác nhận xe khách'
+                  : remainingRentalPhotos > 0
+                  ? `Cần thêm ${remainingRentalPhotos} ảnh`
+                  : 'Lưu biên bản kiểm định'}
+              </Text>
+            </Pressable>
+          </View>
         </View>
       </KeyboardAvoidingView>
+
       <ImageZoomModal
         visible={!!previewPhoto}
         imageUrl={previewPhoto?.url}
@@ -744,274 +1197,5 @@ export function StaffInspectionFormScreen({
         onClose={() => setPreviewPhoto(null)}
       />
     </SafeAreaView>
-  );
-}
-
-function SectionTitle({ title }: { title: string }) {
-  return (
-    <Text className="mb-3 text-[12px] uppercase tracking-wider text-slate-400" weight="700">
-      {title}
-    </Text>
-  );
-}
-
-function PhotoSlotCard({
-  slot,
-  onPickCamera,
-  onPickLibrary,
-  onRemove,
-  removable,
-  onChangeNotes,
-  onPreview,
-}: {
-  slot: PhotoSlot;
-  onPickCamera: () => void;
-  onPickLibrary: () => void;
-  onRemove: () => void;
-  removable: boolean;
-  onChangeNotes: (notes: string) => void;
-  onPreview: () => void;
-}) {
-  const hasPhoto = !!slot.uri || !!slot.url;
-
-  return (
-    <View className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-4 shadow-sm">
-      <View className="mb-3 flex-row items-center justify-between gap-3">
-        <View>
-          <Text className="text-[13px] text-slate-900 dark:text-white" weight="700">
-            {slot.label}
-          </Text>
-          <Text className="mt-1 text-[10px] uppercase tracking-wider text-slate-500">{slot.angle}</Text>
-        </View>
-        <View className="flex-row items-center gap-2">
-          {slot.url ? (
-            <View className="flex-row items-center gap-1 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-2 py-1">
-              <CheckCircle2 color="#34d399" size={12} />
-              <Text className="text-[9px] text-emerald-300" weight="700">
-                Đã upload
-              </Text>
-            </View>
-          ) : null}
-          {removable ? (
-            <Pressable
-              disabled={slot.uploading}
-              onPress={onRemove}
-              className="h-7 w-7 items-center justify-center rounded-lg border border-red-500/20 bg-red-500/10"
-            >
-              <Trash2 color="#f87171" size={13} />
-            </Pressable>
-          ) : null}
-        </View>
-      </View>
-
-      <View className="aspect-[4/3] overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-950">
-        {hasPhoto ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Phóng to ${slot.label}`}
-            onPress={onPreview}
-            className="h-full w-full"
-          >
-            <Image source={{ uri: slot.uri || slot.url }} className="h-full w-full" resizeMode="cover" />
-            {slot.uploading ? (
-              <View className="absolute inset-0 items-center justify-center bg-black/60">
-                <ActivityIndicator color="#ffffff" />
-                <Text className="mt-2 text-[11px] text-white" weight="700">
-                  Đang nén & upload...
-                </Text>
-              </View>
-            ) : null}
-          </Pressable>
-        ) : (
-          <View className="h-full w-full items-center justify-center gap-2">
-            <ImagePlus color="#475569" size={30} />
-            <Text className="text-[11px] text-slate-500" weight="700">
-              Chưa có ảnh
-            </Text>
-          </View>
-        )}
-      </View>
-
-      <View className="mt-3 flex-row gap-2">
-        <Pressable
-          disabled={slot.uploading}
-          onPress={onPickCamera}
-          className="h-10 flex-1 flex-row items-center justify-center gap-2 rounded-xl border border-orange-500/30 bg-orange-500/10"
-        >
-          <Camera color="#fb923c" size={15} />
-          <Text className="text-[11px] text-[#fb923c]" weight="700">
-            Chụp ảnh
-          </Text>
-        </Pressable>
-        <Pressable
-          disabled={slot.uploading}
-          onPress={onPickLibrary}
-          className="h-10 flex-1 flex-row items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-950"
-        >
-          <UploadCloud color="#cbd5e1" size={15} />
-          <Text className="text-[11px] text-slate-200" weight="700">
-            Chọn ảnh
-          </Text>
-        </Pressable>
-      </View>
-
-      <TextInput
-        value={slot.notes}
-        onChangeText={onChangeNotes}
-        placeholder="Ghi chú cho ảnh này..."
-        placeholderTextColor="#64748b"
-        className="mt-3 min-h-[44px] rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-[11px] text-white"
-        style={{ textAlignVertical: 'top' }}
-      />
-    </View>
-  );
-}
-
-function DamageLineItemCard({
-  item,
-  index,
-  onChange,
-  onRemove,
-}: {
-  item: DamageLineItemInput;
-  index: number;
-  onChange: (index: number, field: keyof DamageLineItemInput, value: string | number) => void;
-  onRemove: () => void;
-}) {
-  const lineTotal = Number(item.partsPrice || 0) + Number(item.laborPrice || 0);
-
-  return (
-    <View className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-3">
-      <View className="mb-3 flex-row items-center justify-between gap-3">
-        <Text className="text-[11px] text-slate-900 dark:text-white" weight="700">
-          Hạng mục {index + 1}
-        </Text>
-        <Pressable onPress={onRemove} className="h-8 w-8 items-center justify-center rounded-lg bg-red-500/10">
-          <Trash2 color="#f87171" size={14} />
-        </Pressable>
-      </View>
-
-      <View className="mb-3 flex-row flex-wrap gap-2">
-        {(Object.keys(DAMAGE_PART_LABELS) as DamagePartType[]).map((partType) => {
-          const selected = item.partType === partType;
-          return (
-            <Pressable
-              key={partType}
-              onPress={() => onChange(index, 'partType', partType)}
-              className={`rounded-lg border px-2.5 py-2 ${
-                selected
-                  ? 'border-orange-500 bg-orange-500/10'
-                  : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0b0f19]'
-              }`}
-            >
-              <Text className={`text-[10px] ${selected ? 'text-[#fb923c]' : 'text-slate-500'}`} weight="700">
-                {DAMAGE_PART_LABELS[partType]}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      {item.partType === 'OTHER' ? (
-        <TextInput
-          value={item.customPartName || ''}
-          onChangeText={(value) => onChange(index, 'customPartName', value)}
-          placeholder="Tên hư hỏng cụ thể"
-          placeholderTextColor="#64748b"
-          className="mb-3 h-11 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0b0f19] px-3 text-[12px] text-slate-900 dark:text-white"
-        />
-      ) : null}
-
-      <View className="flex-row gap-3">
-        <View className="flex-1">
-          <Text className="mb-1 text-[10px] text-slate-500" weight="700">
-            Linh kiện (đ)
-          </Text>
-          <TextInput
-            value={item.partsPrice ? String(item.partsPrice) : ''}
-            onChangeText={(value) => onChange(index, 'partsPrice', Number(value.replace(/[^\d]/g, '') || 0))}
-            keyboardType="number-pad"
-            placeholder="0"
-            placeholderTextColor="#64748b"
-            className="h-11 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0b0f19] px-3 text-[12px] text-slate-900 dark:text-white"
-          />
-        </View>
-        <View className="flex-1">
-          <Text className="mb-1 text-[10px] text-slate-500" weight="700">
-            Công sửa (đ)
-          </Text>
-          <TextInput
-            value={item.laborPrice ? String(item.laborPrice) : ''}
-            onChangeText={(value) => onChange(index, 'laborPrice', Number(value.replace(/[^\d]/g, '') || 0))}
-            keyboardType="number-pad"
-            placeholder="0"
-            placeholderTextColor="#64748b"
-            className="h-11 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0b0f19] px-3 text-[12px] text-slate-900 dark:text-white"
-          />
-        </View>
-      </View>
-
-      <View className="mt-3 flex-row justify-between">
-        <Text className="text-[10px] text-slate-500">Tổng hạng mục</Text>
-        <Text className="text-[11px] text-slate-900 dark:text-white" weight="700">
-          {formatCurrency(lineTotal)}
-        </Text>
-      </View>
-    </View>
-  );
-}
-
-function ChecklistCard({
-  item,
-  onToggle,
-  onChangeNote,
-}: {
-  item: ChecklistItem;
-  onToggle: (ok: boolean) => void;
-  onChangeNote: (note: string) => void;
-}) {
-  const ok = item.status === 'OK';
-
-  return (
-    <View
-      className={`rounded-2xl border p-4 ${
-        ok ? 'border-slate-800 bg-[#0f172a]/60' : 'border-amber-500/30 bg-amber-500/10'
-      }`}
-    >
-      <View className="flex-row items-start gap-3">
-        <View
-          className={`mt-0.5 h-9 w-9 items-center justify-center rounded-xl border ${
-            ok ? 'border-emerald-500/20 bg-emerald-500/10' : 'border-amber-500/30 bg-amber-500/10'
-          }`}
-        >
-          {ok ? <ShieldCheck color="#34d399" size={17} /> : <XCircle color="#f59e0b" size={17} />}
-        </View>
-        <View className="flex-1">
-          <Text className="text-[12px] text-white" weight="700">
-            {item.itemLabel}
-          </Text>
-          <Text className="mt-1 text-[10px] uppercase tracking-wider text-slate-500" weight="700">
-            {ok ? 'Đạt' : 'Cần kiểm tra lại'}
-          </Text>
-        </View>
-        <Switch
-          value={ok}
-          onValueChange={onToggle}
-          trackColor={{ false: '#92400e', true: '#047857' }}
-          thumbColor="#ffffff"
-        />
-      </View>
-
-      {!ok || item.note ? (
-        <TextInput
-          value={item.note}
-          onChangeText={onChangeNote}
-          placeholder="Ghi chú tình trạng hoặc điểm cần theo dõi..."
-          placeholderTextColor="#64748b"
-          className="mt-3 min-h-[44px] rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-[11px] text-white"
-          style={{ textAlignVertical: 'top' }}
-        />
-      ) : null}
-    </View>
   );
 }

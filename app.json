@@ -13,7 +13,8 @@
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "RCField cần quyền truy cập vị trí của bạn để định vị và tìm kiếm các chi nhánh sân đua gần nhất.",
         "NSCameraUsageDescription": "RCField cần quyền camera để nhân viên quét mã QR nhận xe và chụp ảnh kiểm xe.",
-        "NSPhotoLibraryUsageDescription": "RCField cần quyền thư viện ảnh để nhân viên chọn ảnh kiểm xe khi nhận và trả xe."
+        "NSPhotoLibraryUsageDescription": "RCField cần quyền thư viện ảnh để lưu mã QR thanh toán hoặc chọn ảnh kiểm xe khi nhận và trả xe.",
+        "NSPhotoLibraryAddUsageDescription": "RCField cần quyền lưu ảnh để lưu mã QR VietQR thanh toán vào thư viện ảnh của bạn."
       }
     },
     "android": {
@@ -31,6 +32,7 @@
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.CAMERA",
         "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.RECORD_AUDIO"
       ]
@@ -42,6 +44,13 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "RCField cần quyền truy cập ảnh để lưu mã QR thanh toán vào thư viện.",
+          "savePhotosPermission": "RCField cần quyền lưu ảnh để lưu mã QR thanh toán VietQR."
+        }
+      ],
       [
         "expo-image-picker",
         {

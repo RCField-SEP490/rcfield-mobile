@@ -125,9 +125,26 @@ export interface CreateBookingResult {
   total_amount: number;
 }
 
+export interface BankTransferCheckout {
+  qr_payload: string;
+  qr_image_data_url: string;
+  ref_code: string;
+  bank_name: string;
+  account_number: string;
+  account_name: string;
+  amount: number;
+  expires_at: string;
+  is_sandbox: boolean;
+  sandbox_url?: string;
+}
+
 export interface CheckoutResponse {
   confirmed: boolean;
   payment_url?: string;
+  txn_ref?: string;
+  total_amount?: number;
+  flow?: 'redirect' | 'bank_transfer';
+  bank_transfer?: BankTransferCheckout;
 }
 
 export interface PromoValidationResult {
@@ -224,9 +241,26 @@ export const bookingWizardApi = {
     return response.data?.data;
   },
 
-  createCheckout: async (bookingId: string, returnUrl?: string): Promise<CheckoutResponse> => {
-    const response = await api.post(`/bookings/${bookingId}/checkout`, { return_url: returnUrl });
+  createCheckout: async (
+    bookingId: string,
+    returnUrl?: string,
+    paymentMethod?: 'vnpay' | 'bank_transfer'
+  ): Promise<CheckoutResponse> => {
+    const response = await api.post(`/bookings/${bookingId}/checkout`, {
+      return_url: returnUrl,
+      payment_method: paymentMethod,
+    });
     return response.data?.data;
+  },
+
+  getCafePaymentMethods: async (cafeId: string): Promise<string[]> => {
+    try {
+      const response = await api.get(`/cafes/${cafeId}/payment-methods`);
+      return response.data?.data || ['vnpay', 'bank_transfer'];
+    } catch (error) {
+      console.error('[BookingWizardAPI] Error fetching cafe payment methods:', error);
+      return ['vnpay', 'bank_transfer'];
+    }
   },
 
   mockCheckout: async (bookingId: string): Promise<void> => {

@@ -253,6 +253,14 @@ class WebSocketClient {
           `Món ăn/nước uống mới trị giá ${Number(data.totalAmount).toLocaleString('vi-VN')}đ đã được thêm vào phiên chạy.`
         );
         break;
+      case 'SESSION_OVERDUE_ALERT':
+        if (role !== 'customer') {
+          Alert.alert(
+            'Phiên chạy quá giờ chưa trả xe',
+            data?.message || 'Vui lòng kiểm tra và hoàn tất trả xe cho phiên này.'
+          );
+        }
+        break;
     }
   }
 

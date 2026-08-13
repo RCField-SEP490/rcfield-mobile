@@ -7,12 +7,14 @@ import {
   Coffee,
   Compass,
   Home,
+  Trophy,
   UserRound,
   type LucideIcon,
 } from 'lucide-react-native';
 import { usePathname } from 'expo-router';
 
 import { BookingListScreen } from '@/features/bookings/components/BookingListScreen';
+import { ContestListScreen } from '@/features/contests/screens/ContestListScreen';
 import { ExploreScreen } from '@/features/explore/components/ExploreScreen';
 import { HomeScreen } from '@/features/home/components/HomeScreen';
 import { ProfileScreen } from '@/features/profile/components/ProfileScreen';
@@ -38,6 +40,7 @@ const CUSTOMER_TABS: MainTab[] = [
   { key: 'home', title: 'Trang chủ', href: '/', Icon: Home, Screen: HomeScreen },
   { key: 'explore', title: 'Khám phá', href: '/explore', Icon: Compass, Screen: ExploreScreen },
   { key: 'bookings', title: 'Lịch đặt', href: '/bookings', Icon: CalendarDays, Screen: BookingListScreen },
+  { key: 'contest', title: 'Giải đấu', href: '/contests', Icon: Trophy, Screen: ContestListScreen },
   { key: 'profile', title: 'Cá nhân', href: '/profile', Icon: UserRound, Screen: ProfileScreen },
 ];
 

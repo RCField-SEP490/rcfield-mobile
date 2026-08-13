@@ -49,16 +49,19 @@ function getInspectionPhotoLabel(angle?: string, index = 0) {
 export const PART_TYPE_NAMES: Record<string, string> = {
   TIRE_WHEEL: 'Bánh xe / Lốp',
   WHEEL_TIRE: 'Bánh xe / Lốp',
+  SPOILER: 'Cánh gió',
   MOTOR: 'Động cơ (Motor)',
   BATTERY: 'Pin / Ắc quy',
   SERVO: 'Bộ bẻ lái (Servo)',
   ESC: 'Bộ điều tốc (ESC)',
   CHASSIS: 'Khung gầm (Chassis)',
+  SHELL: 'Vỏ xe (Shell)',
   BODY_SHELL: 'Vỏ xe (Body Shell)',
   SUSPENSION: 'Phuộc / Giảm xóc',
   TRANSMISSION: 'Hộp số / Truyền động',
+  REMOTE: 'Tay điều khiển (Remote)',
   REMOTE_CONTROL: 'Tay điều khiển (Remote)',
-  OTHER: 'Hạng mục khác',
+  OTHER: 'Khác',
 };
 
 export function getPartTypeName(partType?: string, customPartName?: string | null): string {

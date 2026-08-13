@@ -13,6 +13,7 @@ import { ArrowLeft, CheckCircle2, Clock3, CreditCard, XCircle } from 'lucide-rea
 import { useColorScheme } from 'nativewind';
 
 import { bookingWizardApi } from '@/features/bookings/api/booking-wizard.api';
+import { getSessionOperationalTiming } from '@/features/staff/lib/session-operational-timing';
 import { getStatusLabel } from '@/features/bookings/lib/status-label';
 import { Text } from '@/shared/ui/Text';
 
@@ -45,9 +46,17 @@ export default function CustomerExtensionResponseScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [submitting, setSubmitting] = useState<'approve' | 'reject' | null>(null);
   const [sessionDetail, setSessionDetail] = useState<any>(null);
+  const [now, setNow] = useState(() => Date.now());
 
   const extensionProposal = sessionDetail?.extensionProposal;
-  const canRespond = extensionProposal?.status === 'PENDING';
+  const extensionWindowClosed =
+    getSessionOperationalTiming(sessionDetail?.plannedEnd, sessionDetail?.status, now).state === 'OVERDUE';
+  const canRespond = extensionProposal?.status === 'PENDING' && !extensionWindowClosed;
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(interval);
+  }, []);
 
   const [timeLeft, setTimeLeft] = useState<number>(0);
 
@@ -180,6 +189,15 @@ export default function CustomerExtensionResponseScreen() {
             </Text>
             <Text className="mt-2 text-center text-[12px] leading-5 text-slate-500 dark:text-slate-400 font-medium">
               Yêu cầu có thể đã được xử lý hoặc đã hết hạn.
+            </Text>
+          </View>
+        ) : extensionWindowClosed ? (
+          <View className="rounded-2xl border border-red-500/25 bg-red-500/10 p-5">
+            <Text className="text-center text-[14px] text-red-500" weight="700">
+              Không thể gia hạn sau khi phiên đã quá giờ
+            </Text>
+            <Text className="mt-2 text-center text-[12px] leading-5 text-slate-500">
+              Nhân viên sẽ kiểm tra và xử lý trả xe. Hệ thống không tự tính phí quá giờ theo thời điểm checkout.
             </Text>
           </View>
         ) : (
