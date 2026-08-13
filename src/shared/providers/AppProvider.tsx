@@ -5,7 +5,6 @@ import {
   BeVietnamPro_700Bold,
   useFonts,
 } from '@expo-google-fonts/be-vietnam-pro';
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { QueryClientProvider } from '@tanstack/react-query';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -18,7 +17,6 @@ import * as SecureStore from 'expo-secure-store';
 import { queryClient } from '@/shared/lib/query-client';
 import { useAuthStore } from '@/shared/store/auth-store';
 import { wsClient } from '@/shared/lib/websocket';
-import { GestureWrapper } from '@/shared/ui/GestureWrapper';
 import {
   registerPushNotificationsAsync,
   startNotificationResponseListener,
@@ -98,14 +96,10 @@ export function AppProvider({ children }: PropsWithChildren) {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <ThemeProvider value={nwColorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-          <QueryClientProvider client={queryClient}>
-            <GestureWrapper>
-              {children}
-            </GestureWrapper>
-            <StatusBar style={nwColorScheme === 'dark' ? 'light' : 'dark'} />
-          </QueryClientProvider>
-        </ThemeProvider>
+        <QueryClientProvider client={queryClient}>
+          {children}
+          <StatusBar style={nwColorScheme === 'dark' ? 'light' : 'dark'} />
+        </QueryClientProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
