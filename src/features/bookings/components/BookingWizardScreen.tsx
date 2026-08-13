@@ -1,5 +1,15 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { View, ScrollView, Pressable, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, DeviceEventEmitter, BackHandler } from 'react-native';
+import {
+  View,
+  ScrollView,
+  Pressable,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  DeviceEventEmitter,
+  BackHandler,
+} from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from 'nativewind';
 import { ChevronLeft, ChevronRight, Trophy } from 'lucide-react-native';
@@ -15,8 +25,18 @@ import { StepperBar } from './StepperBar';
 import { TrackSelectionStep } from './TrackSelectionStep';
 import { ParticipantsStep } from './ParticipantsStep';
 import { FnbStep } from './FnbStep';
-import { PaymentStep } from './PaymentStep';
-import { bookingWizardApi, type TrackConfig, type VehicleCatalog, type RentalVehicleUnit, type MenuItem, type PromoValidationResult, type Companion } from '../api/booking-wizard.api';
+import { PaymentStep, type PaymentMethodType } from './PaymentStep';
+import { BankTransferModal } from './BankTransferModal';
+import {
+  bookingWizardApi,
+  type TrackConfig,
+  type VehicleCatalog,
+  type RentalVehicleUnit,
+  type MenuItem,
+  type PromoValidationResult,
+  type Companion,
+  type BankTransferCheckout,
+} from '../api/booking-wizard.api';
 
 function vietnamDateString() {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -61,6 +81,17 @@ export function BookingWizardScreen({
 
   const [selectedPackageId, setSelectedPackageId] = useState<string | null>(null);
   const [appliedPromo, setAppliedPromo] = useState<PromoValidationResult | null>(null);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethodType>('vnpay');
+  const [availablePaymentMethods, setAvailablePaymentMethods] = useState<string[]>([
+    'vnpay',
+    'bank_transfer',
+  ]);
+
+  // Bank Transfer Modal State
+  const [bankTransferModalData, setBankTransferModalData] = useState<{
+    bookingId: string;
+    checkout: BankTransferCheckout;
+  } | null>(null);
 
   // Submit states
   const [submitting, setSubmitting] = useState(false);
@@ -71,7 +102,7 @@ export function BookingWizardScreen({
   const [vehicleUnits, setVehicleUnits] = useState<RentalVehicleUnit[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
 
-  // 1. Fetch Cafe Details & catalogs/menus
+  // 1. Fetch Cafe Details & catalogs/menus/payment methods
   useEffect(() => {
     const fetchCafeData = async () => {
       setLoadingCafe(true);
@@ -83,17 +114,25 @@ export function BookingWizardScreen({
         } else {
           Alert.alert('Lỗi', 'Không tìm thấy thông tin cơ sở này!');
           router.back();
+          return;
         }
 
-        // Preload vehicle catalogs & menu items for breakdown calculations
-        const [vehiclesData, unitsData, menuData] = await Promise.all([
+        // Preload vehicle catalogs & menu items & payment methods for breakdown calculations
+        const [vehiclesData, unitsData, menuData, methods] = await Promise.all([
           bookingWizardApi.getCafeCatalogs(cafeId),
           bookingWizardApi.getCafeVehicleUnits(cafeId),
           bookingWizardApi.getCafeMenu(cafeId),
+          bookingWizardApi.getCafePaymentMethods(cafeId),
         ]);
         setCatalogs(vehiclesData);
         setVehicleUnits(unitsData);
         setMenuItems(menuData);
+        if (methods && methods.length > 0) {
+          setAvailablePaymentMethods(methods);
+          if (!methods.includes('vnpay') && methods.includes('bank_transfer')) {
+            setSelectedPaymentMethod('bank_transfer');
+          }
+        }
 
         // Preselect vehicle if provided
         if (preselectedVehicleId && unitsData.some((unit) => unit.id === preselectedVehicleId)) {
@@ -118,8 +157,6 @@ export function BookingWizardScreen({
 
   // 2. Calculations
   const sortedSlots = useMemo(() => {
-    // TrackSelectionStep stores selected slots in the cafe schedule order so
-    // a range crossing midnight (for example 23:00 → 00:00) remains valid.
     return selectedSlots;
   }, [selectedSlots]);
 
@@ -136,13 +173,12 @@ export function BookingWizardScreen({
     }, 0);
   }, [selectedVehicleIds, vehicleUnits, durationHours, cafe?.slotDurationMinutes]);
 
-  // Fnb preorder price total — hỗ trợ key dạng "itemId" hoặc "itemId__variantId"
+  // Fnb preorder price total
   const fnbPriceTotal = useMemo(() => {
     return Object.entries(fnbQuantities).reduce((sum, [key, qty]) => {
       const [itemId, variantId] = key.split('__');
       const item = menuItems.find((m) => m.id === itemId);
       if (!item) return sum;
-      // Nếu có variantId thì lấy giá của variant đó, ngược lại lấy giá base
       let unitPrice = Number(item.price);
       if (variantId && item.variants) {
         const variant = item.variants.find((v) => v.id === variantId);
@@ -175,8 +211,7 @@ export function BookingWizardScreen({
       .filter((m) => m.qty > 0);
   }, [fnbQuantities, menuItems]);
 
-
-  // Final Total calculation for Step 4 Preview (also used for next step button label)
+  // Final Total calculation for Step 4 Preview
   const finalTotalAmount = useMemo(() => {
     const baseSlotFee = slotFeeRate * participants * durationHours;
     const slotFeeDiscount = selectedPackageId !== null ? slotFeeRate * durationHours : 0;
@@ -194,7 +229,15 @@ export function BookingWizardScreen({
     }
 
     return Math.max(0, subtotal - promoDiscount);
-  }, [slotFeeRate, participants, durationHours, selectedPackageId, vehiclePriceTotal, fnbPriceTotal, appliedPromo]);
+  }, [
+    slotFeeRate,
+    participants,
+    durationHours,
+    selectedPackageId,
+    vehiclePriceTotal,
+    fnbPriceTotal,
+    appliedPromo,
+  ]);
 
   // 3. Navigation Controls
   const slotStartIso = useMemo(() => {
@@ -231,7 +274,6 @@ export function BookingWizardScreen({
       return !selectedTrackConfig || selectedSlots.length === 0 || !cafe?.slotDurationMinutes;
     }
     if (currentStep === 2) {
-      // Validation rules
       const phoneRegex = /^(0|84)(3|5|7|8|9)[0-9]{8}$/;
       const companionPhoneInvalid = companions.some(
         (c) => c.phone.trim() !== '' && !phoneRegex.test(c.phone)
@@ -243,15 +285,22 @@ export function BookingWizardScreen({
       if (playMode === 'RENTAL') {
         return selectedVehicleIds.length === 0;
       }
-      return false; // For BYOC capacity error, screen will show warnings but we check before going next
+      return false;
     }
     return false;
-  }, [currentStep, selectedTrackConfig, selectedSlots.length, playMode, selectedVehicleIds.length, companions, cafe?.slotDurationMinutes]);
+  }, [
+    currentStep,
+    selectedTrackConfig,
+    selectedSlots.length,
+    playMode,
+    selectedVehicleIds.length,
+    companions,
+    cafe?.slotDurationMinutes,
+  ]);
 
   const handleNext = async () => {
     if (currentStep === 4) return;
 
-    // Step 1 Validation: Ensure sequential selected slots
     if (currentStep === 1) {
       const duration = Number(cafe?.slotDurationMinutes || 0);
       if (!duration) {
@@ -299,32 +348,35 @@ export function BookingWizardScreen({
             return;
           }
         } else {
-          const availableIds = new Set(availability.vehicles?.map((vehicle) => vehicle.vehicle_id) ?? []);
+          const availableIds = new Set(availability.vehicles?.map((v) => v.vehicle_id) ?? []);
           if (selectedVehicleIds.length === 0 || selectedVehicleIds.some((id) => !availableIds.has(id))) {
             setSelectedVehicleIds((current) => current.filter((id) => availableIds.has(id)));
-            Alert.alert('Xe không còn khả dụng', 'Một hoặc nhiều xe đã được đặt trong khung giờ đã chọn. Vui lòng chọn lại xe.');
+            Alert.alert(
+              'Xe không còn khả dụng',
+              'Một hoặc nhiều xe đã được đặt trong khung giờ đã chọn. Vui lòng chọn lại xe.'
+            );
             return;
           }
         }
       } catch (error: any) {
-        const message = error?.response?.data?.message || 'Không thể kiểm tra availability. Vui lòng thử lại.';
+        const message =
+          error?.response?.data?.message || 'Không thể kiểm tra availability. Vui lòng thử lại.';
         Alert.alert('Không thể tiếp tục', message);
         return;
       }
     }
 
-    setCurrentStep(prev => prev + 1);
+    setCurrentStep((prev) => prev + 1);
   };
 
   const handleBack = useCallback(() => {
     if (currentStep === 1) {
       router.back();
     } else {
-      setCurrentStep(prev => prev - 1);
+      setCurrentStep((prev) => prev - 1);
     }
   }, [currentStep, router]);
 
-  // Sử dụng useRef để lưu trữ tham chiếu hàm handleBack mới nhất, tránh stale closure trong Event Listener
   const handleBackRef = React.useRef(handleBack);
   handleBackRef.current = handleBack;
 
@@ -335,7 +387,7 @@ export function BookingWizardScreen({
 
     const onBackPress = () => {
       handleBackRef.current();
-      return true; // Chặn hành động back mặc định của hệ thống
+      return true;
     };
 
     const backHandlerSub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
@@ -362,7 +414,6 @@ export function BookingWizardScreen({
       fnb_items: Object.entries(fnbQuantities)
         .filter(([, qty]) => qty > 0)
         .map(([key, quantity]) => {
-          // Key có thể là "itemId" hoặc "itemId__variantId" (khi chọn size)
           const [menu_item_id, variant_id] = key.split('__');
           return {
             menu_item_id,
@@ -377,9 +428,12 @@ export function BookingWizardScreen({
     };
   };
 
-  const navigateToDetail = useCallback((bookingId: string) => {
-    router.replace(`/booking/${bookingId}`);
-  }, [router]);
+  const navigateToDetail = useCallback(
+    (bookingId: string) => {
+      router.replace(`/booking/${bookingId}`);
+    },
+    [router]
+  );
 
   const handleConfirmPayment = async () => {
     setSubmitting(true);
@@ -389,16 +443,33 @@ export function BookingWizardScreen({
 
       const customReturnUrl = getVnpayReturnUrl();
 
-      // Create VNPay checkout url
-      const checkout = await bookingWizardApi.createCheckout(booking.booking_id, customReturnUrl);
+      // Create checkout with selected payment method
+      const checkout = await bookingWizardApi.createCheckout(
+        booking.booking_id,
+        customReturnUrl,
+        selectedPaymentMethod
+      );
 
+      // Package full-coverage
       if (checkout.confirmed) {
-        Alert.alert('Thành công', 'Đặt lịch thành công! Slot đã được thanh toán thông qua Gói hội viên.', [
-          { text: 'Đóng', onPress: () => navigateToDetail(booking.booking_id) },
-        ]);
+        Alert.alert(
+          'Thành công',
+          'Đặt lịch thành công! Slot đã được thanh toán thông qua Gói hội viên.',
+          [{ text: 'Đóng', onPress: () => navigateToDetail(booking.booking_id) }]
+        );
         return;
       }
 
+      // Bank Transfer VietQR flow
+      if (checkout.flow === 'bank_transfer' && checkout.bank_transfer) {
+        setBankTransferModalData({
+          bookingId: booking.booking_id,
+          checkout: checkout.bank_transfer,
+        });
+        return;
+      }
+
+      // VNPay Redirect Flow
       if (checkout.payment_url) {
         await openVnpayPaymentSession(checkout.payment_url);
 
@@ -406,20 +477,27 @@ export function BookingWizardScreen({
         setSubmitting(true);
         try {
           const latestBooking = await bookingWizardApi.getBooking(booking.booking_id);
-          if (latestBooking.status === 'PAYMENT_CONFIRMED' || latestBooking.status === 'CONFIRMED') {
-            Alert.alert('Thành công', 'Thanh toán thành công! Lịch đặt của bạn đã được xác nhận.', [
-              { text: 'Xem lịch đặt', onPress: () => navigateToDetail(booking.booking_id) },
-            ]);
+          if (
+            latestBooking.status === 'PAYMENT_CONFIRMED' ||
+            latestBooking.status === 'CONFIRMED'
+          ) {
+            Alert.alert(
+              'Thành công',
+              'Thanh toán thành công! Lịch đặt của bạn đã được xác nhận.',
+              [{ text: 'Xem lịch đặt', onPress: () => navigateToDetail(booking.booking_id) }]
+            );
           } else {
-            Alert.alert('Chưa hoàn tất', 'Giao dịch thanh toán chưa được xác nhận hoặc đã bị hủy. Bạn có thể kiểm tra lại trong mục Lịch đặt.', [
-              { text: 'Xem lịch đặt', onPress: () => navigateToDetail(booking.booking_id) },
-            ]);
+            Alert.alert(
+              'Chưa hoàn tất',
+              'Giao dịch thanh toán chưa được xác nhận hoặc đã bị hủy. Bạn có thể kiểm tra lại trong mục Lịch đặt.',
+              [{ text: 'Xem lịch đặt', onPress: () => navigateToDetail(booking.booking_id) }]
+            );
           }
         } catch {
           navigateToDetail(booking.booking_id);
         }
       } else {
-        throw new Error('Không nhận được URL thanh toán từ cổng VNPay!');
+        throw new Error('Không nhận được URL hoặc thông tin thanh toán từ hệ thống!');
       }
     } catch (err: any) {
       console.error('[BookingWizard] Submit payment error:', err);
@@ -451,18 +529,31 @@ export function BookingWizardScreen({
     }
   };
 
+  const confirmButtonLabel = useMemo(() => {
+    if (finalTotalAmount === 0 || selectedPackageId) return 'Xác nhận đặt lịch';
+    if (selectedPaymentMethod === 'bank_transfer') return 'Chuyển khoản VietQR';
+    return 'Thanh toán VNPay';
+  }, [finalTotalAmount, selectedPackageId, selectedPaymentMethod]);
+
   return (
-    <SafeAreaView className="flex-grow flex-1 bg-[#f8fafc] dark:bg-[#0b0f19]" edges={['top', 'left', 'right']}>
+    <SafeAreaView
+      className="flex-grow flex-1 bg-[#f8fafc] dark:bg-[#0b0f19]"
+      edges={['top', 'left', 'right']}
+    >
       {/* Header Back Button */}
       <View className="flex-row items-center px-4 py-3 border-b border-slate-200 dark:border-slate-900 bg-white dark:bg-[#0f172a]/50">
-        <Pressable onPress={handleBack} className="p-1 rounded-full active:bg-slate-100 dark:active:bg-slate-800 flex-row items-center gap-1">
+        <Pressable
+          onPress={handleBack}
+          className="p-1 rounded-full active:bg-slate-100 dark:active:bg-slate-800 flex-row items-center gap-1"
+        >
           <ChevronLeft color={colorScheme === 'dark' ? '#f97316' : '#ea580c'} size={20} />
-          <Text className="text-[12px] text-[#f97316] font-bold">
-            Quay lại
-          </Text>
+          <Text className="text-[12px] text-[#f97316] font-bold">Quay lại</Text>
         </Pressable>
         {cafe && (
-          <Text className="text-[13px] text-slate-900 dark:text-white flex-1 text-center font-bold mr-10" numberOfLines={1}>
+          <Text
+            className="text-[13px] text-slate-900 dark:text-white flex-1 text-center font-bold mr-10"
+            numberOfLines={1}
+          >
             Đặt sân {cafe.name}
           </Text>
         )}
@@ -475,7 +566,7 @@ export function BookingWizardScreen({
       ) : (
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+          keyboardVerticalOffset={0}
           className="flex-1"
         >
           <View className="flex-1">
@@ -499,7 +590,8 @@ export function BookingWizardScreen({
                       Bạn tham gia giải đấu?
                     </Text>
                     <Text className="text-[10px] text-orange-850 dark:text-orange-400 mt-0.5 leading-4 font-semibold">
-                      Thuê xe thi đấu cho contest đang mở – chọn giải, chi nhánh, khung giờ và dòng xe trong một bước.
+                      Thuê xe thi đấu cho contest đang mở – chọn giải, chi nhánh, khung giờ và dòng
+                      xe trong một bước.
                     </Text>
                   </View>
                 </View>
@@ -572,6 +664,9 @@ export function BookingWizardScreen({
                   setSelectedPackageId={setSelectedPackageId}
                   appliedPromo={appliedPromo}
                   setAppliedPromo={setAppliedPromo}
+                  selectedPaymentMethod={selectedPaymentMethod}
+                  setSelectedPaymentMethod={setSelectedPaymentMethod}
+                  availablePaymentMethods={availablePaymentMethods}
                   onMockPayment={handleMockPayment}
                   isMockSubmitting={mockSubmitting}
                   cafeName={cafe?.name || 'Chi nhánh'}
@@ -590,7 +685,9 @@ export function BookingWizardScreen({
               className="border-t border-slate-200 dark:border-slate-900 bg-white/95 dark:bg-[#0f172a]/95 px-5 flex-row justify-between items-center shadow-lg"
             >
               <View>
-                <Text className="text-[10px] text-slate-550 dark:text-slate-400 font-semibold">Tạm tính</Text>
+                <Text className="text-[10px] text-slate-550 dark:text-slate-400 font-semibold">
+                  Tạm tính
+                </Text>
                 <Text className="text-[16px] text-[#f97316]" weight="700">
                   {finalTotalAmount.toLocaleString('vi-VN')}đ
                 </Text>
@@ -606,9 +703,7 @@ export function BookingWizardScreen({
                     <ActivityIndicator size="small" color="#ffffff" />
                   ) : (
                     <>
-                      <Text className="text-[12px] text-white font-bold">
-                        Thanh toán VNPay
-                      </Text>
+                      <Text className="text-[12px] text-white font-bold">{confirmButtonLabel}</Text>
                       <ChevronRight color="#ffffff" size={14} strokeWidth={2.5} />
                     </>
                   )}
@@ -623,16 +718,48 @@ export function BookingWizardScreen({
                       : 'bg-[#ea580c] active:bg-[#f97316]'
                   }`}
                 >
-                  <Text className={`text-[12px] font-bold ${isNextDisabled ? 'text-slate-400 dark:text-slate-500' : 'text-white'}`}>
+                  <Text
+                    className={`text-[12px] font-bold ${
+                      isNextDisabled ? 'text-slate-400 dark:text-slate-500' : 'text-white'
+                    }`}
+                  >
                     Tiếp theo
                   </Text>
-                  <ChevronRight color={isNextDisabled ? (colorScheme === 'dark' ? '#64748b' : '#94a3b8') : '#ffffff'} size={14} strokeWidth={2.5} />
+                  <ChevronRight
+                    color={
+                      isNextDisabled
+                        ? colorScheme === 'dark'
+                          ? '#64748b'
+                          : '#94a3b8'
+                        : '#ffffff'
+                    }
+                    size={14}
+                    strokeWidth={2.5}
+                  />
                 </Pressable>
               )}
             </View>
           </View>
         </KeyboardAvoidingView>
       )}
+
+      {/* Bank Transfer VietQR Modal */}
+      <BankTransferModal
+        visible={bankTransferModalData !== null}
+        bookingId={bankTransferModalData?.bookingId || ''}
+        checkout={bankTransferModalData?.checkout || null}
+        onClose={() => {
+          const bookingId = bankTransferModalData?.bookingId;
+          setBankTransferModalData(null);
+          if (bookingId) {
+            navigateToDetail(bookingId);
+          }
+        }}
+        onSuccess={(bookingId) => {
+          setBankTransferModalData(null);
+          navigateToDetail(bookingId);
+        }}
+      />
     </SafeAreaView>
   );
 }

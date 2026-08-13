@@ -12,6 +12,7 @@ import {
   Camera,
   User,
   CreditCard,
+  Building2,
   Star,
 } from 'lucide-react-native';
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
@@ -34,12 +35,15 @@ import { useColorScheme } from 'nativewind';
 
 import { bookingWizardApi } from '@/features/bookings/api/booking-wizard.api';
 import { getDisplayBookingStatus, isCheckInWindowExpired } from '@/features/bookings/lib/check-in-window';
+import { getSessionOperationalTiming } from '@/features/staff/lib/session-operational-timing';
 import { wsClient } from '@/shared/lib/websocket';
 import { Text } from '@/shared/ui/Text';
 import { cn } from '@/shared/lib/utils';
 import { getVnpayReturnUrl } from '@/shared/lib/vnpay-return-url';
 import { openVnpayPaymentSession } from '@/shared/lib/vnpay-browser';
 import { ImageZoomModal } from '@/shared/ui/ImageZoomModal';
+import { BankTransferModal } from './BankTransferModal';
+import type { BankTransferCheckout } from '@/features/bookings/api/booking-wizard.api';
 
 interface BookingDetailScreenProps {
   bookingId: string;
@@ -121,6 +125,18 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
 
   const [sessionDetail, setSessionDetail] = useState<any>(null);
   const [previewPhoto, setPreviewPhoto] = useState<{ url: string; title: string } | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const [bankTransferModalData, setBankTransferModalData] = useState<{
+    bookingId: string;
+    checkout: BankTransferCheckout;
+  } | null>(null);
+
+  useEffect(() => {
+    const status = booking?.session?.status;
+    if (!['ACTIVE', 'EXTENDING'].includes(status)) return;
+    const interval = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(interval);
+  }, [booking?.session?.status, booking?.session?.plannedEndAt]);
 
   const checkInPhotos = useMemo(() => {
     if (!sessionDetail?.inspections) return [];
@@ -242,6 +258,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
             'CUSTOMER_PAYMENT_CONFIRMED',
             'SESSION_EXTENSION_PROPOSED',
             'SESSION_EXTENSION_UPDATED',
+            'SESSION_EXTENSION_EXPIRED',
             'SESSION_CHECKOUT_COMPLETED',
             'SESSION_FNB_ORDER_ADDED',
             'SESSION_FNB_ORDER_UPDATED',
@@ -296,21 +313,29 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
     }
   };
 
-  // Thanh toán lại VNPay
-  const handlePayment = async () => {
+  // Thanh toán lại (VNPay / Chuyển khoản VietQR)
+  const handlePayment = async (method: 'vnpay' | 'bank_transfer' = 'vnpay') => {
     setSubmittingPayment(true);
     try {
       const returnUrl = getVnpayReturnUrl();
-      const res = await bookingWizardApi.createCheckout(bookingId, returnUrl);
+      const res = await bookingWizardApi.createCheckout(bookingId, returnUrl, method);
+
+      if (res.flow === 'bank_transfer' && res.bank_transfer) {
+        setBankTransferModalData({
+          bookingId,
+          checkout: res.bank_transfer,
+        });
+        return;
+      }
 
       if (res.payment_url) {
         await openVnpayPaymentSession(res.payment_url);
         loadBookingDetail();
       } else {
-        Alert.alert('Lỗi', 'Không tìm thấy URL thanh toán VNPay.');
+        Alert.alert('Lỗi', 'Không tìm thấy URL hoặc thông tin thanh toán.');
       }
     } catch (error: any) {
-      const errMsg = error?.response?.data?.message || 'Khởi tạo thanh toán VNPay thất bại.';
+      const errMsg = error?.response?.data?.message || 'Khởi tạo thanh toán thất bại.';
       Alert.alert('Lỗi thanh toán', errMsg);
     } finally {
       setSubmittingPayment(false);
@@ -454,6 +479,11 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
 
   // Session thực tế
   const session = booking.session;
+  const operationalTiming = getSessionOperationalTiming(
+    sessionDetail?.plannedEnd ?? session?.plannedEndAt,
+    sessionDetail?.status ?? session?.status,
+    now,
+  );
   const checkInExpired = isCheckInWindowExpired(booking.status, booking.slotStart, session);
   const displayBookingStatus = getDisplayBookingStatus(booking.status, booking.slotStart, session);
   const isSessionActive =
@@ -462,7 +492,9 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
     (inspection: any) => inspection.customerConfirmed !== true && inspection.type === 'CHECK_OUT'
   );
   const pendingExtension =
-    sessionDetail?.extensionProposal?.status === 'PENDING' ? sessionDetail.extensionProposal : null;
+    sessionDetail?.extensionProposal?.status === 'PENDING' && operationalTiming.state !== 'OVERDUE'
+      ? sessionDetail.extensionProposal
+      : null;
 
   const handleOpenInspectionReview = () => {
     if (!session?.id || !pendingInspection?.inspectionId) return;
@@ -573,26 +605,71 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
           </View>
         ) : null}
 
+        {(operationalTiming.state === 'DUE_FOR_CHECKOUT' || operationalTiming.state === 'OVERDUE') ? (
+          <View
+            className={`mb-6 flex-row items-start gap-3 rounded-2xl border p-4 ${
+              operationalTiming.state === 'OVERDUE'
+                ? 'border-red-500/30 bg-red-500/10'
+                : 'border-amber-500/30 bg-amber-500/10'
+            }`}
+          >
+            <AlertTriangle
+              color={operationalTiming.state === 'OVERDUE' ? '#ef4444' : '#d97706'}
+              size={20}
+              style={{ marginTop: 2 }}
+            />
+            <View className="flex-1">
+              <Text
+                className={`text-[14px] ${operationalTiming.state === 'OVERDUE' ? 'text-red-500' : 'text-amber-600'}`}
+                weight="700"
+              >
+                {operationalTiming.state === 'OVERDUE'
+                  ? `Phiên đã quá giờ ${operationalTiming.minutesPastPlannedEnd} phút`
+                  : 'Đã đến giờ trả xe'}
+              </Text>
+              <Text className="mt-1 text-[12px] leading-4 text-slate-500">
+                Vui lòng trả xe tại quầy để nhân viên kiểm tra và hoàn tất phiên. Xe vẫn được giữ trong phiên đến khi checkout xong.
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
         {/* Trạng thái / Cảnh báo thanh toán */}
         {booking.status === 'PENDING' && (
-          <View className="mb-6 rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 flex-row items-start gap-3 shadow-lg">
-            <AlertTriangle color="#f59e0b" size={20} style={{ marginTop: 2 }} />
-            <View className="flex-1">
-              <Text className="text-amber-500 text-[14px]" weight="700">Đơn đặt sân chưa thanh toán</Text>
-              <Text className="text-slate-500 dark:text-slate-400 text-xs leading-4 mt-1 font-semibold">
-                Lượt đặt của bạn sẽ bị hủy nếu không thanh toán trước thời hạn. Vui lòng hoàn tất thanh toán VNPay ngay.
-              </Text>
+          <View className="mb-6 rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 shadow-lg">
+            <View className="flex-row items-start gap-3">
+              <AlertTriangle color="#f59e0b" size={20} style={{ marginTop: 2 }} />
+              <View className="flex-1">
+                <Text className="text-amber-500 text-[14px]" weight="700">
+                  Đơn đặt sân chưa thanh toán
+                </Text>
+                <Text className="text-slate-500 dark:text-slate-400 text-xs leading-4 mt-1 font-semibold">
+                  Lượt đặt của bạn sẽ bị hủy nếu không thanh toán trước thời hạn. Vui lòng chọn phương thức để thanh toán ngay.
+                </Text>
+              </View>
+            </View>
+
+            <View className="flex-row gap-2 mt-3.5">
               <Pressable
-                className="mt-3 h-9 flex-row items-center justify-center rounded-xl bg-amber-500 active:bg-amber-600 gap-1.5 shadow-md"
-                onPress={handlePayment}
+                className="flex-1 h-9 flex-row items-center justify-center rounded-xl bg-slate-900 dark:bg-slate-800 border border-slate-700 active:bg-slate-800 gap-1.5 shadow-sm"
+                onPress={() => handlePayment('vnpay')}
+                disabled={submittingPayment}
+              >
+                <CreditCard color="#ffffff" size={13} />
+                <Text className="text-white text-[11px] font-bold">Thanh toán VNPay</Text>
+              </Pressable>
+
+              <Pressable
+                className="flex-1 h-9 flex-row items-center justify-center rounded-xl bg-[#ea580c] active:bg-[#f97316] gap-1.5 shadow-md"
+                onPress={() => handlePayment('bank_transfer')}
                 disabled={submittingPayment}
               >
                 {submittingPayment ? (
                   <ActivityIndicator color="#ffffff" size="small" />
                 ) : (
                   <>
-                    <CreditCard color="#ffffff" size={14} />
-                    <Text className="text-white text-xs font-bold">Thanh toán VNPay</Text>
+                    <Building2 color="#ffffff" size={13} />
+                    <Text className="text-white text-[11px] font-bold">Chuyển khoản VietQR</Text>
                   </>
                 )}
               </Pressable>
@@ -1276,6 +1353,19 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
         imageUrl={previewPhoto?.url}
         title={previewPhoto?.title}
         onClose={() => setPreviewPhoto(null)}
+      />
+      <BankTransferModal
+        visible={bankTransferModalData !== null}
+        bookingId={bankTransferModalData?.bookingId || ''}
+        checkout={bankTransferModalData?.checkout || null}
+        onClose={() => {
+          setBankTransferModalData(null);
+          loadBookingDetail();
+        }}
+        onSuccess={() => {
+          setBankTransferModalData(null);
+          loadBookingDetail();
+        }}
       />
     </SafeAreaView>
   );

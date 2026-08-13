@@ -1,5 +1,5 @@
 import React from 'react';
-import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { BookingWizardScreen } from '@/features/bookings/components/BookingWizardScreen';
 import { View, Pressable } from 'react-native';
 import { Text } from '@/shared/ui/Text';
@@ -25,7 +25,6 @@ export default function BookingCreateRoute() {
   if (!isAuthenticated) {
     return (
       <SafeAreaView className="flex-1 bg-[#f8fafc] dark:bg-[#0b0f19] justify-center items-center px-8" edges={['top', 'left', 'right']}>
-        <Stack.Screen options={{ title: 'Đặt lịch chơi', headerTitleAlign: 'center' }} />
         {/* Background Glows */}
         <View className="absolute -top-20 -right-20 w-80 h-80 rounded-full bg-[#f97316]/5 blur-3xl pointer-events-none" />
         <View className="absolute bottom-10 -left-20 w-80 h-80 rounded-full bg-[#6366f1]/5 blur-3xl pointer-events-none" />
@@ -60,14 +59,11 @@ export default function BookingCreateRoute() {
   }
 
   return (
-    <>
-      <Stack.Screen options={{ gestureEnabled: false }} />
-      <BookingWizardScreen
-        cafeId={cafeId}
-        preselectedVehicleId={vehicleId}
-        preselectedFnb={preselectedFnb}
-      />
-    </>
+    <BookingWizardScreen
+      cafeId={cafeId}
+      preselectedVehicleId={vehicleId}
+      preselectedFnb={preselectedFnb}
+    />
   );
 }
 
