@@ -1,5 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { View, Pressable, ScrollView, ActivityIndicator, Image, Modal, Alert } from 'react-native';
+import {
+  View,
+  Pressable,
+  ScrollView,
+  ActivityIndicator,
+  Image,
+  Modal,
+  Alert,
+  StyleSheet,
+  Text as NativeText,
+} from 'react-native';
 import { Calendar, Clock, Layers, ShieldCheck, AlertCircle, ChevronLeft, ChevronRight, X, Car, User } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
 import { Text } from '@/shared/ui/Text';
@@ -32,6 +42,12 @@ interface SlotDetails {
   blockedByNotice?: boolean;
 }
 
+interface SlotTiming {
+  isPast: boolean;
+  isTooSoon: boolean;
+  isBlocked: boolean;
+}
+
 const VIETNAM_TIME_ZONE = 'Asia/Ho_Chi_Minh';
 const MAX_CONSECUTIVE_SLOTS = 8;
 
@@ -50,8 +66,28 @@ function toVietnamSlotDate(dateStr: string, slot: string) {
   return new Date(`${dateStr}T${slot}:00+07:00`);
 }
 
-function isSlotBlockedByTime(slot: string, dateStr: string, minNoticeMinutes = 0) {
-  return toVietnamSlotDate(dateStr, slot).getTime() < Date.now() + minNoticeMinutes * 60_000;
+function getSlotTiming(slot: string, dateStr: string, minNoticeMinutes = 0): SlotTiming {
+  const todayStr = vietnamDateString();
+  if (dateStr < todayStr) {
+    return { isPast: true, isTooSoon: false, isBlocked: true };
+  }
+  if (dateStr > todayStr) {
+    return { isPast: false, isTooSoon: false, isBlocked: false };
+  }
+
+  const slotDate = toVietnamSlotDate(dateStr, slot);
+  const now = Date.now();
+  const slotTime = slotDate.getTime();
+
+  if (slotTime <= now) {
+    return { isPast: true, isTooSoon: false, isBlocked: true };
+  }
+
+  if (minNoticeMinutes > 0 && slotTime < now + minNoticeMinutes * 60_000) {
+    return { isPast: false, isTooSoon: true, isBlocked: true };
+  }
+
+  return { isPast: false, isTooSoon: false, isBlocked: false };
 }
 
 // Generate 7 days starting from today
@@ -161,6 +197,8 @@ export function TrackSelectionStep({
     return date.toISOString().slice(0, 10);
   }, [maxAdvanceBookingDays]);
 
+  const isToday = selectedDate === vietnamDateString();
+
   // Popup warning when switching playMode from RENTAL to BYOC with selected vehicles
   const handleSelectByoc = () => {
     if (playMode === 'RENTAL' && selectedVehicleIds.length > 0) {
@@ -220,13 +258,13 @@ export function TrackSelectionStep({
       try {
         await Promise.all(
           timeSlots.map(async (slot) => {
-            // Avoid presenting slots that are already past or violate the cafe's minimum notice.
-            if (isSlotBlockedByTime(slot, selectedDate, minNoticeMinutes)) {
+            const timing = getSlotTiming(slot, selectedDate, minNoticeMinutes);
+            if (timing.isBlocked) {
               updatedDetails[slot] = {
                 available: false,
                 byocRemaining: 0,
                 vehiclesAvailable: 0,
-                blockedByNotice: minNoticeMinutes > 0,
+                blockedByNotice: timing.isTooSoon,
               };
               return;
             }
@@ -243,7 +281,7 @@ export function TrackSelectionStep({
             // Handle date overflow when booking crosses midnight
             let endDateStr = selectedDate;
             if (endMinutes >= 24 * 60) {
-              const d = new Date(selectedDate);
+              const d = new Date(`${selectedDate}T12:00:00+07:00`);
               d.setDate(d.getDate() + 1);
               const y = d.getFullYear();
               const mo = String(d.getMonth() + 1).padStart(2, '0');
@@ -308,18 +346,18 @@ export function TrackSelectionStep({
   const handlePrevMonth = () => {
     if (calendarMonth === 0) {
       setCalendarMonth(11);
-      setCalendarYear(prev => prev - 1);
+      setCalendarYear((prev) => prev - 1);
     } else {
-      setCalendarMonth(prev => prev - 1);
+      setCalendarMonth((prev) => prev - 1);
     }
   };
 
   const handleNextMonth = () => {
     if (calendarMonth === 11) {
       setCalendarMonth(0);
-      setCalendarYear(prev => prev + 1);
+      setCalendarYear((prev) => prev + 1);
     } else {
-      setCalendarMonth(prev => prev + 1);
+      setCalendarMonth((prev) => prev + 1);
     }
   };
 
@@ -341,12 +379,17 @@ export function TrackSelectionStep({
 
   const handleToggleSlot = (slot: string) => {
     if (selectedSlots.includes(slot)) {
-      setSelectedSlots(selectedSlots.filter(s => s !== slot));
+      setSelectedSlots(selectedSlots.filter((s) => s !== slot));
       return;
     }
 
     if (selectedSlots.length >= MAX_CONSECUTIVE_SLOTS) {
       Alert.alert('Đã đạt giới hạn', `Mỗi đơn chỉ được chọn tối đa ${MAX_CONSECUTIVE_SLOTS} slot liên tiếp.`);
+      return;
+    }
+
+    if (selectedSlots.length === 0) {
+      setSelectedSlots([slot]);
       return;
     }
 
@@ -363,6 +406,8 @@ export function TrackSelectionStep({
 
     setSelectedSlots([...selectedSlots, slot].sort((a, b) => timeSlots.indexOf(a) - timeSlots.indexOf(b)));
   };
+
+  const isDark = colorScheme === 'dark';
 
   return (
     <View className="space-y-6">
@@ -500,7 +545,7 @@ export function TrackSelectionStep({
               3. Chọn ngày chơi
             </Text>
           </View>
-          <Text className="text-[11px] text-slate-900 dark:text-white font-bold bg-slate-105 dark:bg-slate-900 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-800">
+          <Text className="text-[11px] text-slate-900 dark:text-white font-bold bg-slate-100 dark:bg-slate-900 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-800">
             {formattedMonthYear}
           </Text>
         </View>
@@ -560,21 +605,37 @@ export function TrackSelectionStep({
 
       {/* 4. Chọn giờ */}
       <View className="mt-5">
-        <View className="flex-row items-center justify-between mb-3 h-6">
-          <View className="flex-row items-center gap-1.5">
+        <View className="flex-row items-center justify-between mb-2">
+          <View className="flex-row items-center gap-1.5 flex-1 mr-2">
             <Clock color="#f97316" size={15} />
-            <Text className="text-[13px] text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold">
-              4. Chọn khung giờ (Có thể chọn nhiều slot liên tiếp)
+            <Text className="text-[13px] text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold" numberOfLines={1}>
+              4. Chọn khung giờ (Liên tiếp)
             </Text>
           </View>
           {loadingSlots && <ActivityIndicator size="small" color="#f97316" />}
         </View>
 
-        {minNoticeMinutes > 0 ? (
+        {/* Legend */}
+        <View className="flex-row items-center justify-start gap-4 mb-3">
+          <View className="flex-row items-center gap-1.5">
+            <View className="h-2 w-2 rounded-full bg-emerald-500" />
+            <Text className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold">Khả dụng</Text>
+          </View>
+          <View className="flex-row items-center gap-1.5">
+            <View className="h-2 w-2 rounded-full bg-[#ea580c]" />
+            <Text className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold">Đang chọn</Text>
+          </View>
+          <View className="flex-row items-center gap-1.5">
+            <View className="h-2 w-2 rounded-full bg-slate-400" />
+            <Text className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold">Khóa/Hết</Text>
+          </View>
+        </View>
+
+        {isToday && minNoticeMinutes > 0 ? (
           <View className="mb-3 flex-row items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
-            <AlertCircle color="#f59e0b" size={15} />
+            <AlertCircle color="#f59e0b" size={15} className="mt-0.5" />
             <Text className="flex-1 text-[11px] leading-4 text-amber-700 dark:text-amber-200">
-              Cần đặt trước tối thiểu {minNoticeMinutes} phút. Các slot quá sát giờ bắt đầu sẽ bị khóa.
+              Cần đặt trước tối thiểu <Text className="font-bold">{minNoticeMinutes} phút</Text>. Các slot quá sát giờ bắt đầu sẽ bị khóa.
             </Text>
           </View>
         ) : null}
@@ -600,66 +661,89 @@ export function TrackSelectionStep({
             {timeSlots.map((slot) => {
               const isSelected = selectedSlots.includes(slot);
               const detail = slotDetails[slot];
-              const blockedByTime = isSlotBlockedByTime(slot, selectedDate, minNoticeMinutes);
-              const isAvailable = !blockedByTime && (detail?.available ?? false);
+              const timing = getSlotTiming(slot, selectedDate, minNoticeMinutes);
+              const isBookedOrClosed = detail ? !detail.available : false;
+              const isSlotDisabled = timing.isBlocked || isBookedOrClosed;
+              const isAvailable = !timing.isBlocked && (detail?.available ?? false);
 
-              // Dynamic Styling based on slot status
-              let btnStyle = "bg-white dark:bg-[#0f172a]/50 border-slate-200 dark:border-slate-800";
-              let textStyle = "text-slate-700 dark:text-slate-300";
-              let subTextStyle = "text-slate-400 dark:text-slate-500";
+              let statusLabel = '';
+              if (timing.isPast) {
+                statusLabel = 'Đã qua';
+              } else if (timing.isTooSoon) {
+                statusLabel = 'Quá sát';
+              } else if (detail) {
+                if (isAvailable) {
+                  statusLabel =
+                    playMode === 'RENTAL'
+                      ? `Còn ${detail.vehiclesAvailable} xe`
+                      : `Còn ${detail.byocRemaining} chỗ`;
+                } else {
+                  statusLabel = 'Hết chỗ';
+                }
+              } else {
+                statusLabel = '...';
+              }
+
+              let btnBgStyle = isDark ? styles.slotBtnDefaultDark : styles.slotBtnDefault;
+              let txtStyle = isDark ? styles.slotTextAvailableDark : styles.slotTextAvailable;
+              let subTxtStyle = isDark ? styles.slotSubTextAvailableDark : styles.slotSubTextAvailable;
 
               if (isSelected) {
-                btnStyle = "bg-[#ea580c] border-[#ea580c]";
-                textStyle = "text-white";
-                subTextStyle = "text-orange-200";
-              } else if (blockedByTime || (detail && !isAvailable)) {
-                // Disabled state
-                btnStyle = "bg-slate-100/30 dark:bg-slate-900/10 border-slate-200/40 dark:border-slate-900/40 opacity-30";
-                textStyle = "text-slate-400 dark:text-slate-600 line-through";
-                subTextStyle = "text-slate-400 dark:text-slate-600";
+                btnBgStyle = styles.slotBtnSelected;
+                txtStyle = styles.slotTextSelected;
+                subTxtStyle = styles.slotSubTextSelected;
+              } else if (timing.isPast) {
+                btnBgStyle = isDark ? styles.slotBtnDisabledDark : styles.slotBtnDisabled;
+                txtStyle = styles.slotTextPast;
+                subTxtStyle = styles.slotSubTextPast;
+              } else if (timing.isTooSoon) {
+                btnBgStyle = isDark ? styles.slotBtnTooSoonDark : styles.slotBtnTooSoon;
+                txtStyle = styles.slotTextTooSoon;
+                subTxtStyle = styles.slotSubTextTooSoon;
+              } else if (isSlotDisabled) {
+                btnBgStyle = isDark ? styles.slotBtnDisabledDark : styles.slotBtnDisabled;
+                txtStyle = styles.slotTextDisabled;
+                subTxtStyle = styles.slotSubTextDisabled;
               } else if (isAvailable) {
-                // Available slot gets elegant green borders and indicators
-                btnStyle = "bg-emerald-50 dark:bg-emerald-950/15 border-emerald-200 dark:border-emerald-500/30";
-                textStyle = "text-emerald-500 dark:text-emerald-400 font-bold";
-                subTextStyle = "text-emerald-600 dark:text-emerald-500/80";
+                btnBgStyle = isDark ? styles.slotBtnAvailableDark : styles.slotBtnAvailable;
+                txtStyle = isDark ? styles.slotTextAvailableDark : styles.slotTextAvailable;
+                subTxtStyle = isDark ? styles.slotSubTextAvailableDark : styles.slotSubTextAvailable;
               }
 
               return (
                 <Pressable
                   key={slot}
-                  disabled={!isAvailable}
+                  disabled={isSlotDisabled}
                   onPress={() => handleToggleSlot(slot)}
-                  className={`w-[23%] py-2 rounded-xl border items-center justify-center ${btnStyle}`}
+                  style={[styles.slotBtn, btnBgStyle]}
                 >
-                  <Text className={`text-[12px] ${textStyle}`}>
+                  <NativeText style={[styles.slotText, txtStyle]}>
                     {slot}
-                  </Text>
-                  {isAvailable && detail && (
-                    <Text className={`text-[7.5px] font-semibold mt-0.5 ${subTextStyle}`}>
-                      {playMode === 'RENTAL' ? `Còn ${detail.vehiclesAvailable} xe` : `Còn ${detail.byocRemaining} chỗ`}
-                    </Text>
-                  )}
-                  {!isAvailable && (blockedByTime || (detail && !detail.available)) && (
-                    <Text className={`text-[7.5px] font-semibold mt-0.5 ${subTextStyle}`}>
-                      {blockedByTime ? (minNoticeMinutes > 0 ? 'Chưa đủ thời gian đặt trước' : 'Đã qua') : 'Hết chỗ'}
-                    </Text>
-                  )}
+                  </NativeText>
+                  <NativeText
+                    numberOfLines={1}
+                    style={[styles.slotSubText, subTxtStyle]}
+                  >
+                    {statusLabel}
+                  </NativeText>
                 </Pressable>
               );
             })}
           </View>
         )}
 
-        {!loadingSlots && Object.values(slotDetails).every(v => v.available === false) && Object.keys(slotDetails).length > 0 && (
-          <View className="flex-row items-center gap-2 bg-[#ef4444]/10 border border-[#ef4444]/20 rounded-xl p-3 mt-3">
-            <AlertCircle color="#ef4444" size={15} />
-            <Text className="text-[11px] text-[#ef4444] font-semibold flex-1">
-              Khung giờ ngày này đã hết chỗ hoặc không khả dụng. Vui lòng chọn ngày khác!
-            </Text>
-          </View>
-        )}
+        {!loadingSlots &&
+          Object.values(slotDetails).every((v) => v.available === false) &&
+          Object.keys(slotDetails).length > 0 && (
+            <View className="flex-row items-center gap-2 bg-[#ef4444]/10 border border-[#ef4444]/20 rounded-xl p-3 mt-3">
+              <AlertCircle color="#ef4444" size={15} />
+              <Text className="text-[11px] text-[#ef4444] font-semibold flex-1">
+                Khung giờ ngày này đã hết chỗ hoặc không khả dụng. Vui lòng chọn ngày khác!
+              </Text>
+            </View>
+          )}
         {selectedSlots.length > 0 ? (
-          <Text className="mt-3 text-[11px] text-slate-500">
+          <Text className="mt-3 text-[11px] text-slate-500 font-medium">
             Đã chọn {selectedSlots.length}/{MAX_CONSECUTIVE_SLOTS} slot liên tiếp.
           </Text>
         ) : null}
@@ -771,3 +855,103 @@ export function TrackSelectionStep({
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  slotBtn: {
+    width: '22.8%',
+    minHeight: 50,
+    paddingVertical: 6,
+    paddingHorizontal: 2,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  slotBtnSelected: {
+    backgroundColor: '#ea580c',
+    borderColor: '#ea580c',
+  },
+  slotBtnAvailable: {
+    backgroundColor: '#ecfdf5',
+    borderColor: '#6ee7b7',
+  },
+  slotBtnAvailableDark: {
+    backgroundColor: 'rgba(6, 78, 59, 0.25)',
+    borderColor: 'rgba(16, 185, 129, 0.4)',
+  },
+  slotBtnDisabled: {
+    backgroundColor: 'rgba(241, 245, 249, 0.6)',
+    borderColor: 'rgba(226, 232, 240, 0.6)',
+    opacity: 0.4,
+  },
+  slotBtnDisabledDark: {
+    backgroundColor: 'rgba(15, 23, 42, 0.3)',
+    borderColor: 'rgba(30, 41, 59, 0.4)',
+    opacity: 0.4,
+  },
+  slotBtnTooSoon: {
+    backgroundColor: 'rgba(245, 158, 11, 0.08)',
+    borderColor: 'rgba(245, 158, 11, 0.3)',
+    opacity: 0.75,
+  },
+  slotBtnTooSoonDark: {
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    borderColor: 'rgba(245, 158, 11, 0.3)',
+    opacity: 0.75,
+  },
+  slotBtnDefault: {
+    backgroundColor: '#ffffff',
+    borderColor: '#e2e8f0',
+  },
+  slotBtnDefaultDark: {
+    backgroundColor: 'rgba(15, 23, 42, 0.5)',
+    borderColor: '#1e293b',
+  },
+  slotText: {
+    fontSize: 12,
+    fontFamily: 'BeVietnamPro_700Bold',
+  },
+  slotTextSelected: {
+    color: '#ffffff',
+  },
+  slotTextPast: {
+    color: '#94a3b8',
+    textDecorationLine: 'line-through',
+  },
+  slotTextTooSoon: {
+    color: '#d97706',
+  },
+  slotTextDisabled: {
+    color: '#94a3b8',
+  },
+  slotTextAvailable: {
+    color: '#047857',
+  },
+  slotTextAvailableDark: {
+    color: '#34d399',
+  },
+  slotSubText: {
+    fontSize: 8,
+    fontFamily: 'BeVietnamPro_700Bold',
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  slotSubTextSelected: {
+    color: '#ffedd5',
+  },
+  slotSubTextPast: {
+    color: '#94a3b8',
+  },
+  slotSubTextTooSoon: {
+    color: '#b45309',
+  },
+  slotSubTextDisabled: {
+    color: '#94a3b8',
+  },
+  slotSubTextAvailable: {
+    color: '#059669',
+  },
+  slotSubTextAvailableDark: {
+    color: '#34d399',
+  },
+});
