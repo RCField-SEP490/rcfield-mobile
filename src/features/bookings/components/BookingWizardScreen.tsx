@@ -535,6 +535,22 @@ export function BookingWizardScreen({
     return 'Thanh toán VNPay';
   }, [finalTotalAmount, selectedPackageId, selectedPaymentMethod]);
 
+  const handleBankTransferClose = useCallback(() => {
+    const bookingId = bankTransferModalData?.bookingId;
+    setBankTransferModalData(null);
+    if (bookingId) {
+      navigateToDetail(bookingId);
+    }
+  }, [bankTransferModalData?.bookingId, navigateToDetail]);
+
+  const handleBankTransferSuccess = useCallback(
+    (bookingId: string) => {
+      setBankTransferModalData(null);
+      navigateToDetail(bookingId);
+    },
+    [navigateToDetail]
+  );
+
   return (
     <SafeAreaView
       className="flex-grow flex-1 bg-[#f8fafc] dark:bg-[#0b0f19]"
@@ -748,17 +764,8 @@ export function BookingWizardScreen({
         visible={bankTransferModalData !== null}
         bookingId={bankTransferModalData?.bookingId || ''}
         checkout={bankTransferModalData?.checkout || null}
-        onClose={() => {
-          const bookingId = bankTransferModalData?.bookingId;
-          setBankTransferModalData(null);
-          if (bookingId) {
-            navigateToDetail(bookingId);
-          }
-        }}
-        onSuccess={(bookingId) => {
-          setBankTransferModalData(null);
-          navigateToDetail(bookingId);
-        }}
+        onClose={handleBankTransferClose}
+        onSuccess={handleBankTransferSuccess}
       />
     </SafeAreaView>
   );
