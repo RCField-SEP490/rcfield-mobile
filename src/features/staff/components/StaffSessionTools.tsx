@@ -515,7 +515,6 @@ export function StaffSessionTools({
                         // Dynamic shadow classes make NativeWind 4.2 remount this Pressable on selection.
                         <Pressable
                           key={item.id}
-                          cssInterop={false}
                           accessibilityRole="button"
                           accessibilityLabel={`Chọn ${item.name}`}
                           accessibilityState={{ selected: active }}
@@ -596,7 +595,6 @@ export function StaffSessionTools({
                           return (
                             <Pressable
                               key={variant.id}
-                              cssInterop={false}
                               onPress={() =>
                                 setFnbSelection((previous) => ({
                                   ...previous,
@@ -613,7 +611,6 @@ export function StaffSessionTools({
                               ]}
                             >
                               <NativeText
-                                cssInterop={false}
                                 style={[
                                   styles.variantName,
                                   active
@@ -626,7 +623,6 @@ export function StaffSessionTools({
                                 {variant.name}
                               </NativeText>
                               <NativeText
-                                cssInterop={false}
                                 style={[
                                   styles.variantPrice,
                                   active
@@ -857,24 +853,21 @@ function ToolCard({
   const { colorScheme } = useColorScheme();
 
   return (
-    // Keep this boundary outside NativeWind interop so child selection cannot remount the card.
     <View
-      cssInterop={false}
       style={[styles.toolCard, colorScheme === 'dark' ? styles.toolCardDark : styles.toolCardLight]}
     >
-      <View cssInterop={false} style={styles.toolCardHeader}>
-        <View cssInterop={false} style={styles.toolCardTitleRow}>
-          <View cssInterop={false} style={styles.toolCardIcon}>
+      <View style={styles.toolCardHeader}>
+        <View style={styles.toolCardTitleRow}>
+          <View style={styles.toolCardIcon}>
             {icon}
           </View>
-          <View cssInterop={false}>
+          <View>
             <NativeText
-              cssInterop={false}
               style={[styles.toolCardTitle, colorScheme === 'dark' && styles.toolCardTitleDark]}
             >
               {title}
             </NativeText>
-            <NativeText cssInterop={false} style={styles.toolCardSubtitle}>
+            <NativeText style={styles.toolCardSubtitle}>
               {subtitle}
             </NativeText>
           </View>
