@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   ScrollView,
@@ -51,6 +51,7 @@ export function BankTransferModal({
   const [redirectCountdown, setRedirectCountdown] = useState(5);
   const [isSavingQr, setIsSavingQr] = useState(false);
   const [isSharingQr, setIsSharingQr] = useState(false);
+  const hasTriggeredSuccessRef = useRef(false);
 
   // 1. Countdown timer
   const expiresAtMs = useMemo(() => {
@@ -69,10 +70,12 @@ export function BankTransferModal({
       setIsCheckingStatus(false);
       setIsSavingQr(false);
       setIsSharingQr(false);
+      hasTriggeredSuccessRef.current = false;
       return;
     }
     setIsPaid(false);
     setRedirectCountdown(5);
+    hasTriggeredSuccessRef.current = false;
     const initialRemaining = Math.max(0, Math.floor((expiresAtMs - Date.now()) / 1000));
     setRemainingSeconds(initialRemaining);
 
@@ -125,7 +128,13 @@ export function BankTransferModal({
     return () => clearInterval(pollInterval);
   }, [visible, bookingId, isPaid, remainingSeconds, checkPaymentStatus]);
 
-  // 3. Auto-redirect on Paid
+  const handleSuccess = useCallback(() => {
+    if (hasTriggeredSuccessRef.current) return;
+    hasTriggeredSuccessRef.current = true;
+    onSuccess(bookingId);
+  }, [bookingId, onSuccess]);
+
+  // 3. Auto-redirect countdown on Paid
   useEffect(() => {
     if (!isPaid) return;
 
@@ -133,7 +142,6 @@ export function BankTransferModal({
       setRedirectCountdown((prev) => {
         if (prev <= 1) {
           clearInterval(countdownTimer);
-          onSuccess(bookingId);
           return 0;
         }
         return prev - 1;
@@ -141,7 +149,14 @@ export function BankTransferModal({
     }, 1000);
 
     return () => clearInterval(countdownTimer);
-  }, [isPaid, bookingId, onSuccess]);
+  }, [isPaid]);
+
+  // 4. Trigger redirect when countdown hits 0
+  useEffect(() => {
+    if (isPaid && redirectCountdown === 0) {
+      handleSuccess();
+    }
+  }, [isPaid, redirectCountdown, handleSuccess]);
 
   const handleCopy = async (text: string, fieldName: string) => {
     await Clipboard.setStringAsync(text);
@@ -290,7 +305,7 @@ export function BankTransferModal({
               </Text>
             </View>
             <Pressable
-              onPress={() => onSuccess(bookingId)}
+              onPress={handleSuccess}
               className="w-full bg-[#ea580c] active:bg-[#f97316] py-3.5 rounded-xl items-center justify-center shadow-lg shadow-orange-500/20"
             >
               <Text className="text-white text-sm font-bold uppercase tracking-wider">
