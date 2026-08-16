@@ -155,14 +155,15 @@ export async function listCafeReviews(cafeId: string): Promise<Review[]> {
     const reviewsData = response.data?.data || [];
     return reviewsData.map((rev: any): Review => ({
       id: rev.id,
-      rating: toNumber(rev.rating),
-      comment: rev.comment || '',
-      createdAt: rev.createdAt || rev.created_at || '',
-      user: rev.user ? {
-        fullName: rev.user.fullName || rev.user.full_name || 'Khách hàng',
-        avatarUrl: rev.user.avatarUrl || rev.user.avatar_url || null,
-      } : null,
-      ownerResponse: rev.ownerResponse || rev.owner_response || null,
+      rating: toNumber(rev.overallScore),
+      comment: rev.note || '',
+      createdAt: rev.createdAt || '',
+      customerId: rev.customerId,
+      user: {
+        fullName: rev.fullName || rev.customerName || 'Khách hàng',
+        avatarUrl: null,
+      },
+      ownerResponse: null,
     }));
   } catch (error) {
     console.error('[ExploreAPI] Error fetching cafe reviews:', error);
@@ -211,4 +212,15 @@ export async function listActivePromotions(cafeId: string): Promise<ActivePromot
     return [];
   }
 }
+
+export async function listFeaturedPopups(): Promise<any[]> {
+  try {
+    const response = await api.get('/explore/featured-popups');
+    return response.data?.data || [];
+  } catch (error) {
+    console.error('[ExploreAPI] Error fetching featured popups:', error);
+    return [];
+  }
+}
+
 

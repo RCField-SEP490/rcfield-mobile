@@ -22,7 +22,7 @@ import {
   Star,
 } from 'lucide-react-native';
 
-import { getCafes } from '@/features/explore/api/explore.api';
+import { getCafeById, getCafes } from '@/features/explore/api/explore.api';
 import { favoriteApi, favoriteLocal } from '@/features/explore/api/favorite.api';
 import type { Cafe } from '@/features/explore/types/explore.types';
 import { useAuthStore } from '@/shared/store/auth-store';
@@ -33,7 +33,7 @@ export function FavoritesScreen() {
   const router = useRouter();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const role = useAuthStore((state) => state.role);
-  const isCustomer = role === 'customer';
+  const isCustomer = role === 'customer' || role === null;
 
   const [favorites, setFavorites] = useState<Cafe[]>([]);
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
@@ -60,12 +60,9 @@ export function FavoritesScreen() {
       }
 
       try {
-        const [allCafes, localFavs] = await Promise.all([
-          getCafes(),
-          favoriteLocal.getLocalFavorites(),
-        ]);
-
+        const localFavs = await favoriteLocal.getLocalFavorites();
         let favIds = localFavs;
+
         if (isAuthenticated) {
           try {
             favIds = await favoriteApi.getFavorites();
@@ -76,7 +73,13 @@ export function FavoritesScreen() {
         }
 
         setFavoriteIds(favIds);
-        setFavorites(allCafes.filter((cafe) => favIds.includes(cafe.id)));
+
+        // Fetch detailed info of each favorite cafe in parallel to bypass global list limits or pagination
+        const cafePromises = favIds.map((id) => getCafeById(id));
+        const cafesResults = await Promise.all(cafePromises);
+        const activeCafes = cafesResults.filter((cafe): cafe is Cafe => cafe !== null);
+
+        setFavorites(activeCafes);
       } catch (error) {
         console.error('[FavoritesScreen] Fetch error:', error);
         Alert.alert('Lỗi', 'Không thể tải danh sách cơ sở yêu thích.');

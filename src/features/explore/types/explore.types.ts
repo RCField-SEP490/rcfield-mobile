@@ -88,6 +88,7 @@ export interface Review {
   rating: number;
   comment: string;
   createdAt: string;
+  customerId?: string;
   user?: {
     fullName: string;
     avatarUrl?: string | null;
