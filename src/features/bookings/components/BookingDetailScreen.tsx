@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import {
   Calendar,
   Clock,
@@ -29,6 +29,7 @@ import {
   Platform,
   AppState,
   AppStateStatus,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useColorScheme } from 'nativewind';
@@ -231,9 +232,11 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
     }
   }, [bookingId]);
 
-  useEffect(() => {
-    loadBookingDetail();
-  }, [loadBookingDetail]);
+  useFocusEffect(
+    useCallback(() => {
+      loadBookingDetail();
+    }, [loadBookingDetail])
+  );
 
   // Lưu ref của booking để so khớp trong callback websocket mà không cần re-subscribe
   const bookingRef = useRef<any>(null);
@@ -570,7 +573,18 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
         <View className="size-9" />
       </View>
 
-      <ScrollView contentContainerClassName="px-5 py-5 pb-12" showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerClassName="px-5 py-5 pb-12"
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={loading}
+            onRefresh={loadBookingDetail}
+            colors={['#ea580c']}
+            tintColor={colorScheme === 'dark' ? '#ffffff' : '#ea580c'}
+          />
+        }
+      >
 
         {/* Mã QR Code Check-in — dùng endpoint BE /bookings/:id/qr (Hiển thị ở tất cả các bước/trạng thái) */}
         <View className="items-center mb-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-6 shadow-xl">
@@ -727,7 +741,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
           </View>
         ) : null}
 
-        {(booking.status === 'COMPLETED' || session?.status === 'COMPLETED') ? (
+        {((booking.status === 'COMPLETED' || session?.status === 'COMPLETED') && !booking.review) ? (
           <View className="mb-6 rounded-2xl border border-[#fde68a] dark:border-[#451a03]/50 bg-[#fffbeb] dark:bg-[#1c1912] p-4 shadow-sm">
             <View className="flex-row items-start gap-3">
               <Star color="#d97706" fill="#d97706" size={20} style={{ marginTop: 2 }} />
@@ -749,6 +763,38 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                 Đánh giá ngay
               </Text>
             </Pressable>
+          </View>
+        ) : null}
+
+        {((booking.status === 'COMPLETED' || session?.status === 'COMPLETED') && booking.review) ? (
+          <View className="mb-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-4 shadow-sm">
+            <View className="flex-row items-start gap-3">
+              <Star color="#eab308" fill="#eab308" size={20} style={{ marginTop: 2 }} />
+              <View className="flex-1">
+                <Text className="text-slate-900 dark:text-white text-[14px]" weight="700">
+                  Đánh giá của bạn
+                </Text>
+                <View className="flex-row items-center gap-0.5 mt-1">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Star
+                      key={i}
+                      color="#eab308"
+                      fill={i < booking.review.overallScore ? '#eab308' : 'transparent'}
+                      size={12}
+                    />
+                  ))}
+                </View>
+                {booking.review.note ? (
+                  <Text className="mt-2 text-xs leading-4 text-slate-600 dark:text-slate-300 font-medium">
+                    {`"${booking.review.note}"`}
+                  </Text>
+                ) : (
+                  <Text className="mt-2 text-xs leading-4 text-slate-400 italic">
+                    Bạn không để lại bình luận.
+                  </Text>
+                )}
+              </View>
+            </View>
           </View>
         ) : null}
         <View className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-5 shadow-xl mb-6">
