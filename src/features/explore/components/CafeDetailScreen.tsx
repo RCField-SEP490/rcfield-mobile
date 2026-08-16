@@ -458,7 +458,7 @@ export function CafeDetailScreen({ cafeId }: CafeDetailScreenProps) {
             <View className="flex-row items-center gap-1 mt-2.5">
               <Star color="#eab308" fill="#eab308" size={14} />
               <Text className="text-[13px] text-amber-500 font-bold">
-                {cafe.rating > 0 ? cafe.rating.toFixed(1) : '5.0'}
+                {cafe.rating > 0 ? cafe.rating.toFixed(1) : '—'}
               </Text>
               <Text className="text-[11px] text-slate-500 font-semibold">
                 ({cafe.reviewsCount || 0} đánh giá)
@@ -514,7 +514,7 @@ export function CafeDetailScreen({ cafeId }: CafeDetailScreenProps) {
               <View>
                 <Text className="text-[10px] text-slate-500 font-bold uppercase">Đánh giá</Text>
                 <Text className="text-[12px] text-slate-900 dark:text-white font-extrabold mt-0.5">
-                  {cafe.rating > 0 ? `${cafe.rating.toFixed(1)}/5` : '5.0/5'}
+                  {cafe.rating > 0 ? `${cafe.rating.toFixed(1)}/5` : '—'}
                 </Text>
               </View>
             </View>

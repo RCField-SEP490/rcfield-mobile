@@ -103,7 +103,7 @@ export function CafeDetailCard({ cafe, userLocation, onClose }: CafeDetailCardPr
             <View className="flex-row items-center gap-1">
               <Star color="#f59e0b" fill="#f59e0b" size={14} />
               <Text className="text-[12px] text-amber-500" weight="700">
-                {cafe.rating > 0 ? cafe.rating.toFixed(1) : '5.0'}
+                {cafe.rating > 0 ? cafe.rating.toFixed(1) : '—'}
               </Text>
             </View>
  

@@ -252,4 +252,26 @@ export async function listFeaturedPopups(): Promise<any[]> {
   }
 }
 
+export async function getRecentReviews(limit = 5): Promise<Review[]> {
+  try {
+    const response = await api.get('/reviews/recent', { params: { limit } });
+    const reviewsData = response.data?.data || [];
+    return reviewsData.map((rev: any): Review => ({
+      id: rev.id,
+      rating: toNumber(rev.overallScore || rev.rating),
+      comment: rev.note || rev.comment || '',
+      createdAt: rev.createdAt,
+      customerId: rev.customerId,
+      user: {
+        fullName: rev.fullName || rev.customerName || 'Người chơi',
+        avatarUrl: null,
+      },
+      cafeName: rev.cafeName || '',
+    }));
+  } catch (error) {
+    console.error('[ExploreAPI] Error fetching recent reviews:', error);
+    return [];
+  }
+}
+
 

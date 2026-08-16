@@ -30,9 +30,9 @@ import { Text } from '@/shared/ui/Text';
 import { requestMainTab, createScrollHandler } from '@/shared/ui/main-tab-events';
 import { getMyBookings, type BookingListItem } from '@/features/bookings/api/booking.api';
 import { getMyPackages, type MyPackageResponse } from '@/features/packages/api/package.api';
-import { getCafes } from '@/features/explore/api/explore.api';
+import { getCafes, getRecentReviews } from '@/features/explore/api/explore.api';
 import { NotificationBellButton } from '@/features/notifications/components/NotificationBellButton';
-import type { Cafe } from '@/features/explore/types/explore.types';
+import type { Cafe, Review } from '@/features/explore/types/explore.types';
 
 function getInitials(name: string) {
   return name
@@ -79,29 +79,7 @@ function formatExpiryDate(isoString: string) {
   }
 }
 
-const REVIEWS = [
-  {
-    id: '1',
-    name: 'Hoàng Minh Tuấn',
-    role: 'RC Enthusiast • Hà Nội',
-    content: 'Trước đây tôi phải nhắn tin Facebook để đặt lịch, nhiều khi chờ cả tiếng không thấy rep. Giờ đặt xong là có lịch ngay, còn biết chính xác xe nào mình sẽ dùng.',
-    avatar: 'HT',
-  },
-  {
-    id: '2',
-    name: 'Ngọc Linh',
-    role: 'BYOC Player • TP. HCM',
-    content: 'Tôi hay mang xe riêng đi chơi, tính năng BYOC rất tiện. Đặt chỗ trước, đến nơi check-in là chạy luôn không cần chờ nhân viên sắp xếp.',
-    avatar: 'NL',
-  },
-  {
-    id: '3',
-    name: 'Minh Khoa',
-    role: 'Chạy tuần 2 lần • Đà Nẵng',
-    content: 'Phần kiểm tra xe 4 góc lúc đầu nghĩ phức tạp nhưng thực ra rất nhanh. Và lần đầu tiên tôi không lo ngại khi trả xe vì mọi thứ đã được ghi nhận rõ ràng.',
-    avatar: 'MK',
-  },
-];
+
 
 const STEPS = [
   {
@@ -144,6 +122,7 @@ export function HomeScreen() {
   const [upcomingBooking, setUpcomingBooking] = useState<BookingListItem | null>(null);
   const [activePackages, setActivePackages] = useState<MyPackageResponse[]>([]);
   const [featuredCafes, setFeaturedCafes] = useState<Cafe[]>([]);
+  const [recentReviews, setRecentReviews] = useState<Review[]>([]);
 
   const displayName = user?.fullName ?? user?.email ?? 'Khách hàng';
   const greeting = useMemo(() => getGreeting(), []);
@@ -153,17 +132,22 @@ export function HomeScreen() {
     setLoading(true);
     try {
       if (!isAuthenticated || !isCustomer) {
-        const cafesResult = await getCafes();
+        const [cafesResult, reviewsResult] = await Promise.all([
+          getCafes(),
+          getRecentReviews(5),
+        ]);
         setUpcomingBooking(null);
         setActivePackages([]);
         setFeaturedCafes(cafesResult.slice(0, 5));
+        setRecentReviews(reviewsResult);
         return;
       }
 
-      const [bookingsResult, packagesResult, cafesResult] = await Promise.all([
+      const [bookingsResult, packagesResult, cafesResult, reviewsResult] = await Promise.all([
         getMyBookings({ limit: 10 }),
         getMyPackages('ACTIVE'),
         getCafes(),
+        getRecentReviews(5),
       ]);
 
       const now = new Date();
@@ -173,6 +157,7 @@ export function HomeScreen() {
       setUpcomingBooking(upcoming);
       setActivePackages(packagesResult);
       setFeaturedCafes(cafesResult.slice(0, 5));
+      setRecentReviews(reviewsResult);
     } catch (err) {
       console.error('[HomeScreen] Error loading dashboard:', err);
     } finally {
@@ -519,57 +504,74 @@ export function HomeScreen() {
           </View>
 
           {/* Người chơi nói gì */}
-          <View className="mb-6">
-            <View className="flex-row items-center gap-1.5 mb-2.5">
-              <MessageSquare color="#f97316" size={15} />
-              <Text className="text-[13px] text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold">
-                Người chơi nói gì
-              </Text>
+          {recentReviews.length > 0 && (
+            <View className="mb-6">
+              <View className="flex-row items-center gap-1.5 mb-2.5">
+                <MessageSquare color="#f97316" size={15} />
+                <Text className="text-[13px] text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold">
+                  Người chơi nói gì
+                </Text>
+              </View>
+
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerClassName="gap-3.5"
+                className="py-1"
+              >
+                {recentReviews.map((rev) => {
+                  const reviewerName = rev.user?.fullName || 'Người chơi';
+                  return (
+                    <View
+                      key={rev.id}
+                      className="w-64 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/40 p-4 shadow-sm"
+                    >
+                      {/* Sao đánh giá */}
+                      <View className="flex-row gap-0.5 mb-2">
+                        {[1, 2, 3, 4, 5].map((s) => (
+                          <Star 
+                            key={s} 
+                            color="#f59e0b" 
+                            fill={s <= rev.rating ? "#f59e0b" : "transparent"} 
+                            size={11} 
+                          />
+                        ))}
+                      </View>
+
+                      <Text className="text-[11px] text-slate-700 dark:text-slate-300 italic leading-4.5 font-semibold" numberOfLines={3}>
+                        &quot;{rev.comment}&quot;
+                      </Text>
+
+                      {/* Divider */}
+                      <View className="h-[1px] bg-slate-200 dark:bg-slate-800/60 my-3" />
+
+                      {/* Info reviewer */}
+                      <View className="flex-row items-center gap-2.5">
+                        <View className="h-7 w-7 items-center justify-center rounded-full bg-[#ea580c]/10 border border-[#ea580c]/30">
+                          <Text className="text-[9px] font-bold text-[#f97316]">
+                            {getInitials(reviewerName)}
+                          </Text>
+                        </View>
+                        <View className="flex-1">
+                          <Text className="text-[11px] text-slate-900 dark:text-white" weight="700" numberOfLines={1}>
+                            {reviewerName}
+                          </Text>
+                          <Text className="text-[9px] text-slate-500 dark:text-slate-400 font-semibold" numberOfLines={1}>
+                            Đã đánh giá: {new Date(rev.createdAt).toLocaleDateString('vi-VN')}
+                          </Text>
+                          {rev.cafeName ? (
+                            <Text className="text-[9px] text-[#f97316] font-bold mt-0.5" numberOfLines={1}>
+                              Sân: {rev.cafeName}
+                            </Text>
+                          ) : null}
+                        </View>
+                      </View>
+                    </View>
+                  );
+                })}
+              </ScrollView>
             </View>
-
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerClassName="gap-3.5"
-              className="py-1"
-            >
-              {REVIEWS.map((rev) => (
-                <View
-                  key={rev.id}
-                  className="w-64 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/40 p-4 shadow-sm"
-                >
-                  {/* Sao đánh giá */}
-                  <View className="flex-row gap-0.5 mb-2">
-                    {[1, 2, 3, 4, 5].map((s) => (
-                      <Star key={s} color="#f59e0b" fill="#f59e0b" size={11} />
-                    ))}
-                  </View>
-
-                  <Text className="text-[11px] text-slate-700 dark:text-slate-300 italic leading-4.5 font-semibold">
-                    &quot;{rev.content}&quot;
-                  </Text>
-
-                  {/* Divider */}
-                  <View className="h-[1px] bg-slate-200 dark:bg-slate-800/60 my-3" />
-
-                  {/* Info reviewer */}
-                  <View className="flex-row items-center gap-2.5">
-                    <View className="h-7 w-7 items-center justify-center rounded-full bg-[#ea580c]/10 border border-[#ea580c]/30">
-                      <Text className="text-[9px] font-bold text-[#f97316]">{rev.avatar}</Text>
-                    </View>
-                    <View className="flex-1">
-                      <Text className="text-[11px] text-slate-900 dark:text-white" weight="700" numberOfLines={1}>
-                        {rev.name}
-                      </Text>
-                      <Text className="text-[9px] text-slate-500 dark:text-slate-400 font-semibold" numberOfLines={1}>
-                        {rev.role}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              ))}
-            </ScrollView>
-          </View>
+          )}
 
           {/* Featured Cafes */}
           <View className="mb-6">
@@ -610,7 +612,9 @@ export function HomeScreen() {
                       <View className="flex-row justify-between items-center mt-3">
                         <View className="flex-row items-center gap-0.5 bg-amber-500/10 px-1.5 py-0.5 rounded">
                           <Star color="#f59e0b" fill="#f59e0b" size={10} />
-                          <Text className="text-[9px] text-amber-500 font-bold">5.0</Text>
+                          <Text className="text-[9px] text-amber-500 font-bold">
+                            {cafe.rating > 0 ? cafe.rating.toFixed(1) : '—'}
+                          </Text>
                         </View>
                         <Text className="text-[12px] text-[#f97316]" weight="700">
                           {cafe.priceRange.split(' ')[0]}

@@ -46,9 +46,10 @@ export function FavoritesScreen() {
     [favorites],
   );
   const averageRating = useMemo(() => {
-    if (!favorites.length) return 0;
-    const total = favorites.reduce((sum, cafe) => sum + (cafe.rating > 0 ? cafe.rating : 5), 0);
-    return total / favorites.length;
+    const ratedCafes = favorites.filter((cafe) => cafe.rating > 0);
+    if (!ratedCafes.length) return 0;
+    const total = ratedCafes.reduce((sum, cafe) => sum + cafe.rating, 0);
+    return total / ratedCafes.length;
   }, [favorites]);
 
   const fetchFavorites = useCallback(
@@ -147,7 +148,7 @@ export function FavoritesScreen() {
       item.slotFeeRate && item.slotFeeRate > 0
         ? `${item.slotFeeRate.toLocaleString('vi-VN')} đ`
         : item.priceRange || 'Chưa cập nhật';
-    const rating = item.rating > 0 ? item.rating.toFixed(1) : '5.0';
+    const rating = item.rating > 0 ? item.rating.toFixed(1) : '—';
 
     return (
       <Pressable
