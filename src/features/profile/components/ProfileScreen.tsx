@@ -20,6 +20,7 @@ import {
   ChevronRight,
   CalendarDays,
   Trophy,
+  MessageSquare,
 } from 'lucide-react-native';
 import { useEffect, useMemo, useState, useRef } from 'react';
 import {
@@ -750,7 +751,7 @@ export function ProfileScreen() {
                       <Gem color="#a855f7" size={16} />
                     </View>
                     <View className="flex-1 pr-6">
-                      <Text className="text-xs font-bold text-slate-800 dark:text-slate-250">Gói hội viên của tôi</Text>
+                      <Text className="text-xs font-bold text-slate-800 dark:text-slate-200">Gói hội viên của tôi</Text>
                       <Text className="text-[10px] font-semibold text-slate-400 mt-0.5" numberOfLines={1}>Xem thông tin gói hội viên và đặc quyền tích lũy</Text>
                     </View>
                   </View>
@@ -767,8 +768,25 @@ export function ProfileScreen() {
                       <Heart color="#ef4444" size={16} />
                     </View>
                     <View className="flex-1 pr-6">
-                      <Text className="text-xs font-bold text-slate-800 dark:text-slate-250">Cơ sở yêu thích</Text>
+                      <Text className="text-xs font-bold text-slate-800 dark:text-slate-200">Cơ sở yêu thích</Text>
                       <Text className="text-[10px] font-semibold text-slate-400 mt-0.5" numberOfLines={1}>Các chi nhánh RC Field bạn thường xuyên ghé chơi</Text>
+                    </View>
+                  </View>
+                  <ChevronRight color="#94a3b8" size={16} />
+                </Pressable>
+
+                {/* Đánh giá của tôi */}
+                <Pressable
+                  onPress={() => router.push('/customer/my-reviews' as any)}
+                  className="flex-row items-center justify-between p-3.5 rounded-xl border border-slate-100 dark:border-slate-800/45 bg-slate-50/50 dark:bg-slate-900/40 active:bg-slate-100 dark:active:bg-slate-900"
+                >
+                  <View className="flex-row items-center gap-3">
+                    <View className="size-8 rounded-lg bg-amber-50 dark:bg-amber-950/20 items-center justify-center">
+                      <MessageSquare color="#d97706" size={16} />
+                    </View>
+                    <View className="flex-1 pr-6">
+                      <Text className="text-xs font-bold text-slate-800 dark:text-slate-200">Đánh giá của tôi</Text>
+                      <Text className="text-[10px] font-semibold text-slate-400 mt-0.5" numberOfLines={1}>Xem các đánh giá và phản hồi dịch vụ của bạn</Text>
                     </View>
                   </View>
                   <ChevronRight color="#94a3b8" size={16} />

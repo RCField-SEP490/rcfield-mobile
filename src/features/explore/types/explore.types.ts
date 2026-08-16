@@ -97,6 +97,7 @@ export interface Review {
   vehicleScore?: number | null;
   staffScore?: number | null;
   facilityScore?: number | null;
+  cafeName?: string;
 }
 
 export interface ActivePromotion {

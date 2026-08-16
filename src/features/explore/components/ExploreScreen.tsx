@@ -349,7 +349,7 @@ export function ExploreScreen() {
             <View className="flex-row items-center gap-1 bg-amber-500/10 px-2 py-1 rounded-lg">
               <Star color="#f59e0b" fill="#f59e0b" size={12} />
               <Text className="text-[11px] text-amber-500 font-bold">
-                {item.rating > 0 ? item.rating.toFixed(1) : '5.0'}
+                {item.rating > 0 ? item.rating.toFixed(1) : '—'}
               </Text>
             </View>
           </View>
