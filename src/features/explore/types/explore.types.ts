@@ -94,6 +94,9 @@ export interface Review {
     avatarUrl?: string | null;
   } | null;
   ownerResponse?: string | null;
+  vehicleScore?: number | null;
+  staffScore?: number | null;
+  facilityScore?: number | null;
 }
 
 export interface ActivePromotion {

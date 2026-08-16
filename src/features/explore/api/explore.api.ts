@@ -149,11 +149,25 @@ export async function listCafeImages(cafeId: string): Promise<string[]> {
   }
 }
 
-export async function listCafeReviews(cafeId: string): Promise<Review[]> {
+export interface CafeReviewsResponse {
+  data: Review[];
+  total: number;
+  aggregate: {
+    reviewCount: number;
+    overallAvg: number | null;
+    vehicleAvg: number | null;
+    staffAvg: number | null;
+    facilityAvg: number | null;
+  } | null;
+}
+
+export async function listCafeReviews(cafeId: string): Promise<CafeReviewsResponse> {
   try {
     const response = await api.get(`/cafes/${cafeId}/reviews`);
     const reviewsData = response.data?.data || [];
-    return reviewsData.map((rev: any): Review => ({
+    const aggregate = response.data?.aggregate || null;
+
+    const reviews = reviewsData.map((rev: any): Review => ({
       id: rev.id,
       rating: toNumber(rev.overallScore),
       comment: rev.note || '',
@@ -164,10 +178,25 @@ export async function listCafeReviews(cafeId: string): Promise<Review[]> {
         avatarUrl: null,
       },
       ownerResponse: null,
+      vehicleScore: rev.vehicleScore ? toNumber(rev.vehicleScore) : null,
+      staffScore: rev.staffScore ? toNumber(rev.staffScore) : null,
+      facilityScore: rev.facilityScore ? toNumber(rev.facilityScore) : null,
     }));
+
+    return {
+      data: reviews,
+      total: response.data?.total || reviews.length,
+      aggregate: aggregate ? {
+        reviewCount: toNumber(aggregate.reviewCount),
+        overallAvg: aggregate.overallAvg ? toNumber(aggregate.overallAvg) : null,
+        vehicleAvg: aggregate.vehicleAvg ? toNumber(aggregate.vehicleAvg) : null,
+        staffAvg: aggregate.staffAvg ? toNumber(aggregate.staffAvg) : null,
+        facilityAvg: aggregate.facilityAvg ? toNumber(aggregate.facilityAvg) : null,
+      } : null,
+    };
   } catch (error) {
     console.error('[ExploreAPI] Error fetching cafe reviews:', error);
-    return [];
+    return { data: [], total: 0, aggregate: null };
   }
 }
 

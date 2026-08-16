@@ -127,6 +127,7 @@ export function CafeDetailScreen({ cafeId }: CafeDetailScreenProps) {
   const [cafe, setCafe] = useState<Cafe | null>(null);
   const [images, setImages] = useState<string[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviewsAggregate, setReviewsAggregate] = useState<any>(null);
   const [packages, setPackages] = useState<PublicPackage[]>([]);
   const [promotions, setPromotions] = useState<ActivePromotion[]>([]);
   const [tracks, setTracks] = useState<TrackConfig[]>([]);
@@ -174,7 +175,7 @@ export function CafeDetailScreen({ cafeId }: CafeDetailScreenProps) {
         const [
           cafeData,
           imagesData,
-          reviewsData,
+          reviewsRes,
           packagesData,
           tracksData,
           catalogsData,
@@ -202,7 +203,8 @@ export function CafeDetailScreen({ cafeId }: CafeDetailScreenProps) {
         }
 
         setImages(imagesData.length > 0 ? imagesData : [cafeData.image]);
-        setReviews(reviewsData);
+        setReviews(reviewsRes.data);
+        setReviewsAggregate(reviewsRes.aggregate);
         setPackages(packagesData);
         setPromotions(promosData);
         setTracks(tracksData);
@@ -902,12 +904,84 @@ export function CafeDetailScreen({ cafeId }: CafeDetailScreenProps) {
           <View className="h-[1px] bg-slate-200 dark:bg-slate-800/80" />
 
           {/* 10. Reviews List */}
-          <View className="gap-3">
+          <View className="gap-4">
             <Text className="text-[14px] text-slate-900 dark:text-white font-bold uppercase tracking-wider">
               Đánh giá khách hàng
             </Text>
+
+            {/* 10.1 Reviews Summary Dashboard (Aggregate Card) */}
+            {reviewsAggregate && reviewsAggregate.reviewCount > 0 ? (
+              <View className="flex-row items-center border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/40 p-4 rounded-2xl shadow-sm gap-4">
+                {/* Left side: Overall score */}
+                <View className="items-center justify-center pr-4 border-r border-slate-200 dark:border-slate-800 min-w-[90px]">
+                  <Text className="text-[32px] text-slate-900 dark:text-white font-mono" weight="700">
+                    {reviewsAggregate.overallAvg ? reviewsAggregate.overallAvg.toFixed(1) : '5.0'}
+                  </Text>
+                  <View className="flex-row items-center gap-0.5 mt-1">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <Star
+                        key={i}
+                        color="#eab308"
+                        fill={i < Math.round(reviewsAggregate.overallAvg || 5) ? '#eab308' : 'transparent'}
+                        size={12}
+                      />
+                    ))}
+                  </View>
+                  <Text className="text-[10px] text-slate-500 dark:text-slate-400 font-bold mt-1">
+                    {reviewsAggregate.reviewCount} đánh giá
+                  </Text>
+                </View>
+
+                {/* Right side: Categories sub-scores bars */}
+                <View className="flex-1 gap-2">
+                  {/* Staff rating */}
+                  <View className="flex-row items-center justify-between">
+                    <Text className="text-[10px] text-slate-500 dark:text-slate-400 font-bold w-20">Nhân viên</Text>
+                    <View className="flex-1 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 mx-2.5 overflow-hidden">
+                      <View 
+                        style={{ width: `${((reviewsAggregate.staffAvg || 5) / 5) * 100}%` }}
+                        className="h-full rounded-full bg-amber-500" 
+                      />
+                    </View>
+                    <Text className="text-[10px] text-slate-900 dark:text-white font-extrabold w-4 text-right font-mono">
+                      {reviewsAggregate.staffAvg ? Math.round(reviewsAggregate.staffAvg) : 5}
+                    </Text>
+                  </View>
+
+                  {/* Facility rating */}
+                  <View className="flex-row items-center justify-between">
+                    <Text className="text-[10px] text-slate-500 dark:text-slate-400 font-bold w-20">Cơ sở vật chất</Text>
+                    <View className="flex-1 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 mx-2.5 overflow-hidden">
+                      <View 
+                        style={{ width: `${((reviewsAggregate.facilityAvg || 5) / 5) * 100}%` }}
+                        className="h-full rounded-full bg-amber-500" 
+                      />
+                    </View>
+                    <Text className="text-[10px] text-slate-900 dark:text-white font-extrabold w-4 text-right font-mono">
+                      {reviewsAggregate.facilityAvg ? Math.round(reviewsAggregate.facilityAvg) : 5}
+                    </Text>
+                  </View>
+
+                  {/* Vehicle rating */}
+                  <View className="flex-row items-center justify-between">
+                    <Text className="text-[10px] text-slate-500 dark:text-slate-400 font-bold w-20">Chất lượng xe</Text>
+                    <View className="flex-1 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 mx-2.5 overflow-hidden">
+                      <View 
+                        style={{ width: `${((reviewsAggregate.vehicleAvg || 5) / 5) * 100}%` }}
+                        className="h-full rounded-full bg-amber-500" 
+                      />
+                    </View>
+                    <Text className="text-[10px] text-slate-900 dark:text-white font-extrabold w-4 text-right font-mono">
+                      {reviewsAggregate.vehicleAvg ? Math.round(reviewsAggregate.vehicleAvg) : 5}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            ) : null}
+
+            {/* 10.2 Individual Reviews List */}
             {reviews.length === 0 ? (
-              <Text className="text-[11px] text-slate-500 font-medium">
+              <Text className="text-[11px] text-slate-500 font-medium pl-1">
                 Chưa có lượt đánh giá nào cho chi nhánh này.
               </Text>
             ) : (
@@ -915,28 +989,65 @@ export function CafeDetailScreen({ cafeId }: CafeDetailScreenProps) {
                 {reviews.map((rev) => (
                   <View
                     key={rev.id}
-                    className="border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/20 p-3 rounded-2xl gap-2 shadow-sm"
+                    className="border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/20 p-4 rounded-2xl gap-2 shadow-sm"
                   >
-                    <View className="flex-row justify-between items-center">
-                      <Text className="text-[12px] text-slate-900 dark:text-white font-extrabold">
-                        {isAuthenticated && user && rev.customerId === user.id ? 'Bạn' : (rev.user?.fullName || 'Khách hàng')}
-                      </Text>
+                    <View className="flex-row justify-between items-start">
+                      <View>
+                        <Text className="text-[12px] text-slate-900 dark:text-white font-extrabold">
+                          {isAuthenticated && user && rev.customerId === user.id ? 'Bạn' : (rev.user?.fullName || 'Khách hàng')}
+                        </Text>
+                        <Text className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold mt-0.5">
+                          {rev.createdAt ? new Date(rev.createdAt).toLocaleDateString('vi-VN') : ''}
+                        </Text>
+                      </View>
                       <View className="flex-row items-center gap-0.5">
                         {Array.from({ length: 5 }).map((_, i) => (
                           <Star
                             key={i}
                             color="#eab308"
                             fill={i < rev.rating ? '#eab308' : 'transparent'}
-                            size={10}
+                            size={12}
                           />
                         ))}
                       </View>
                     </View>
-                    <Text className="text-[11px] text-slate-600 dark:text-slate-300 leading-4 font-medium">
-                      {rev.comment}
-                    </Text>
+
+                    {/* Review text comment */}
+                    {rev.comment ? (
+                      <Text className="text-[11px] text-slate-650 dark:text-slate-300 leading-4 font-medium mt-1">
+                        {rev.comment}
+                      </Text>
+                    ) : null}
+
+                    {/* Sub-scores Chips */}
+                    {(rev.staffScore || rev.facilityScore || rev.vehicleScore) ? (
+                      <View className="flex-row flex-wrap gap-1.5 mt-2">
+                        {rev.staffScore ? (
+                          <View className="rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2.5 py-0.5">
+                            <Text className="text-[9px] text-slate-650 dark:text-slate-300 font-bold">
+                              Nhân viên: {rev.staffScore}/5
+                            </Text>
+                          </View>
+                        ) : null}
+                        {rev.facilityScore ? (
+                          <View className="rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2.5 py-0.5">
+                            <Text className="text-[9px] text-slate-650 dark:text-slate-350 font-bold">
+                              Cơ sở: {rev.facilityScore}/5
+                            </Text>
+                          </View>
+                        ) : null}
+                        {rev.vehicleScore ? (
+                          <View className="rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2.5 py-0.5">
+                            <Text className="text-[9px] text-slate-650 dark:text-slate-350 font-bold">
+                              Xe: {rev.vehicleScore}/5
+                            </Text>
+                          </View>
+                        ) : null}
+                      </View>
+                    ) : null}
+
                     {rev.ownerResponse ? (
-                      <View className="border-l-2 border-orange-500/80 pl-2.5 py-0.5 mt-1 bg-orange-500/5">
+                      <View className="border-l-2 border-orange-500/80 pl-2.5 py-0.5 mt-2.5 bg-orange-500/5 rounded-r">
                         <Text className="text-[9px] text-[#f97316] font-bold">
                           Phản hồi từ chủ sân:
                         </Text>
