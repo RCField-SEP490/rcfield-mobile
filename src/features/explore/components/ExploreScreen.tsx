@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Map, MapPin, Search, Star, Compass, RotateCcw, Heart, Trophy, Sparkles } from 'lucide-react-native';
+import { Map, MapPin, Search, Star, Compass, RotateCcw, Heart, Trophy } from 'lucide-react-native';
 
 import { getCafes, listFeaturedPopups } from '../api/explore.api';
 import { favoriteApi, favoriteLocal } from '../api/favorite.api';

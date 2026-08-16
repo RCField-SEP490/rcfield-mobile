@@ -22,7 +22,7 @@ import {
   Star,
 } from 'lucide-react-native';
 
-import { getCafeById, getCafes } from '@/features/explore/api/explore.api';
+import { getCafeById } from '@/features/explore/api/explore.api';
 import { favoriteApi, favoriteLocal } from '@/features/explore/api/favorite.api';
 import type { Cafe } from '@/features/explore/types/explore.types';
 import { useAuthStore } from '@/shared/store/auth-store';

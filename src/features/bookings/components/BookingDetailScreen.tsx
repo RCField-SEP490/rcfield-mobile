@@ -786,7 +786,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                 </View>
                 {booking.review.note ? (
                   <Text className="mt-2 text-xs leading-4 text-slate-600 dark:text-slate-300 font-medium">
-                    "{booking.review.note}"
+                    {`"${booking.review.note}"`}
                   </Text>
                 ) : (
                   <Text className="mt-2 text-xs leading-4 text-slate-400 italic">
