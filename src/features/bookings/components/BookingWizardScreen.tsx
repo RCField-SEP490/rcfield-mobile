@@ -430,7 +430,15 @@ export function BookingWizardScreen({
 
   const navigateToDetail = useCallback(
     (bookingId: string) => {
-      router.replace(`/booking/${bookingId}`);
+      if (!bookingId) {
+        console.warn('[BookingWizard] navigateToDetail called without bookingId, redirecting to /bookings');
+        router.push('/(tabs)/bookings');
+        return;
+      }
+      router.push({
+        pathname: '/booking/[id]',
+        params: { id: bookingId },
+      } as any);
     },
     [router]
   );
@@ -539,14 +547,18 @@ export function BookingWizardScreen({
     const bookingId = bankTransferModalData?.bookingId;
     setBankTransferModalData(null);
     if (bookingId) {
-      navigateToDetail(bookingId);
+      setTimeout(() => {
+        navigateToDetail(bookingId);
+      }, 100);
     }
   }, [bankTransferModalData?.bookingId, navigateToDetail]);
 
   const handleBankTransferSuccess = useCallback(
     (bookingId: string) => {
       setBankTransferModalData(null);
-      navigateToDetail(bookingId);
+      setTimeout(() => {
+        navigateToDetail(bookingId);
+      }, 100);
     },
     [navigateToDetail]
   );

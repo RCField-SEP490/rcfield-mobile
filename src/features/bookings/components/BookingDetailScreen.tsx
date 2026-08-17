@@ -545,15 +545,27 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
   const isPaid = !booking.payment_components?.some((c: any) => c.status === 'PENDING');
 
   const transactions = booking.payment_transactions ?? [];
-  const gatewayLabel = (gateway: string) =>
-    gateway === 'DIRECT' ? 'Tiền mặt' : gateway === 'MOCK' ? 'DEV Mock' : 'VNPay Online';
+  const gatewayLabel = (gateway?: string | null) => {
+    if (!gateway) return 'Online';
+    const gw = String(gateway).toUpperCase();
+    if (gw === 'DIRECT') return 'Tiền mặt tại quầy';
+    if (gw === 'BANK_TRANSFER' || gw === 'VIETQR') return 'VietQR';
+    if (gw === 'VNPAY') return 'VNPay Online';
+    if (gw === 'MOCK') return 'DEV Mock';
+    if (gw === 'PACKAGE') return 'Gói hội viên';
+    return gateway;
+  };
 
-  const prepaidTx = transactions.find((t: any) => t.type === 'PAYMENT' && t.gateway !== 'DIRECT' && t.status === 'SUCCESS');
-  const counterTx = transactions.find((t: any) => t.type === 'PAYMENT' && t.gateway === 'DIRECT' && t.status === 'SUCCESS');
-  const successfulVnpayTxs = transactions.filter(
-    (t: any) => t.type === 'PAYMENT' && t.gateway !== 'DIRECT' && t.status === 'SUCCESS'
+  const prepaidTx = transactions.find(
+    (t: any) => t.type === 'PAYMENT' && t.gateway !== 'DIRECT' && (t.status === 'SUCCESS' || t.status === 'COMPLETED' || t.status === 'PAID')
   );
-  const additionalVnpayTx = successfulVnpayTxs.length > 1 ? successfulVnpayTxs[successfulVnpayTxs.length - 1] : undefined;
+  const counterTx = transactions.find(
+    (t: any) => t.type === 'PAYMENT' && t.gateway === 'DIRECT' && (t.status === 'SUCCESS' || t.status === 'COMPLETED' || t.status === 'PAID')
+  );
+  const successfulPrepaidTxs = transactions.filter(
+    (t: any) => t.type === 'PAYMENT' && t.gateway !== 'DIRECT' && (t.status === 'SUCCESS' || t.status === 'COMPLETED' || t.status === 'PAID')
+  );
+  const additionalPrepaidTx = successfulPrepaidTxs.length > 1 ? successfulPrepaidTxs[successfulPrepaidTxs.length - 1] : undefined;
 
   return (
     <SafeAreaView className="flex-grow flex-1 bg-[#f8fafc] dark:bg-[#0b0f19]" edges={['top', 'left', 'right']}>
@@ -565,7 +577,13 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
       <View className="px-5 pt-3 pb-4 flex-row items-center justify-between border-b border-slate-200 dark:border-slate-800/80 bg-white dark:bg-[#0b0f19]">
         <Pressable
           className="size-9 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 justify-center items-center active:bg-slate-100 dark:active:bg-slate-800"
-          onPress={() => router.back()}
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/(tabs)/bookings');
+            }
+          }}
         >
           <ArrowLeft color={colorScheme === 'dark' ? '#ffffff' : '#475569'} size={18} />
         </Pressable>
@@ -1119,16 +1137,22 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
             </Text>
           </View>
 
-          {/* Block 1: Trả trước qua cổng VNPAY */}
+          {/* Block 1: Trả trước qua cổng thanh toán */}
           <View className="space-y-3">
             <View className="flex-row items-center gap-2">
-              <CheckCircle2 color="#10b981" size={15} />
-              <Text className="text-[#10b981] text-xs font-bold uppercase tracking-wide">
+              <CheckCircle2 color={booking.status === 'PENDING' ? '#f59e0b' : '#10b981'} size={15} />
+              <Text
+                className={`text-xs font-bold uppercase tracking-wide ${
+                  booking.status === 'PENDING' ? 'text-amber-500' : 'text-[#10b981]'
+                }`}
+              >
                 {booking.status === 'PENDING'
-                  ? 'Sẽ thanh toán qua VNPAY'
+                  ? 'Chờ thanh toán'
                   : prepaidTx
                     ? `Đã trả qua ${gatewayLabel(prepaidTx.gateway)}`
-                    : 'Đã trả qua VNPAY'}
+                    : (booking.selected_package_id || booking.package_id)
+                      ? 'Đã trả qua Gói hội viên'
+                      : 'Đã thanh toán'}
               </Text>
             </View>
 
@@ -1302,9 +1326,9 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                   <CheckCircle2 color="#10b981" size={16} />
                   <Text className="text-emerald-400 text-xs font-bold">
                     Đã thanh toán đầy đủ
-                    {(counterTx || additionalVnpayTx) && (
+                    {(counterTx || additionalPrepaidTx) && (
                       <Text className="font-semibold text-[11px] text-[#10b981]">
-                        {` · ${gatewayLabel((counterTx ?? additionalVnpayTx)!.gateway)}`}
+                        {` · ${gatewayLabel((counterTx ?? additionalPrepaidTx)!.gateway)}`}
                       </Text>
                     )}
                   </Text>

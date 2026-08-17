@@ -627,7 +627,8 @@ export function PaymentStep({
           )}
         </View>
 
-        {/* Mock Payment button for Dev */}
+        {/* Mock Payment button for Dev (Hidden on UI) */}
+        {/*
         <Pressable
           disabled={isMockSubmitting}
           onPress={onMockPayment}
@@ -644,6 +645,7 @@ export function PaymentStep({
             </View>
           )}
         </Pressable>
+        */}
       </View>
     </View>
   );
