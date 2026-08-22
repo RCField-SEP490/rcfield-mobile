@@ -10,7 +10,6 @@ import {
   Layers,
   Building2,
   Sparkles,
-  Zap,
 } from 'lucide-react-native';
 
 import { Text } from '@/shared/ui/Text';
