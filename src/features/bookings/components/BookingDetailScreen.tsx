@@ -1168,7 +1168,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
             <View className="flex-row items-center gap-2 mb-3.5 border-b border-slate-200 dark:border-slate-800/80 pb-2">
               <Camera color="#f97316" size={16} />
               <Text className="text-[12px] font-bold text-slate-900 dark:text-white uppercase tracking-wider">
-                Đối chiếu bàn giao xe (Side-by-Side)
+                {booking.playMode === 'BYOC' ? 'Ảnh xe bàn giao Check-in' : 'Đối chiếu bàn giao xe (Side-by-Side)'}
               </Text>
             </View>
 
@@ -1178,7 +1178,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                 {renderPhotoGrid(checkInPhotos, 'Ảnh bàn giao Check-in')}
 
                 {/* Check-out Photos Grid */}
-                {renderPhotoGrid(checkOutPhotos, 'Ảnh bàn giao Check-out')}
+                {booking.playMode !== 'BYOC' && renderPhotoGrid(checkOutPhotos, 'Ảnh bàn giao Check-out')}
               </View>
               {sessionDetail?.damageNotes && (
                 <View className="rounded-lg bg-red-500/5 border border-red-500/10 p-2.5">
@@ -1368,9 +1368,18 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
             </View>
           )}
 
+          {/* Tổng số tiền của cả hóa đơn */}
+          <View className="w-full h-[1px] bg-slate-200 dark:bg-slate-800/60 my-4" />
+          <View className="flex-row justify-between items-center mb-1">
+            <Text className="text-slate-900 dark:text-white text-xs font-bold uppercase tracking-wide">Tổng số tiền</Text>
+            <Text className="text-[#f97316] text-base font-black">
+              {((totalPrepaid ?? 0) + (totalCounterBill ?? 0) - (depositRefundAmount ?? 0)).toLocaleString('vi-VN')}đ
+            </Text>
+          </View>
+
           {/* Block 3: Trạng thái quyết toán nợ phát sinh */}
           {totalCounterBill > 0 && (
-            <View className="mt-5 pt-4 border-t border-slate-200 dark:border-slate-800/80">
+            <View className="mt-4">
               {!isPaid ? (
                 <View className="space-y-3">
                   <View className="rounded-xl bg-amber-500/5 border border-amber-500/10 p-3 flex-row items-center gap-2">
