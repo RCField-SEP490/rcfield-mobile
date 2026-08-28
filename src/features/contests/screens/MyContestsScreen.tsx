@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, ActivityIndicator, RefreshControl, Modal, TextInput, TouchableOpacity, Alert, SafeAreaView, Image, ScrollView } from 'react-native';
+import { View, Text, FlatList, ActivityIndicator, RefreshControl, Modal, TextInput, TouchableOpacity, Alert, Image, ScrollView } from 'react-native';
 import { Trophy, Edit, X, Camera, Check } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { contestsApi } from '../api/contests.api';
+import { getVnpayReturnUrl } from '@/shared/lib/vnpay-return-url';
+import { openVnpayPaymentSession } from '@/shared/lib/vnpay-browser';
+import { bookingWizardApi } from '@/features/bookings/api/booking-wizard.api';
 import { MyRegistrationCard } from '../components/MyRegistrationCard';
 import type { ContestRegistration } from '../types/contests.types';
 import { useColorScheme } from 'nativewind';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -62,17 +66,65 @@ export const MyContestsScreen: React.FC = () => {
   const handlePayPress = async (registrationId: string) => {
     setActionLoading(true);
     try {
-      const returnUrl = 'rcfield://payment-return';
-      const result = await contestsApi.createEntryFeePayment(registrationId, returnUrl);
+      const returnUrl = getVnpayReturnUrl() || 'rcfield://payment-return';
+      const reg = registrations.find((r) => r.id === registrationId);
+      const bookingId = reg?.booking_id;
+      let result;
+
+      if (bookingId) {
+        result = await bookingWizardApi.createCheckout(bookingId, returnUrl, 'vnpay');
+      } else {
+        result = await contestsApi.createEntryFeePayment(registrationId, returnUrl);
+      }
+
       if (result && result.payment_url) {
-        await WebBrowser.openBrowserAsync(result.payment_url);
-        fetchMyRegistrations(false); // Reload lại sau khi thanh toán
+        await openVnpayPaymentSession(result.payment_url!);
+        
+        // Polling để đợi Backend cập nhật trạng thái thanh toán từ VNPay IPN
+        let attempts = 0;
+        const maxAttempts = 4;
+        const interval = 1500;
+        
+        const poll = async () => {
+          try {
+            // Fetch lại danh sách để check xem đã CONFIRMED hay MARKED_PAID chưa
+            const res = await contestsApi.listMyRegistrations();
+            const updatedReg = res.find((r: ContestRegistration) => r.id === registrationId);
+            console.log(`[MyContestsScreen] Polling payment status attempt ${attempts + 1}:`, {
+              status: updatedReg?.status,
+              payment_status: updatedReg?.payment_status
+            });
+            
+            if (
+              updatedReg?.payment_status === 'MARKED_PAID' ||
+              updatedReg?.status === 'CONFIRMED'
+            ) {
+              console.log('[MyContestsScreen] Payment confirmed via polling!');
+              fetchMyRegistrations(false);
+              return;
+            }
+          } catch (e) {
+            console.error('[MyContestsScreen] Polling error:', e);
+          }
+          
+          attempts++;
+          if (attempts < maxAttempts) {
+            setTimeout(poll, interval);
+          } else {
+            console.log('[MyContestsScreen] Polling finished, performing final data fetch.');
+            fetchMyRegistrations(false);
+          }
+        };
+        
+        // Chờ 500ms trước khi bắt đầu check lần đầu
+        setTimeout(poll, 500);
       } else {
         Alert.alert('Thất bại', 'Không thể khởi tạo thanh toán VNPay.');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('[MyContestsScreen] Pay error:', error);
-      Alert.alert('Lỗi', 'Đã xảy ra lỗi khi tạo link thanh toán.');
+      const errMsg = error?.response?.data?.message || 'Đã xảy ra lỗi khi tạo link thanh toán.';
+      Alert.alert('Không thể thanh toán', errMsg);
     } finally {
       setActionLoading(false);
     }

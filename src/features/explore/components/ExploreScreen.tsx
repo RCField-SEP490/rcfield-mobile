@@ -10,7 +10,7 @@ import {
   View,
   Dimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Map, MapPin, Search, Star, Compass, RotateCcw, Heart, Trophy } from 'lucide-react-native';
 
@@ -153,6 +153,7 @@ const TRACK_TYPES = ['Tất cả', 'Drift', 'Off-Road', 'Speed'];
 
 export function ExploreScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const handleScroll = useRef(createScrollHandler()).current;
   const { location: userLocation } = useLocation();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -577,11 +578,11 @@ export function ExploreScreen() {
         />
       )}
 
-      {/* Nút nổi Bản đồ */}
+      {/* Nút nổi Bản đồ - luôn cao hơn bottom tab */}
       <Pressable
         onPress={handleOpenMap}
-        className="absolute bottom-6 right-5 h-14 w-14 items-center justify-center rounded-full bg-[#ea580c] active:bg-[#f97316] shadow-xl"
-        style={{ elevation: 5 }}
+        className="absolute right-5 h-14 w-14 items-center justify-center rounded-full bg-[#ea580c] active:bg-[#f97316] shadow-xl"
+        style={{ elevation: 5, bottom: insets.bottom + 72 }}
       >
         <Map color="#ffffff" size={24} />
       </Pressable>
