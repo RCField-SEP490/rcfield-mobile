@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, Image, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useColorScheme } from 'nativewind';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Shield, Car, Check, Camera, CreditCard } from 'lucide-react-native';
 import { contestsApi, type ContestRentalOptions, type ContestAvailableRentalCatalogGroup } from '../api/contests.api';
@@ -15,6 +16,8 @@ const MOCK_BYOC_PHOTOS = [
 ];
 
 export const ContestRegisterScreen: React.FC = () => {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
@@ -228,7 +231,7 @@ export const ContestRegisterScreen: React.FC = () => {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#ffffff' }}>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: isDark ? '#0b0f19' : '#ffffff' }}>
         <ActivityIndicator size="large" color="#ea580c" />
       </View>
     );
@@ -269,12 +272,14 @@ export const ContestRegisterScreen: React.FC = () => {
     try {
       return (
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 42 }} showsVerticalScrollIndicator={false}>
-          {/* Step Header */}
-          <View className="mb-6 flex-row items-center bg-gray-50 p-4 rounded-2xl border border-gray-100">
-            <Shield size={20} color="#f97316" style={{ marginRight: 12 }} />
+          {/* Step Header - Card Quy Định (Đỏ nổi bật) */}
+          <View className="mb-6 flex-row items-center bg-red-50 dark:bg-red-950/30 p-4 rounded-2xl border-2 border-red-200 dark:border-red-800/60">
+            <View className="h-9 w-9 rounded-full bg-red-100 dark:bg-red-900/60 items-center justify-center mr-3">
+              <Shield size={18} color="#ef4444" />
+            </View>
             <View className="flex-1">
-              <Text className="text-xs font-extrabold text-gray-800">Quy định giải đấu</Text>
-              <Text className="text-[10px] font-semibold text-gray-400 mt-0.5">
+              <Text className="text-xs font-extrabold text-red-700 dark:text-red-300">Quy định giải đấu</Text>
+              <Text className="text-[10px] font-semibold text-red-500 dark:text-red-400 mt-0.5">
                 Giải đấu áp dụng phí tham gia {formatPrice(contest.entry_fee)}. Bạn cần thanh toán giữ chỗ.
               </Text>
             </View>
@@ -283,17 +288,17 @@ export const ContestRegisterScreen: React.FC = () => {
           {/* Vehicle Source Toggle (Only if MIXED policy) */}
           {policy === 'MIXED' && (
             <View className="mb-6">
-              <Text className="text-sm font-extrabold text-gray-900 mb-3">Hình thức xe thi đấu</Text>
+              <Text className="text-sm font-extrabold text-gray-900 dark:text-white mb-3">Hình thức xe thi đấu</Text>
               <View className="flex-row gap-3">
                 <TouchableOpacity
                   activeOpacity={0.8}
                   onPress={() => setVehicleSource('RENTAL')}
                   className={`flex-1 p-4 rounded-2xl border-2 items-center ${
-                    vehicleSource === 'RENTAL' ? 'border-orange-500 bg-orange-50/10' : 'border-gray-100 bg-white'
+                    vehicleSource === 'RENTAL' ? 'border-orange-500 bg-orange-50/10' : 'border-gray-100 dark:border-slate-800/80 bg-white dark:bg-[#0f172a]/60'
                   }`}
                 >
                   <Car size={24} color={vehicleSource === 'RENTAL' ? '#ea580c' : '#94a3b8'} />
-                  <Text className={`text-xs mt-2 ${vehicleSource === 'RENTAL' ? 'font-extrabold text-gray-900' : 'font-bold text-gray-500'}`}>
+                  <Text className={`text-xs mt-2 ${vehicleSource === 'RENTAL' ? 'font-extrabold text-gray-900 dark:text-white' : 'font-bold text-gray-500 dark:text-slate-400'}`}>
                     Thuê xe tại quầy
                   </Text>
                 </TouchableOpacity>
@@ -302,11 +307,11 @@ export const ContestRegisterScreen: React.FC = () => {
                   activeOpacity={0.8}
                   onPress={() => setVehicleSource('BYOC')}
                   className={`flex-1 p-4 rounded-2xl border-2 items-center ${
-                    vehicleSource === 'BYOC' ? 'border-orange-500 bg-orange-50/10' : 'border-gray-100 bg-white'
+                    vehicleSource === 'BYOC' ? 'border-orange-500 bg-orange-50/10' : 'border-gray-100 dark:border-slate-800/80 bg-white dark:bg-[#0f172a]/60'
                   }`}
                 >
                   <Shield size={24} color={vehicleSource === 'BYOC' ? '#ea580c' : '#94a3b8'} />
-                  <Text className={`text-xs mt-2 ${vehicleSource === 'BYOC' ? 'font-extrabold text-gray-900' : 'font-bold text-gray-500'}`}>
+                  <Text className={`text-xs mt-2 ${vehicleSource === 'BYOC' ? 'font-extrabold text-gray-900 dark:text-white' : 'font-bold text-gray-500 dark:text-slate-400'}`}>
                     Xe cá nhân (BYOC)
                   </Text>
                 </TouchableOpacity>
@@ -315,8 +320,8 @@ export const ContestRegisterScreen: React.FC = () => {
           )}
 
           {policy !== 'MIXED' && (
-            <View className="mb-6 p-4 bg-gray-50 rounded-2xl border border-gray-100">
-              <Text className="text-xs font-semibold text-gray-600">
+            <View className="mb-6 p-4 bg-gray-50 dark:bg-slate-900/30 rounded-2xl border border-gray-100 dark:border-slate-800/80">
+              <Text className="text-xs font-semibold text-gray-600 dark:text-slate-400">
                 {policy === 'BYOC_ONLY'
                   ? 'Giải này chỉ nhận xe cá nhân (BYOC) — khai báo xe của bạn bên dưới.'
                   : 'Giải này yêu cầu thuê xe tại quầy — chọn chi nhánh và dòng xe bên dưới.'}
@@ -330,7 +335,7 @@ export const ContestRegisterScreen: React.FC = () => {
               {/* Chi nhánh picker (Chỉ hiển thị nếu có nhiều hơn 1 chi nhánh) */}
               {rentalOptions && rentalOptions.cafes && rentalOptions.cafes.length > 1 && (
                 <View>
-                  <Text className="text-sm font-extrabold text-gray-900 mb-3">Chi nhánh thi đấu</Text>
+                  <Text className="text-sm font-extrabold text-gray-900 dark:text-white mb-3">Chi nhánh thi đấu</Text>
                   <View style={{ gap: 8 }}>
                     {rentalOptions.cafes.map((cafe) => {
                       const isSelected = cafe.id === selectedCafeId;
@@ -339,19 +344,19 @@ export const ContestRegisterScreen: React.FC = () => {
                           key={cafe.id}
                           activeOpacity={0.8}
                           onPress={() => setSelectedCafeId(cafe.id)}
-                          className={`flex-row items-center justify-between p-4 rounded-2xl border-2 bg-white ${
-                            isSelected ? 'border-orange-500 bg-orange-50/5' : 'border-gray-100'
+                          className={`flex-row items-center justify-between p-4 rounded-2xl border-2 bg-white dark:bg-[#0f172a]/60 ${
+                            isSelected ? 'border-orange-500 bg-orange-50/5' : 'border-gray-100 dark:border-slate-800/80'
                           }`}
                         >
                           <View>
-                            <Text className={`text-xs font-extrabold ${isSelected ? 'text-orange-600' : 'text-gray-900'}`}>{cafe.name}</Text>
+                            <Text className={`text-xs font-extrabold ${isSelected ? 'text-orange-600 dark:text-orange-500' : 'text-gray-900 dark:text-white'}`}>{cafe.name}</Text>
                             {(cafe.district || cafe.city) && (
-                              <Text className="text-[10px] text-gray-400 mt-0.5">
+                              <Text className="text-[10px] text-gray-400 dark:text-slate-500 mt-0.5">
                                 {[cafe.district, cafe.city].filter(Boolean).join(', ')}
                               </Text>
                             )}
                           </View>
-                          <View className="h-6 w-6 rounded-full border border-gray-100 items-center justify-center bg-gray-50">
+                          <View className="h-6 w-6 rounded-full border border-gray-100 dark:border-slate-800/80 items-center justify-center bg-gray-50 dark:bg-slate-900/40">
                             {isSelected && <Check size={14} color="#ea580c" />}
                           </View>
                         </TouchableOpacity>
@@ -363,17 +368,17 @@ export const ContestRegisterScreen: React.FC = () => {
 
               {/* Xe picker */}
               <View>
-                <Text className="text-sm font-extrabold text-gray-900 mb-3">Chọn xe thi đấu</Text>
+                <Text className="text-sm font-extrabold text-gray-900 dark:text-white mb-3">Chọn xe thi đấu</Text>
                 {!selectedCafeId ? (
-                  <Text className="text-xs text-gray-400 italic">Chọn chi nhánh trước để xem danh sách xe.</Text>
+                  <Text className="text-xs text-gray-400 dark:text-slate-500 italic">Chọn chi nhánh trước để xem danh sách xe.</Text>
                 ) : vehiclesLoading ? (
                   <View className="flex-row items-center gap-2 py-4">
                     <ActivityIndicator size="small" color="#ea580c" />
-                    <Text className="text-xs text-gray-400 font-bold">Đang tải danh sách xe...</Text>
+                    <Text className="text-xs text-gray-400 dark:text-slate-500 font-bold">Đang tải danh sách xe...</Text>
                   </View>
                 ) : availableVehicles.length === 0 ? (
-                  <View className="p-4 bg-gray-50 rounded-xl border border-gray-100 items-center">
-                    <Text className="text-xs font-bold text-gray-400 italic">Chi nhánh này chưa có xe phù hợp với đường đua của giải.</Text>
+                  <View className="p-4 bg-gray-50 dark:bg-slate-900/30 rounded-xl border border-gray-100 dark:border-slate-800/80 items-center">
+                    <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 italic">Chi nhánh này chưa có xe phù hợp với đường đua của giải.</Text>
                   </View>
                 ) : (
                   <View style={{ gap: 12 }}>
@@ -387,12 +392,12 @@ export const ContestRegisterScreen: React.FC = () => {
                           activeOpacity={0.8}
                           disabled={isSoldOut}
                           onPress={() => setSelectedCatalogId(group.catalog_id)}
-                          className={`flex-row items-center p-3 rounded-2xl border-2 bg-white ${
+                          className={`flex-row items-center p-3 rounded-2xl border-2 bg-white dark:bg-[#0f172a]/60 ${
                             isSoldOut
-                              ? 'border-gray-50 bg-gray-50/50 opacity-65'
+                              ? 'border-gray-50 dark:border-slate-800/20 bg-gray-50/50 dark:bg-slate-900/10 opacity-65'
                               : isSelected
                               ? 'border-orange-500 bg-orange-50/5'
-                              : 'border-gray-100'
+                              : 'border-gray-100 dark:border-slate-800/80'
                           }`}
                         >
                           {group.cover_image_url ? (
@@ -401,20 +406,20 @@ export const ContestRegisterScreen: React.FC = () => {
                               className="h-14 w-14 rounded-xl object-cover"
                             />
                           ) : (
-                            <View className="h-14 w-14 rounded-xl bg-gray-100 items-center justify-center">
+                            <View className="h-14 w-14 rounded-xl bg-gray-100 dark:bg-slate-900/40 items-center justify-center">
                               <Car size={20} color="#94a3b8" />
                             </View>
                           )}
                           <View className="ml-3 flex-1">
-                            <Text className="text-xs font-extrabold text-gray-900">{group.catalog_name}</Text>
-                            <Text className="text-[10px] font-semibold text-gray-400 mt-0.5">
+                            <Text className="text-xs font-extrabold text-gray-900 dark:text-white">{group.catalog_name}</Text>
+                            <Text className="text-[10px] font-semibold text-gray-400 dark:text-slate-500 mt-0.5">
                               {group.tier}
                             </Text>
-                            <Text className={`text-[11px] font-extrabold mt-1 ${isSoldOut ? 'text-gray-400' : 'text-emerald-600'}`}>
+                            <Text className={`text-[11px] font-extrabold mt-1 ${isSoldOut ? 'text-gray-400 dark:text-slate-600' : 'text-emerald-600 dark:text-emerald-500'}`}>
                               {isSoldOut ? 'Đã hết xe dòng này' : `Còn ${group.remaining_slots}/${group.total_units} xe`}
                             </Text>
                           </View>
-                          <View className="h-6 w-6 rounded-full border border-gray-100 items-center justify-center bg-gray-50">
+                          <View className="h-6 w-6 rounded-full border border-gray-100 dark:border-slate-800/80 items-center justify-center bg-gray-50 dark:bg-slate-900/40">
                             {isSelected && <Check size={14} color="#ea580c" />}
                           </View>
                         </TouchableOpacity>
@@ -424,10 +429,16 @@ export const ContestRegisterScreen: React.FC = () => {
                 )}
               </View>
 
-              <View className="border-l-2 border-emerald-300 bg-emerald-50/60 p-3 rounded-xl">
-                <Text className="text-xs leading-5 text-emerald-900">
-                  Thuê xe trong giải không mất thêm tiền — lệ phí giải đã bao gồm. Xe được giao khi bạn tới check-in đúng giờ thi đấu.
-                </Text>
+              {/* Card Thuê xe (Xanh nổi bật) */}
+              <View className="bg-blue-600 dark:bg-blue-700 p-4 rounded-2xl shadow-sm">
+                <View className="flex-row items-start">
+                  <View className="h-7 w-7 rounded-full bg-white/20 items-center justify-center mr-3 mt-0.5">
+                    <Car size={14} color="#ffffff" />
+                  </View>
+                  <Text className="text-xs leading-5 text-white font-semibold flex-1">
+                    Thuê xe trong giải không mất thêm tiền — lệ phí giải đã bao gồm. Xe được giao khi bạn tới check-in đúng giờ thi đấu.
+                  </Text>
+                </View>
               </View>
             </View>
           )}
@@ -435,51 +446,55 @@ export const ContestRegisterScreen: React.FC = () => {
           {/* FOR BYOC OPTION */}
           {vehicleSource === 'BYOC' && (
             <View className="mb-6" style={{ gap: 16 }}>
-              <Text className="text-sm font-extrabold text-gray-900">Khai báo thông số xe cá nhân</Text>
+              <Text className="text-sm font-extrabold text-gray-900 dark:text-white">Khai báo thông số xe cá nhân</Text>
               
               {/* Tên xe */}
               <View>
-                <Text className="text-xs font-bold text-gray-700 mb-1.5">Tên xe cá nhân</Text>
+                <Text className="text-xs font-bold text-gray-700 dark:text-slate-300 mb-1.5">Tên xe cá nhân</Text>
                 <TextInput
                   value={byocName}
                   onChangeText={setByocName}
                   placeholder="Ví dụ: MST RMX 2.5"
-                  className="w-full px-4 py-3 rounded-xl border border-gray-100 text-xs font-semibold text-gray-800 bg-gray-50/20 focus:border-orange-500"
+                  placeholderTextColor={isDark ? '#4b5563' : '#94a3b8'}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-100 dark:border-slate-800 text-xs font-semibold text-gray-800 dark:text-white bg-gray-50/20 dark:bg-slate-900/50 focus:border-orange-500"
                 />
               </View>
 
               {/* Hãng xe */}
               <View>
-                <Text className="text-xs font-bold text-gray-700 mb-1.5">Hãng xe</Text>
+                <Text className="text-xs font-bold text-gray-700 dark:text-slate-300 mb-1.5">Hãng xe</Text>
                 <TextInput
                   value={byocBrand}
                   onChangeText={setByocBrand}
                   placeholder="Ví dụ: MST"
-                  className="w-full px-4 py-3 rounded-xl border border-gray-100 text-xs font-semibold text-gray-800 bg-gray-50/20 focus:border-orange-500"
+                  placeholderTextColor={isDark ? '#4b5563' : '#94a3b8'}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-100 dark:border-slate-800 text-xs font-semibold text-gray-800 dark:text-white bg-gray-50/20 dark:bg-slate-900/50 focus:border-orange-500"
                 />
               </View>
 
               {/* Hệ xe / Class */}
               <View>
-                <Text className="text-xs font-bold text-gray-700 mb-1.5">Class</Text>
+                <Text className="text-xs font-bold text-gray-700 dark:text-slate-300 mb-1.5">Class</Text>
                 <TextInput
                   value={byocClass}
                   onChangeText={setByocClass}
                   placeholder="Ví dụ: Drift / Touring"
-                  className="w-full px-4 py-3 rounded-xl border border-gray-100 text-xs font-semibold text-gray-800 bg-gray-50/20 focus:border-orange-500"
+                  placeholderTextColor={isDark ? '#4b5563' : '#94a3b8'}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-100 dark:border-slate-800 text-xs font-semibold text-gray-800 dark:text-white bg-gray-50/20 dark:bg-slate-900/50 focus:border-orange-500"
                 />
               </View>
 
               {/* Ghi chú */}
               <View>
-                <Text className="text-xs font-bold text-gray-700 mb-1.5">Ghi chú xe tự mang</Text>
+                <Text className="text-xs font-bold text-gray-700 dark:text-slate-300 mb-1.5">Ghi chú xe tự mang</Text>
                 <TextInput
                   value={byocNotes}
                   onChangeText={setByocNotes}
                   multiline
                   numberOfLines={3}
                   placeholder="Phụ kiện, setup, lưu ý kỹ thuật..."
-                  className="w-full px-4 py-3 rounded-xl border border-gray-100 text-xs font-semibold text-gray-800 bg-gray-50/20 focus:border-orange-500"
+                  placeholderTextColor={isDark ? '#4b5563' : '#94a3b8'}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-100 dark:border-slate-800 text-xs font-semibold text-gray-800 dark:text-white bg-gray-50/20 dark:bg-slate-900/50 focus:border-orange-500"
                   style={{ textAlignVertical: 'top' }}
                 />
               </View>
@@ -487,10 +502,10 @@ export const ContestRegisterScreen: React.FC = () => {
               {/* Ảnh chụp xe */}
               <View>
                 <View className="flex-row items-center mb-1">
-                  <Camera size={14} color="#6b7280" style={{ marginRight: 6 }} />
-                  <Text className="text-xs font-bold text-gray-700">Ảnh xe của bạn</Text>
+                  <Camera size={14} color={isDark ? '#94a3b8' : '#6b7280'} style={{ marginRight: 6 }} />
+                  <Text className="text-xs font-bold text-gray-700 dark:text-slate-300">Ảnh xe của bạn</Text>
                 </View>
-                <Text className="text-[10px] font-semibold text-gray-400 mb-3">
+                <Text className="text-[10px] font-semibold text-gray-400 dark:text-slate-500 mb-3">
                   Ban tổ chức duyệt xe dựa vào ảnh này. Chụp rõ toàn thân xe và phần khung gầm (Chọn tối thiểu 2 ảnh):
                 </Text>
                 
@@ -502,7 +517,7 @@ export const ContestRegisterScreen: React.FC = () => {
                         key={index}
                         activeOpacity={0.8}
                         onPress={() => handlePhotoToggle(url)}
-                        className="relative flex-1 h-20 rounded-xl overflow-hidden border border-gray-100 bg-gray-100"
+                        className="relative flex-1 h-20 rounded-xl overflow-hidden border border-gray-100 dark:border-slate-800 bg-gray-100 dark:bg-slate-900"
                       >
                         <Image source={{ uri: url }} className="h-full w-full object-cover" />
                         {/* Check Overlay */}
@@ -521,8 +536,8 @@ export const ContestRegisterScreen: React.FC = () => {
                 </View>
               </View>
 
-              <View className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-                <Text className="text-xs text-amber-800 leading-5">
+              <View className="rounded-2xl border border-amber-250 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/20 p-4">
+                <Text className="text-xs text-amber-800 dark:text-amber-200 leading-5">
                   Xe cá nhân cần ban tổ chức duyệt trước khi được xếp thi đấu — khai báo càng rõ thì duyệt càng nhanh.
                 </Text>
               </View>
@@ -532,20 +547,20 @@ export const ContestRegisterScreen: React.FC = () => {
           <View className="h-6" />
 
           {/* TÓM TẮT ĐĂNG KÝ */}
-          <View className="mb-6 bg-gray-50/60 border border-gray-100 p-4 rounded-2xl">
-            <Text className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-3">Tóm tắt đăng ký</Text>
+          <View className="mb-6 bg-gray-50/60 dark:bg-slate-900/30 border border-gray-100 dark:border-slate-800/80 p-4 rounded-2xl">
+            <Text className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-3">Tóm tắt đăng ký</Text>
             
             <View className="flex-row flex-wrap">
               <View className="w-1/2 mb-3 pr-2">
-                <Text className="text-[9px] font-bold text-gray-400 uppercase">Nguồn xe</Text>
-                <Text className="text-xs font-extrabold text-gray-800 mt-0.5">
+                <Text className="text-[9px] font-bold text-gray-400 dark:text-slate-500 uppercase">Nguồn xe</Text>
+                <Text className="text-xs font-extrabold text-gray-800 dark:text-slate-200 mt-0.5">
                   {vehicleSource === 'BYOC' ? 'Xe cá nhân mang theo' : 'Thuê xe tại quầy'}
                 </Text>
               </View>
               
               <View className="w-1/2 mb-3 pl-2">
-                <Text className="text-[9px] font-bold text-gray-400 uppercase">Người đăng ký</Text>
-                <Text className="text-xs font-extrabold text-gray-800 mt-0.5" numberOfLines={1}>
+                <Text className="text-[9px] font-bold text-gray-400 dark:text-slate-500 uppercase">Người đăng ký</Text>
+                <Text className="text-xs font-extrabold text-gray-800 dark:text-slate-200 mt-0.5" numberOfLines={1}>
                   {profileName} ({profileEmail})
                 </Text>
               </View>
@@ -553,22 +568,22 @@ export const ContestRegisterScreen: React.FC = () => {
               {vehicleSource === 'RENTAL' && (
                 <>
                   <View className="w-1/2 mb-3 pr-2">
-                    <Text className="text-[9px] font-bold text-gray-400 uppercase">Chi nhánh thi đấu</Text>
-                    <Text className="text-xs font-extrabold text-gray-800 mt-0.5">
+                    <Text className="text-[9px] font-bold text-gray-400 dark:text-slate-500 uppercase">Chi nhánh thi đấu</Text>
+                    <Text className="text-xs font-extrabold text-gray-800 dark:text-slate-200 mt-0.5">
                       {selectedRentalCafe?.name || '--'}
                     </Text>
                   </View>
                   
                   <View className="w-1/2 mb-3 pl-2">
-                    <Text className="text-[9px] font-bold text-gray-400 uppercase">Dòng xe</Text>
-                    <Text className="text-xs font-extrabold text-gray-800 mt-0.5" numberOfLines={1}>
+                    <Text className="text-[9px] font-bold text-gray-400 dark:text-slate-500 uppercase">Dòng xe</Text>
+                    <Text className="text-xs font-extrabold text-gray-800 dark:text-slate-200 mt-0.5" numberOfLines={1}>
                       {selectedRentalCatalogName ? `${selectedRentalCatalogName} · ${selectedRentalCatalogTier}` : '--'}
                     </Text>
                   </View>
                   
                   <View className="w-1/2 pr-2">
-                    <Text className="text-[9px] font-bold text-gray-400 uppercase">Tiền thuê xe</Text>
-                    <Text className="text-xs font-extrabold text-gray-800 mt-0.5">Miễn phí</Text>
+                    <Text className="text-[9px] font-bold text-gray-400 dark:text-slate-500 uppercase">Tiền thuê xe</Text>
+                    <Text className="text-xs font-extrabold text-gray-800 dark:text-slate-200 mt-0.5">Miễn phí</Text>
                   </View>
                 </>
               )}
@@ -576,15 +591,15 @@ export const ContestRegisterScreen: React.FC = () => {
               {vehicleSource === 'BYOC' && (
                 <>
                   <View className="w-1/2 pr-2">
-                    <Text className="text-[9px] font-bold text-gray-400 uppercase">Tên xe</Text>
-                    <Text className="text-xs font-extrabold text-gray-800 mt-0.5">
+                    <Text className="text-[9px] font-bold text-gray-400 dark:text-slate-500 uppercase">Tên xe</Text>
+                    <Text className="text-xs font-extrabold text-gray-800 dark:text-slate-200 mt-0.5">
                       {byocName || '--'}
                     </Text>
                   </View>
                   
                   <View className="w-1/2 pl-2">
-                    <Text className="text-[9px] font-bold text-gray-400 uppercase">Hãng / Class</Text>
-                    <Text className="text-xs font-extrabold text-gray-800 mt-0.5" numberOfLines={1}>
+                    <Text className="text-[9px] font-bold text-gray-400 dark:text-slate-500 uppercase">Hãng / Class</Text>
+                    <Text className="text-xs font-extrabold text-gray-800 dark:text-slate-200 mt-0.5" numberOfLines={1}>
                       {[byocBrand, byocClass].filter(Boolean).join(' · ') || '--'}
                     </Text>
                   </View>
@@ -594,15 +609,15 @@ export const ContestRegisterScreen: React.FC = () => {
           </View>
 
           {/* LỆ PHÍ GIẢI ĐẤU */}
-          <View className="mb-6 bg-slate-50 border border-slate-100 p-4 rounded-2xl flex-row justify-between items-center">
-            <Text className="text-xs font-bold text-slate-700">Lệ phí giải đấu</Text>
-            <Text className="text-sm font-black text-slate-900">{formatPrice(contest.entry_fee)}</Text>
+          <View className="mb-6 bg-slate-50 dark:bg-slate-900/30 border border-slate-100 dark:border-slate-800/80 p-4 rounded-2xl flex-row justify-between items-center">
+            <Text className="text-xs font-bold text-slate-700 dark:text-slate-300">Lệ phí giải đấu</Text>
+            <Text className="text-sm font-black text-slate-900 dark:text-white">{formatPrice(contest.entry_fee)}</Text>
           </View>
 
           {/* THÔNG BÁO GHI CHÚ */}
-          <View className="mb-6 flex-row items-start gap-2 bg-white border border-gray-150 p-3 rounded-2xl">
+          <View className="mb-6 flex-row items-start gap-2 bg-white dark:bg-slate-900/30 border border-gray-150 dark:border-slate-800/80 p-3 rounded-2xl">
             <CreditCard size={14} color="#ea580c" style={{ marginTop: 2 }} />
-            <Text className="text-[10px] font-semibold text-gray-500 flex-1 leading-4">
+            <Text className="text-[10px] font-semibold text-gray-500 dark:text-slate-400 flex-1 leading-4">
               {vehicleSource === 'RENTAL'
                 ? 'Thuê xe của quán không mất thêm tiền — bạn chỉ trả lệ phí giải (nếu có). Xe được giao khi bạn tới check-in đúng giờ thi đấu.'
                 : 'Xe cá nhân sẽ chờ ban tổ chức duyệt. Lệ phí giải (nếu có) thanh toán qua VNPay ngay sau khi gửi đăng ký.'}
@@ -616,11 +631,11 @@ export const ContestRegisterScreen: React.FC = () => {
     } catch (e: any) {
       console.error('[ContestRegisterScreen] Catch block in render:', e);
       return (
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16 }}>
-          <View className="p-4 bg-red-50 rounded-2xl border border-red-200 my-4">
-            <Text className="text-red-800 font-bold">Lỗi Render Giao Diện:</Text>
-            <Text className="text-xs text-red-600 mt-1">{e?.message || String(e)}</Text>
-            <Text className="text-[9px] text-gray-400 mt-2 font-mono">{e?.stack || ''}</Text>
+        <ScrollView style={{ flex: 1, backgroundColor: isDark ? '#0b0f19' : '#ffffff' }} contentContainerStyle={{ padding: 16 }}>
+          <View className="p-4 bg-red-50 dark:bg-red-950/20 rounded-2xl border border-red-200 dark:border-red-900/50 my-4">
+            <Text className="text-red-800 dark:text-red-300 font-bold">Lỗi Render Giao Diện:</Text>
+            <Text className="text-xs text-red-600 dark:text-red-250 mt-1">{e?.message || String(e)}</Text>
+            <Text className="text-[9px] text-gray-400 dark:text-slate-500 mt-2 font-mono">{e?.stack || ''}</Text>
           </View>
         </ScrollView>
       );
@@ -628,13 +643,13 @@ export const ContestRegisterScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#ffffff' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: isDark ? '#0b0f19' : '#ffffff' }}>
       {/* Header */}
-      <View style={{ paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#f3f4f6', flexDirection: 'row', alignItems: 'center' }}>
+      <View style={{ paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: isDark ? '#1e293b' : '#f3f4f6', flexDirection: 'row', alignItems: 'center' }}>
         <TouchableOpacity activeOpacity={0.8} onPress={() => router.back()} style={{ marginRight: 12 }}>
-          <Text style={{ fontSize: 16, fontWeight: '800', color: '#6b7280' }}>← Quay lại</Text>
+          <Text style={{ fontSize: 14, fontWeight: '800', color: isDark ? '#94a3b8' : '#6b7280' }}>← Quay lại</Text>
         </TouchableOpacity>
-        <Text style={{ fontSize: 16, fontWeight: '800', color: '#111827', flex: 1 }} numberOfLines={1}>
+        <Text style={{ fontSize: 15, fontWeight: '800', color: isDark ? '#ffffff' : '#111827', flex: 1 }} numberOfLines={1}>
           Đăng ký: {contest.name}
         </Text>
       </View>
@@ -642,7 +657,7 @@ export const ContestRegisterScreen: React.FC = () => {
       {renderContent()}
 
       {/* Button Submit */}
-      <View style={{ padding: 16, borderTopWidth: 1, borderTopColor: '#f3f4f6' }}>
+      <View style={{ padding: 16, borderTopWidth: 1, borderTopColor: isDark ? '#1e293b' : '#f3f4f6', backgroundColor: isDark ? '#0b0f19' : '#ffffff' }}>
         <TouchableOpacity
           activeOpacity={0.8}
           onPress={handleRegisterSubmit}
@@ -653,8 +668,8 @@ export const ContestRegisterScreen: React.FC = () => {
             borderRadius: 12,
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: submitting || !detailsValid ? '#fdba74' : '#ea580c',
-            opacity: submitting || !detailsValid ? 0.6 : 1,
+            backgroundColor: submitting || !detailsValid ? (isDark ? '#4b2d16' : '#fdba74') : '#ea580c',
+            opacity: submitting || !detailsValid ? 0.5 : 1,
             shadowColor: '#ea580c',
             shadowOffset: { width: 0, height: 2 },
             shadowOpacity: 0.1,
@@ -665,7 +680,7 @@ export const ContestRegisterScreen: React.FC = () => {
           {submitting ? (
             <ActivityIndicator size="small" color="#ffffff" />
           ) : (
-            <Text style={{ fontSize: 14, fontWeight: '800', color: '#ffffff' }}>ĐĂNG KÝ & THANH TOÁN</Text>
+            <Text style={{ fontSize: 13, fontWeight: '800', color: '#ffffff' }}>ĐĂNG KÝ & THANH TOÁN</Text>
           )}
         </TouchableOpacity>
       </View>

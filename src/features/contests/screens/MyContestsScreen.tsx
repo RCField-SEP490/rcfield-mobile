@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, ActivityIndicator, RefreshControl, Modal, TextInput, TouchableOpacity, Alert, SafeAreaView, Image, ScrollView } from 'react-native';
+import { View, Text, FlatList, ActivityIndicator, RefreshControl, Modal, TextInput, TouchableOpacity, Alert, Image, ScrollView } from 'react-native';
 import { Trophy, Edit, X, Camera, Check } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
@@ -10,6 +10,7 @@ import { bookingWizardApi } from '@/features/bookings/api/booking-wizard.api';
 import { MyRegistrationCard } from '../components/MyRegistrationCard';
 import type { ContestRegistration } from '../types/contests.types';
 import { useColorScheme } from 'nativewind';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -87,8 +88,8 @@ export const MyContestsScreen: React.FC = () => {
         const poll = async () => {
           try {
             // Fetch lại danh sách để check xem đã CONFIRMED hay MARKED_PAID chưa
-            const res = await contestsApi.getMyRegistrations();
-            const updatedReg = res.find((r) => r.id === registrationId);
+            const res = await contestsApi.listMyRegistrations();
+            const updatedReg = res.find((r: ContestRegistration) => r.id === registrationId);
             console.log(`[MyContestsScreen] Polling payment status attempt ${attempts + 1}:`, {
               status: updatedReg?.status,
               payment_status: updatedReg?.payment_status

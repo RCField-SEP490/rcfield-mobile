@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, Image, TouchableOpacity, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, Image, TouchableOpacity, Alert, Modal } from 'react-native';
 import { Calendar, QrCode, CreditCard, Trash2, Edit } from 'lucide-react-native';
 import type { ContestRegistration } from '../types/contests.types';
 
@@ -18,6 +18,7 @@ export const MyRegistrationCard: React.FC<MyRegistrationCardProps> = ({
   onEditByocPress,
   onPressCard
 }) => {
+  const [isQrZoomed, setIsQrZoomed] = useState(false);
   const contest = registration.contest;
   if (!contest) return null;
 
@@ -151,7 +152,7 @@ export const MyRegistrationCard: React.FC<MyRegistrationCardProps> = ({
       {/* Detail Grid */}
       <View className="my-3 space-y-2">
         <View className="flex-row justify-between items-center">
-          <Text className="text-xs font-semibold text-gray-500 dark:text-slate-450">Hình thức xe:</Text>
+          <Text className="text-xs font-semibold text-gray-500 dark:text-slate-400">Hình thức xe:</Text>
           <Text className="text-xs font-bold text-gray-800 dark:text-slate-200">
             {registration.vehicle_source === 'RENTAL' ? 'Thuê xe của cơ sở' : 'Xe cá nhân tự mang (BYOC)'}
           </Text>
@@ -159,7 +160,7 @@ export const MyRegistrationCard: React.FC<MyRegistrationCardProps> = ({
 
         {registration.vehicle_source === 'BYOC' && registration.metadata?.byoc_declaration && (
           <View className="flex-row justify-between items-center">
-            <Text className="text-xs font-semibold text-gray-500 dark:text-slate-450">Xe đăng ký:</Text>
+            <Text className="text-xs font-semibold text-gray-500 dark:text-slate-400">Xe đăng ký:</Text>
             <Text className="text-xs font-bold text-gray-800 dark:text-slate-200" numberOfLines={1}>
               {registration.metadata.byoc_declaration.vehicle_brand} - {registration.metadata.byoc_declaration.vehicle_name}
             </Text>
@@ -167,14 +168,14 @@ export const MyRegistrationCard: React.FC<MyRegistrationCardProps> = ({
         )}
 
         <View className="flex-row justify-between items-center">
-          <Text className="text-xs font-semibold text-gray-500 dark:text-slate-450">Lệ phí giải:</Text>
+          <Text className="text-xs font-semibold text-gray-500 dark:text-slate-400">Lệ phí giải:</Text>
           <Text className="text-xs font-extrabold text-gray-800 dark:text-slate-200">
             {contest.entry_fee === 0 ? 'Miễn phí' : `${contest.entry_fee.toLocaleString('vi-VN')} VND`}
           </Text>
         </View>
 
         <View className="flex-row justify-between items-center">
-          <Text className="text-xs font-semibold text-gray-500 dark:text-slate-450">Trạng thái phí:</Text>
+          <Text className="text-xs font-semibold text-gray-500 dark:text-slate-400">Trạng thái phí:</Text>
           <Text className={`text-xs ${getPaymentStatusColor(registration.payment_status)}`}>
             {getPaymentStatusText(registration.payment_status)}
           </Text>
@@ -184,10 +185,12 @@ export const MyRegistrationCard: React.FC<MyRegistrationCardProps> = ({
       {/* QR Code and checkInCode (Only when confirmed or checked in) */}
       {registration.status !== 'CANCELLED' && (
         <View className="my-2 items-center justify-center rounded-xl bg-gray-50 dark:bg-slate-900/30 p-4 border border-gray-100/60 dark:border-slate-800/80">
-          <Image
-            source={{ uri: qrCodeUrl }}
-            className="h-32 w-32 mb-2 bg-white p-1 rounded-lg"
-          />
+          <TouchableOpacity activeOpacity={0.8} onPress={() => setIsQrZoomed(true)}>
+            <Image
+              source={{ uri: qrCodeUrl }}
+              className="h-32 w-32 mb-2 bg-white p-1 rounded-lg"
+            />
+          </TouchableOpacity>
           <View className="flex-row items-center">
             <QrCode size={14} color="#94a3b8" style={{ marginRight: 4 }} />
             <Text className="text-xs font-extrabold tracking-wider text-gray-700 dark:text-slate-350">
@@ -195,13 +198,60 @@ export const MyRegistrationCard: React.FC<MyRegistrationCardProps> = ({
             </Text>
           </View>
           <Text className="text-[10px] font-medium text-gray-400 dark:text-slate-500 mt-1">
-            Đưa mã này cho nhân viên quét điểm danh ngày thi đấu
+            Nhấn vào mã QR để phóng to
           </Text>
         </View>
       )}
 
+      {/* Modal Zoom QR */}
+      <Modal visible={isQrZoomed} transparent animationType="fade" onRequestClose={() => setIsQrZoomed(false)}>
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={() => setIsQrZoomed(false)}
+          className="flex-1 bg-black/85 justify-center items-center p-6"
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            className="bg-white dark:bg-[#0f172a] rounded-3xl p-6 items-center shadow-xl border border-gray-100 dark:border-slate-800/85 w-[85%] max-w-[340px]"
+          >
+            {/* Header / Title */}
+            <Text className="text-sm font-extrabold text-gray-900 dark:text-white mb-4 text-center">
+              Mã QR Check-in
+            </Text>
+            
+            {/* Large QR Image */}
+            <Image
+              source={{ uri: qrCodeUrl }}
+              className="h-64 w-64 bg-white p-2 rounded-2xl mb-4"
+              resizeMode="contain"
+            />
+            
+            {/* Check-in Code */}
+            <Text className="text-xs font-extrabold tracking-widest text-orange-600 dark:text-orange-500 mb-2 uppercase text-center">
+              {registration.check_in_code}
+            </Text>
+            
+            {/* Help text */}
+            <Text className="text-[10px] font-semibold text-gray-400 dark:text-slate-500 text-center mb-5 leading-normal">
+              Đưa mã QR này cho nhân viên quầy quét để thực hiện điểm danh và nhận xe
+            </Text>
+            
+            {/* Close Button */}
+            <TouchableOpacity 
+              activeOpacity={0.8}
+              onPress={() => setIsQrZoomed(false)}
+              className="w-full bg-gray-100 dark:bg-slate-800 py-3 rounded-xl items-center"
+            >
+              <Text className="text-xs font-bold text-gray-700 dark:text-slate-200">
+                Đóng
+              </Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
       {/* Action Buttons */}
-      <View className="flex-row gap-2 mt-2">
+      <View className="flex-row gap-2 mt-2 items-center">
         {/* Nút sửa xe BYOC */}
         {canEditByoc && (
           <TouchableOpacity
@@ -226,15 +276,20 @@ export const MyRegistrationCard: React.FC<MyRegistrationCardProps> = ({
           </TouchableOpacity>
         )}
 
-        {/* Nút hủy */}
+        {/* Spacer để đẩy nút Hủy sang phải khi không có nút nào khác */}
+        {canCancel && !canEditByoc && !showPayButton && (
+          <View className="flex-1" />
+        )}
+
+        {/* Nút hủy - luôn nằm bên phải */}
         {canCancel && (
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={showCancelConfirm}
-            className="flex-row items-center justify-center rounded-xl border border-red-100 bg-red-50/50 px-4 py-2.5"
+            className="flex-row items-center justify-center rounded-xl bg-red-600 px-4 py-2.5"
           >
-            <Trash2 size={14} color="#ef4444" style={{ marginRight: 4 }} />
-            <Text className="text-xs font-bold text-red-500">Hủy</Text>
+            <Trash2 size={14} color="#ffffff" style={{ marginRight: 4 }} />
+            <Text className="text-xs font-bold text-white">Hủy</Text>
           </TouchableOpacity>
         )}
       </View>
