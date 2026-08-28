@@ -7,12 +7,13 @@ interface TournamentBracketProps {
   matches: ContestMatch[];
   onMatchPress?: (match: ContestMatch) => void;
   isDark?: boolean;
+  myRegistrationId?: string;
 }
 
 const MARGIN_LEFT = 16;
 const MARGIN_TOP = 20;
 
-export const TournamentBracket: React.FC<TournamentBracketProps> = ({ matches, onMatchPress, isDark = false }) => {
+export const TournamentBracket: React.FC<TournamentBracketProps> = ({ matches, onMatchPress, isDark = false, myRegistrationId }) => {
   const { width: windowWidth } = useWindowDimensions();
   const [selectedMatch, setSelectedMatch] = useState<ContestMatch | null>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
@@ -100,8 +101,16 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ matches, o
       const colX = MARGIN_LEFT + (r - 1) * (nodeWidth + columnGap);
 
       rMatches.forEach((match) => {
-        const sourceMatch1 = prevRoundMatches.find((m) => m.next_match_id === match.id || m.match_no === match.match_no * 2 - 1);
-        const sourceMatch2 = prevRoundMatches.find((m) => m.next_match_id === match.id || m.match_no === match.match_no * 2);
+        const sources = prevRoundMatches.filter((m) => m.next_match_id === match.id);
+        let sourceMatch1: ContestMatch | undefined = sources[0];
+        let sourceMatch2: ContestMatch | undefined = sources[1];
+
+        if (!sourceMatch1) {
+          sourceMatch1 = prevRoundMatches.find((m) => m.match_no === match.match_no * 2 - 1);
+        }
+        if (!sourceMatch2) {
+          sourceMatch2 = prevRoundMatches.find((m) => m.match_no === match.match_no * 2);
+        }
 
         let y = MARGIN_TOP;
         if (sourceMatch1 && sourceMatch2 && coords[sourceMatch1.id] && coords[sourceMatch2.id]) {
@@ -248,6 +257,17 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ matches, o
                       const isBye = match.metadata?.bye;
                       const isLive = match.status === 'RUNNING';
 
+                      const isMeP1 = Boolean(
+                        myRegistrationId &&
+                        p1 &&
+                        (p1.registration_id === myRegistrationId || p1.registration?.id === myRegistrationId)
+                      );
+                      const isMeP2 = Boolean(
+                        myRegistrationId &&
+                        p2 &&
+                        (p2.registration_id === myRegistrationId || p2.registration?.id === myRegistrationId)
+                      );
+
                       const cardBorderColor = isLive ? '#ea580c' : (isDark ? '#334155' : '#e2e8f0');
                       const cardBgColor = isDark ? '#1e293b' : '#ffffff';
 
@@ -311,6 +331,30 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ matches, o
                           {p1?.is_winner && (
                             <SvgText x={nodeWidth - 14} y={p1Y + rowHeight - 4} fontSize="8">🏆</SvgText>
                           )}
+                          {isMeP1 && (
+                            <G>
+                              <Rect
+                                x={nodeWidth - (p1?.is_winner ? 34 : 22)}
+                                y={p1Y + rowHeight - 11}
+                                width="18"
+                                height="8.5"
+                                rx="2"
+                                ry="2"
+                                fill="#fff7ed"
+                                stroke="#ea580c"
+                                strokeWidth="0.5"
+                              />
+                              <SvgText
+                                x={nodeWidth - (p1?.is_winner ? 31 : 19)}
+                                y={p1Y + rowHeight - 4}
+                                fontSize="6"
+                                fontWeight="bold"
+                                fill="#ea580c"
+                              >
+                                Bạn
+                              </SvgText>
+                            </G>
+                          )}
 
                           <Path d={`M 4 ${separator2Y} H ${nodeWidth - 4}`} stroke={isDark ? '#0f172a' : '#f1f5f9'} strokeWidth="1" />
 
@@ -334,6 +378,30 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ matches, o
                           </SvgText>
                           {p2?.is_winner && (
                             <SvgText x={nodeWidth - 14} y={p2Y + rowHeight - 4} fontSize="8">🏆</SvgText>
+                          )}
+                          {isMeP2 && (
+                            <G>
+                              <Rect
+                                x={nodeWidth - (p2?.is_winner ? 34 : 22)}
+                                y={p2Y + rowHeight - 11}
+                                width="18"
+                                height="8.5"
+                                rx="2"
+                                ry="2"
+                                fill="#fff7ed"
+                                stroke="#ea580c"
+                                strokeWidth="0.5"
+                              />
+                              <SvgText
+                                x={nodeWidth - (p2?.is_winner ? 31 : 19)}
+                                y={p2Y + rowHeight - 4}
+                                fontSize="6"
+                                fontWeight="bold"
+                                fill="#ea580c"
+                              >
+                                Bạn
+                              </SvgText>
+                            </G>
                           )}
                         </G>
                       );
@@ -400,6 +468,17 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ matches, o
                     const isBye = match.metadata?.bye;
                     const isLive = match.status === 'RUNNING';
 
+                    const isMeP1 = Boolean(
+                      myRegistrationId &&
+                      p1 &&
+                      (p1.registration_id === myRegistrationId || p1.registration?.id === myRegistrationId)
+                    );
+                    const isMeP2 = Boolean(
+                      myRegistrationId &&
+                      p2 &&
+                      (p2.registration_id === myRegistrationId || p2.registration?.id === myRegistrationId)
+                    );
+
                     const cardBorderColor = isLive ? '#ea580c' : (isDark ? '#334155' : '#e2e8f0');
                     const cardBgColor = isDark ? '#1e293b' : '#ffffff';
 
@@ -463,6 +542,30 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ matches, o
                         {p1?.is_winner && (
                           <SvgText x={nodeWidth - 14} y={p1Y + rowHeight - 4} fontSize="8">🏆</SvgText>
                         )}
+                        {isMeP1 && (
+                          <G>
+                            <Rect
+                              x={nodeWidth - (p1?.is_winner ? 34 : 22)}
+                              y={p1Y + rowHeight - 11}
+                              width="18"
+                              height="8.5"
+                              rx="2"
+                              ry="2"
+                              fill="#fff7ed"
+                              stroke="#ea580c"
+                              strokeWidth="0.5"
+                            />
+                            <SvgText
+                              x={nodeWidth - (p1?.is_winner ? 31 : 19)}
+                              y={p1Y + rowHeight - 4}
+                              fontSize="6"
+                              fontWeight="bold"
+                              fill="#ea580c"
+                            >
+                              Bạn
+                            </SvgText>
+                          </G>
+                        )}
 
                         <Path d={`M 4 ${separator2Y} H ${nodeWidth - 4}`} stroke={isDark ? '#0f172a' : '#f1f5f9'} strokeWidth="1" />
 
@@ -486,6 +589,30 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ matches, o
                         </SvgText>
                         {p2?.is_winner && (
                           <SvgText x={nodeWidth - 14} y={p2Y + rowHeight - 4} fontSize="8">🏆</SvgText>
+                        )}
+                        {isMeP2 && (
+                          <G>
+                            <Rect
+                              x={nodeWidth - (p2?.is_winner ? 34 : 22)}
+                              y={p2Y + rowHeight - 11}
+                              width="18"
+                              height="8.5"
+                              rx="2"
+                              ry="2"
+                              fill="#fff7ed"
+                              stroke="#ea580c"
+                              strokeWidth="0.5"
+                            />
+                            <SvgText
+                              x={nodeWidth - (p2?.is_winner ? 31 : 19)}
+                              y={p2Y + rowHeight - 4}
+                              fontSize="6"
+                              fontWeight="bold"
+                              fill="#ea580c"
+                            >
+                              Bạn
+                            </SvgText>
+                          </G>
                         )}
                       </G>
                     );
@@ -548,6 +675,11 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ matches, o
               const p1 = selectedMatch?.participants.find((p) => p.slot_no === 1);
               const p1Name = p1 ? (p1.registration?.participant_name || p1.registration?.driver_handle || 'Ẩn danh') : 'Chờ vòng trước';
               const p1Avatar = p1?.registration?.participant_avatar_url || null;
+              const isMeP1 = Boolean(
+                myRegistrationId &&
+                p1 &&
+                (p1.registration_id === myRegistrationId || p1.registration?.id === myRegistrationId)
+              );
 
               return (
                 <View className={`flex-row items-center p-3 mb-3 rounded-2xl border ${
@@ -584,6 +716,12 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ matches, o
                       <Text className="text-[9px] font-extrabold text-amber-700 dark:text-amber-400">THẮNG</Text>
                     </View>
                   )}
+                  {/* Bạn badge */}
+                  {isMeP1 && (
+                    <View className="bg-orange-100 dark:bg-orange-500/20 px-2.5 py-1 rounded-lg flex-row items-center gap-1 ml-1.5 border border-orange-200/60 dark:border-orange-500/20">
+                      <Text className="text-[9px] font-extrabold text-orange-700 dark:text-orange-400">BẠN</Text>
+                    </View>
+                  )}
                 </View>
               );
             })()}
@@ -594,6 +732,11 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ matches, o
               const isBye = selectedMatch?.metadata?.bye;
               const p2Name = p2 ? (p2.registration?.participant_name || p2.registration?.driver_handle || 'Ẩn danh') : (isBye ? 'Không có đối thủ' : 'Chờ vòng trước');
               const p2Avatar = p2?.registration?.participant_avatar_url || null;
+              const isMeP2 = Boolean(
+                myRegistrationId &&
+                p2 &&
+                (p2.registration_id === myRegistrationId || p2.registration?.id === myRegistrationId)
+              );
 
               return (
                 <View className={`flex-row items-center p-3 rounded-2xl border ${
@@ -628,6 +771,12 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ matches, o
                     <View className="bg-amber-100 dark:bg-amber-500/20 px-2 py-1 rounded-lg flex-row items-center gap-1">
                       <Text className="text-xs">🏆</Text>
                       <Text className="text-[9px] font-extrabold text-amber-700 dark:text-amber-400">THẮNG</Text>
+                    </View>
+                  )}
+                  {/* Bạn badge */}
+                  {isMeP2 && (
+                    <View className="bg-orange-100 dark:bg-orange-500/20 px-2.5 py-1 rounded-lg flex-row items-center gap-1 ml-1.5 border border-orange-200/60 dark:border-orange-500/20">
+                      <Text className="text-[9px] font-extrabold text-orange-700 dark:text-orange-400">BẠN</Text>
                     </View>
                   )}
                 </View>
