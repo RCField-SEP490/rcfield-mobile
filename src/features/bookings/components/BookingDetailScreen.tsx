@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import {
   Calendar,
   Clock,
@@ -29,6 +29,7 @@ import {
   Platform,
   AppState,
   AppStateStatus,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useColorScheme } from 'nativewind';
@@ -231,9 +232,11 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
     }
   }, [bookingId]);
 
-  useEffect(() => {
-    loadBookingDetail();
-  }, [loadBookingDetail]);
+  useFocusEffect(
+    useCallback(() => {
+      loadBookingDetail();
+    }, [loadBookingDetail])
+  );
 
   // Lưu ref của booking để so khớp trong callback websocket mà không cần re-subscribe
   const bookingRef = useRef<any>(null);
@@ -539,18 +542,46 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
   const totalCounterServiceBill = counterComponents.reduce((sum: number, c: any) => sum + Number(c.amount), 0);
   const totalCounterBill = totalCounterServiceBill + damageExceedingDeposit;
 
+  const pendingAdditionalAmount = onsiteComponents
+    .filter((c: any) => c.status === 'PENDING')
+    .reduce((sum: number, c: any) => sum + Number(c.amount), 0);
+
   const isPaid = !booking.payment_components?.some((c: any) => c.status === 'PENDING');
 
-  const transactions = booking.payment_transactions ?? [];
-  const gatewayLabel = (gateway: string) =>
-    gateway === 'DIRECT' ? 'Tiền mặt' : gateway === 'MOCK' ? 'DEV Mock' : 'VNPay Online';
+  const approvedExtensions = sessionDetail?.approvedExtensions ?? [];
+  const totalMinutes = approvedExtensions.reduce((sum: number, ext: any) => sum + Number(ext.extraMinutes), 0);
+  const totalFee = approvedExtensions.reduce((sum: number, ext: any) => sum + Number(ext.additionalFee), 0);
 
-  const prepaidTx = transactions.find((t: any) => t.type === 'PAYMENT' && t.gateway !== 'DIRECT' && t.status === 'SUCCESS');
-  const counterTx = transactions.find((t: any) => t.type === 'PAYMENT' && t.gateway === 'DIRECT' && t.status === 'SUCCESS');
-  const successfulVnpayTxs = transactions.filter(
-    (t: any) => t.type === 'PAYMENT' && t.gateway !== 'DIRECT' && t.status === 'SUCCESS'
+  const initialEnd = booking?.slotEnd ? new Date(new Date(booking.slotEnd).getTime() - totalMinutes * 60_000) : null;
+  const auditRows = approvedExtensions.reduce((rows: any[], extension: any) => {
+    const precedingEnd = rows.length > 0 ? rows[rows.length - 1].nextEnd : initialEnd;
+    const previousEnd = precedingEnd && !isNaN(precedingEnd.getTime()) ? new Date(precedingEnd) : null;
+    const nextEnd = previousEnd ? new Date(previousEnd.getTime() + Number(extension.extraMinutes) * 60_000) : null;
+    return [...rows, { extension, previousEnd, nextEnd }];
+  }, []);
+
+  const transactions = booking.payment_transactions ?? [];
+  const gatewayLabel = (gateway?: string | null) => {
+    if (!gateway) return 'Online';
+    const gw = String(gateway).toUpperCase();
+    if (gw === 'DIRECT') return 'Tiền mặt tại quầy';
+    if (gw === 'BANK_TRANSFER' || gw === 'VIETQR') return 'VietQR';
+    if (gw === 'VNPAY') return 'VNPay Online';
+    if (gw === 'MOCK') return 'DEV Mock';
+    if (gw === 'PACKAGE') return 'Gói hội viên';
+    return gateway;
+  };
+
+  const prepaidTx = transactions.find(
+    (t: any) => t.type === 'PAYMENT' && t.gateway !== 'DIRECT' && (t.status === 'SUCCESS' || t.status === 'COMPLETED' || t.status === 'PAID')
   );
-  const additionalVnpayTx = successfulVnpayTxs.length > 1 ? successfulVnpayTxs[successfulVnpayTxs.length - 1] : undefined;
+  const counterTx = transactions.find(
+    (t: any) => t.type === 'PAYMENT' && t.gateway === 'DIRECT' && (t.status === 'SUCCESS' || t.status === 'COMPLETED' || t.status === 'PAID')
+  );
+  const successfulPrepaidTxs = transactions.filter(
+    (t: any) => t.type === 'PAYMENT' && t.gateway !== 'DIRECT' && (t.status === 'SUCCESS' || t.status === 'COMPLETED' || t.status === 'PAID')
+  );
+  const additionalPrepaidTx = successfulPrepaidTxs.length > 1 ? successfulPrepaidTxs[successfulPrepaidTxs.length - 1] : undefined;
 
   return (
     <SafeAreaView className="flex-grow flex-1 bg-[#f8fafc] dark:bg-[#0b0f19]" edges={['top', 'left', 'right']}>
@@ -562,7 +593,13 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
       <View className="px-5 pt-3 pb-4 flex-row items-center justify-between border-b border-slate-200 dark:border-slate-800/80 bg-white dark:bg-[#0b0f19]">
         <Pressable
           className="size-9 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 justify-center items-center active:bg-slate-100 dark:active:bg-slate-800"
-          onPress={() => router.back()}
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/(tabs)/bookings');
+            }
+          }}
         >
           <ArrowLeft color={colorScheme === 'dark' ? '#ffffff' : '#475569'} size={18} />
         </Pressable>
@@ -570,7 +607,18 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
         <View className="size-9" />
       </View>
 
-      <ScrollView contentContainerClassName="px-5 py-5 pb-12" showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerClassName="px-5 py-5 pb-12"
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={loading}
+            onRefresh={loadBookingDetail}
+            colors={['#ea580c']}
+            tintColor={colorScheme === 'dark' ? '#ffffff' : '#ea580c'}
+          />
+        }
+      >
 
         {/* Mã QR Code Check-in — dùng endpoint BE /bookings/:id/qr (Hiển thị ở tất cả các bước/trạng thái) */}
         <View className="items-center mb-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-6 shadow-xl">
@@ -727,7 +775,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
           </View>
         ) : null}
 
-        {(booking.status === 'COMPLETED' || session?.status === 'COMPLETED') ? (
+        {((booking.status === 'COMPLETED' || session?.status === 'COMPLETED') && !booking.review) ? (
           <View className="mb-6 rounded-2xl border border-[#fde68a] dark:border-[#451a03]/50 bg-[#fffbeb] dark:bg-[#1c1912] p-4 shadow-sm">
             <View className="flex-row items-start gap-3">
               <Star color="#d97706" fill="#d97706" size={20} style={{ marginTop: 2 }} />
@@ -749,6 +797,38 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                 Đánh giá ngay
               </Text>
             </Pressable>
+          </View>
+        ) : null}
+
+        {((booking.status === 'COMPLETED' || session?.status === 'COMPLETED') && booking.review) ? (
+          <View className="mb-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-4 shadow-sm">
+            <View className="flex-row items-start gap-3">
+              <Star color="#eab308" fill="#eab308" size={20} style={{ marginTop: 2 }} />
+              <View className="flex-1">
+                <Text className="text-slate-900 dark:text-white text-[14px]" weight="700">
+                  Đánh giá của bạn
+                </Text>
+                <View className="flex-row items-center gap-0.5 mt-1">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Star
+                      key={i}
+                      color="#eab308"
+                      fill={i < booking.review.overallScore ? '#eab308' : 'transparent'}
+                      size={12}
+                    />
+                  ))}
+                </View>
+                {booking.review.note ? (
+                  <Text className="mt-2 text-xs leading-4 text-slate-600 dark:text-slate-300 font-medium">
+                    {`"${booking.review.note}"`}
+                  </Text>
+                ) : (
+                  <Text className="mt-2 text-xs leading-4 text-slate-400 italic">
+                    Bạn không để lại bình luận.
+                  </Text>
+                )}
+              </View>
+            </View>
           </View>
         ) : null}
         <View className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-5 shadow-xl mb-6">
@@ -962,6 +1042,52 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
           </View>
         </View>
 
+        {/* Lịch sử gia hạn giờ chơi */}
+        {approvedExtensions.length > 0 && (
+          <View className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-5 shadow-xl mb-6">
+            <View className="flex-row items-start justify-between mb-4 border-b border-slate-200 dark:border-slate-800/80 pb-3">
+              <View className="flex-1 flex-row items-center gap-2">
+                <Clock color="#f97316" size={16} />
+                <Text className="text-[12px] font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                  Lịch sử gia hạn giờ chơi
+                </Text>
+              </View>
+              <View className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 items-end">
+                <Text className="text-[9px] font-black text-emerald-550 dark:text-emerald-400 uppercase tracking-wide">Đã gia hạn</Text>
+                <Text className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">+{totalMinutes} phút · {totalFee.toLocaleString('vi-VN')}đ</Text>
+              </View>
+            </View>
+
+            <View className="space-y-3">
+              {auditRows.map(({ extension, previousEnd, nextEnd }: any, index: number) => (
+                <View key={extension.proposalId || index} className="rounded-xl border border-slate-100 dark:border-slate-900 bg-slate-50 dark:bg-slate-950/40 p-3.5">
+                  <View className="flex-row justify-between items-center">
+                    <View className="flex-row items-center gap-1.5">
+                      <CheckCircle2 color="#10b981" size={14} />
+                      <Text className="text-slate-900 dark:text-white text-xs font-bold">
+                        Lần {index + 1}: thêm {extension.extraMinutes} phút
+                      </Text>
+                    </View>
+                    <Text className="text-[#f97316] text-xs font-bold">
+                      +{Number(extension.additionalFee).toLocaleString('vi-VN')}đ
+                    </Text>
+                  </View>
+                  <View className="mt-1.5 flex-row flex-wrap gap-x-3 gap-y-1">
+                    {previousEnd && nextEnd && (
+                      <Text className="text-slate-550 dark:text-slate-400 text-[10px] font-semibold">
+                        Khung giờ: {formatTimeOnlyStep(previousEnd)} → {formatTimeOnlyStep(nextEnd)}
+                      </Text>
+                    )}
+                    <Text className="text-slate-550 dark:text-slate-400 text-[10px] font-semibold">
+                      Chấp thuận lúc {formatDateTimeStep(extension.approvedAt)}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
         {/* Danh sách người tham gia (Companions) */}
         {booking.participants && booking.participants.length > 0 && (
           <View className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-5 shadow-xl mb-6">
@@ -1042,7 +1168,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
             <View className="flex-row items-center gap-2 mb-3.5 border-b border-slate-200 dark:border-slate-800/80 pb-2">
               <Camera color="#f97316" size={16} />
               <Text className="text-[12px] font-bold text-slate-900 dark:text-white uppercase tracking-wider">
-                Đối chiếu bàn giao xe (Side-by-Side)
+                {booking.playMode === 'BYOC' ? 'Ảnh xe bàn giao Check-in' : 'Đối chiếu bàn giao xe (Side-by-Side)'}
               </Text>
             </View>
 
@@ -1052,7 +1178,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                 {renderPhotoGrid(checkInPhotos, 'Ảnh bàn giao Check-in')}
 
                 {/* Check-out Photos Grid */}
-                {renderPhotoGrid(checkOutPhotos, 'Ảnh bàn giao Check-out')}
+                {booking.playMode !== 'BYOC' && renderPhotoGrid(checkOutPhotos, 'Ảnh bàn giao Check-out')}
               </View>
               {sessionDetail?.damageNotes && (
                 <View className="rounded-lg bg-red-500/5 border border-red-500/10 p-2.5">
@@ -1073,16 +1199,22 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
             </Text>
           </View>
 
-          {/* Block 1: Trả trước qua cổng VNPAY */}
+          {/* Block 1: Trả trước qua cổng thanh toán */}
           <View className="space-y-3">
             <View className="flex-row items-center gap-2">
-              <CheckCircle2 color="#10b981" size={15} />
-              <Text className="text-[#10b981] text-xs font-bold uppercase tracking-wide">
+              <CheckCircle2 color={booking.status === 'PENDING' ? '#f59e0b' : '#10b981'} size={15} />
+              <Text
+                className={`text-xs font-bold uppercase tracking-wide ${
+                  booking.status === 'PENDING' ? 'text-amber-500' : 'text-[#10b981]'
+                }`}
+              >
                 {booking.status === 'PENDING'
-                  ? 'Sẽ thanh toán qua VNPAY'
+                  ? 'Chờ thanh toán'
                   : prepaidTx
                     ? `Đã trả qua ${gatewayLabel(prepaidTx.gateway)}`
-                    : 'Đã trả qua VNPAY'}
+                    : (booking.selected_package_id || booking.package_id)
+                      ? 'Đã trả qua Gói hội viên'
+                      : 'Đã thanh toán'}
               </Text>
             </View>
 
@@ -1157,9 +1289,20 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                     label = extraMins ? `Phí gia hạn giờ (+${extraMins} phút)` : 'Phí gia hạn giờ';
                   }
                   if (c.type === 'FB_PREORDER' || c.type === 'FNB_PREORDER') label = 'F&B gọi thêm tại quầy';
+                  
+                  const isPaidComp = c.status !== 'PENDING';
+
                   return (
-                    <View key={c.id || idx} className="flex-row justify-between">
-                      <Text className="text-slate-500 dark:text-slate-400 text-xs font-semibold">{label}</Text>
+                    <View key={c.id || idx} className="flex-row justify-between items-start">
+                      <View className="flex-1 pr-2">
+                        <Text className="text-slate-500 dark:text-slate-400 text-xs font-semibold">{label}</Text>
+                        <Text className={cn(
+                          "text-[10px] font-bold mt-0.5",
+                          isPaidComp ? "text-emerald-500" : "text-amber-500"
+                        )}>
+                          {isPaidComp ? "Đã thanh toán" : "Chờ thanh toán"}
+                        </Text>
+                      </View>
                       <Text className="text-rose-400 text-xs font-bold">+{Number(c.amount).toLocaleString('vi-VN')}đ</Text>
                     </View>
                   );
@@ -1225,15 +1368,24 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
             </View>
           )}
 
+          {/* Tổng số tiền của cả hóa đơn */}
+          <View className="w-full h-[1px] bg-slate-200 dark:bg-slate-800/60 my-4" />
+          <View className="flex-row justify-between items-center mb-1">
+            <Text className="text-slate-900 dark:text-white text-xs font-bold uppercase tracking-wide">Tổng số tiền</Text>
+            <Text className="text-[#f97316] text-base font-black">
+              {((totalPrepaid ?? 0) + (totalCounterBill ?? 0) - (depositRefundAmount ?? 0)).toLocaleString('vi-VN')}đ
+            </Text>
+          </View>
+
           {/* Block 3: Trạng thái quyết toán nợ phát sinh */}
           {totalCounterBill > 0 && (
-            <View className="mt-5 pt-4 border-t border-slate-200 dark:border-slate-800/80">
+            <View className="mt-4">
               {!isPaid ? (
                 <View className="space-y-3">
                   <View className="rounded-xl bg-amber-500/5 border border-amber-500/10 p-3 flex-row items-center gap-2">
                     <AlertTriangle color="#f59e0b" size={16} />
                     <Text className="text-amber-500 text-xs font-semibold flex-1">
-                      Còn <Text className="font-bold text-amber-400">{totalCounterBill.toLocaleString('vi-VN')}đ</Text> phí phát sinh chưa thanh toán.
+                      Còn <Text className="font-bold text-amber-400">{pendingAdditionalAmount.toLocaleString('vi-VN')}đ</Text> phí phát sinh chưa thanh toán.
                     </Text>
                   </View>
                   <Pressable
@@ -1256,9 +1408,9 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                   <CheckCircle2 color="#10b981" size={16} />
                   <Text className="text-emerald-400 text-xs font-bold">
                     Đã thanh toán đầy đủ
-                    {(counterTx || additionalVnpayTx) && (
+                    {(counterTx || additionalPrepaidTx) && (
                       <Text className="font-semibold text-[11px] text-[#10b981]">
-                        {` · ${gatewayLabel((counterTx ?? additionalVnpayTx)!.gateway)}`}
+                        {` · ${gatewayLabel((counterTx ?? additionalPrepaidTx)!.gateway)}`}
                       </Text>
                     )}
                   </Text>

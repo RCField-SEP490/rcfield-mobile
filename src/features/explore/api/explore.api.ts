@@ -149,24 +149,54 @@ export async function listCafeImages(cafeId: string): Promise<string[]> {
   }
 }
 
-export async function listCafeReviews(cafeId: string): Promise<Review[]> {
+export interface CafeReviewsResponse {
+  data: Review[];
+  total: number;
+  aggregate: {
+    reviewCount: number;
+    overallAvg: number | null;
+    vehicleAvg: number | null;
+    staffAvg: number | null;
+    facilityAvg: number | null;
+  } | null;
+}
+
+export async function listCafeReviews(cafeId: string): Promise<CafeReviewsResponse> {
   try {
     const response = await api.get(`/cafes/${cafeId}/reviews`);
     const reviewsData = response.data?.data || [];
-    return reviewsData.map((rev: any): Review => ({
+    const aggregate = response.data?.aggregate || null;
+
+    const reviews = reviewsData.map((rev: any): Review => ({
       id: rev.id,
-      rating: toNumber(rev.rating),
-      comment: rev.comment || '',
-      createdAt: rev.createdAt || rev.created_at || '',
-      user: rev.user ? {
-        fullName: rev.user.fullName || rev.user.full_name || 'Khách hàng',
-        avatarUrl: rev.user.avatarUrl || rev.user.avatar_url || null,
-      } : null,
-      ownerResponse: rev.ownerResponse || rev.owner_response || null,
+      rating: toNumber(rev.overallScore),
+      comment: rev.note || '',
+      createdAt: rev.createdAt || '',
+      customerId: rev.customerId,
+      user: {
+        fullName: rev.fullName || rev.customerName || 'Khách hàng',
+        avatarUrl: null,
+      },
+      ownerResponse: null,
+      vehicleScore: rev.vehicleScore ? toNumber(rev.vehicleScore) : null,
+      staffScore: rev.staffScore ? toNumber(rev.staffScore) : null,
+      facilityScore: rev.facilityScore ? toNumber(rev.facilityScore) : null,
     }));
+
+    return {
+      data: reviews,
+      total: response.data?.total || reviews.length,
+      aggregate: aggregate ? {
+        reviewCount: toNumber(aggregate.reviewCount),
+        overallAvg: aggregate.overallAvg ? toNumber(aggregate.overallAvg) : null,
+        vehicleAvg: aggregate.vehicleAvg ? toNumber(aggregate.vehicleAvg) : null,
+        staffAvg: aggregate.staffAvg ? toNumber(aggregate.staffAvg) : null,
+        facilityAvg: aggregate.facilityAvg ? toNumber(aggregate.facilityAvg) : null,
+      } : null,
+    };
   } catch (error) {
     console.error('[ExploreAPI] Error fetching cafe reviews:', error);
-    return [];
+    return { data: [], total: 0, aggregate: null };
   }
 }
 
@@ -211,4 +241,37 @@ export async function listActivePromotions(cafeId: string): Promise<ActivePromot
     return [];
   }
 }
+
+export async function listFeaturedPopups(): Promise<any[]> {
+  try {
+    const response = await api.get('/explore/featured-popups');
+    return response.data?.data || [];
+  } catch (error) {
+    console.error('[ExploreAPI] Error fetching featured popups:', error);
+    return [];
+  }
+}
+
+export async function getRecentReviews(limit = 5): Promise<Review[]> {
+  try {
+    const response = await api.get('/reviews/recent', { params: { limit } });
+    const reviewsData = response.data?.data || [];
+    return reviewsData.map((rev: any): Review => ({
+      id: rev.id,
+      rating: toNumber(rev.overallScore || rev.rating),
+      comment: rev.note || rev.comment || '',
+      createdAt: rev.createdAt,
+      customerId: rev.customerId,
+      user: {
+        fullName: rev.fullName || rev.customerName || 'Người chơi',
+        avatarUrl: null,
+      },
+      cafeName: rev.cafeName || '',
+    }));
+  } catch (error) {
+    console.error('[ExploreAPI] Error fetching recent reviews:', error);
+    return [];
+  }
+}
+
 

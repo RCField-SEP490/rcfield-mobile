@@ -259,8 +259,10 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
   );
 
   const isByoc = useMemo(
-    () => !!session?.vehicles?.length && session.vehicles.every((vehicle) => vehicle.type === 'BYOC'),
-    [session?.vehicles]
+    () =>
+      session?.playMode === 'BYOC' ||
+      (!!session?.vehicles?.length && session.vehicles.every((vehicle) => vehicle.type === 'BYOC')),
+    [session?.playMode, session?.vehicles]
   );
   const paymentSummary = session?.paymentSummary;
   const operationalTiming = getSessionOperationalTiming(session?.plannedEnd, session?.status, now);
@@ -688,7 +690,7 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
                 <WalletCards color="#ffffff" size={16} />
               )}
               <Text className="text-[12px] text-white" weight="700">
-                {canSettlePayments ? 'Xử lý thanh toán' : 'Đã thanh toán đầy đủ'}
+                {canSettlePayments ? 'Khách hàng thanh toán bằng tiền mặt' : 'Đã thanh toán đầy đủ'}
               </Text>
             </Pressable>
           </View>
@@ -755,7 +757,7 @@ function SessionOperations({
 }) {
   const canSubmitCheckIn = status === 'CHECKED_IN' && !hasCheckInInspection;
   const canSubmitCheckOut =
-    ['ACTIVE', 'EXTENDING'].includes(status) && (!hasCheckOutInspection || checkOutDisputed);
+    !isByoc && ['ACTIVE', 'EXTENDING'].includes(status) && (!hasCheckOutInspection || checkOutDisputed);
 
   return (
     <View className="mb-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-4 shadow-sm">
@@ -813,9 +815,7 @@ function SessionOperations({
               {checkOutDisputed
                 ? 'Lập lại biên bản trả xe'
                 : operationalTiming.state === 'ON_TIME'
-                  ? isByoc
-                    ? 'Tạo biên bản trả xe khách tự mang'
-                    : 'Tạo biên bản trả xe'
+                  ? 'Tạo biên bản trả xe'
                   : 'Xử lý trả xe'}
             </Text>
           </Pressable>
@@ -846,7 +846,9 @@ function SessionOperations({
 
         {!canSubmitCheckIn && !canSubmitCheckOut && status !== 'CHECKING_OUT' ? (
           <Text className="text-[11px] leading-4 text-slate-500">
-            Không có thao tác kiểm xe cần xử lý ở trạng thái hiện tại.
+            {isByoc
+              ? 'Phiên mang xe cá nhân (BYOC) không yêu cầu lập biên bản trả xe.'
+              : 'Không có thao tác kiểm xe cần xử lý ở trạng thái hiện tại.'}
           </Text>
         ) : null}
       </View>

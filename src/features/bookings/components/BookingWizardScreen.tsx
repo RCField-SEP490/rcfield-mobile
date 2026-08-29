@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from 'nativewind';
-import { ChevronLeft, ChevronRight, Trophy } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 
 import { Text } from '@/shared/ui/Text';
@@ -430,7 +430,15 @@ export function BookingWizardScreen({
 
   const navigateToDetail = useCallback(
     (bookingId: string) => {
-      router.replace(`/booking/${bookingId}`);
+      if (!bookingId) {
+        console.warn('[BookingWizard] navigateToDetail called without bookingId, redirecting to /bookings');
+        router.push('/(tabs)/bookings');
+        return;
+      }
+      router.push({
+        pathname: '/booking/[id]',
+        params: { id: bookingId },
+      } as any);
     },
     [router]
   );
@@ -539,14 +547,18 @@ export function BookingWizardScreen({
     const bookingId = bankTransferModalData?.bookingId;
     setBankTransferModalData(null);
     if (bookingId) {
-      navigateToDetail(bookingId);
+      setTimeout(() => {
+        navigateToDetail(bookingId);
+      }, 100);
     }
   }, [bankTransferModalData?.bookingId, navigateToDetail]);
 
   const handleBankTransferSuccess = useCallback(
     (bookingId: string) => {
       setBankTransferModalData(null);
-      navigateToDetail(bookingId);
+      setTimeout(() => {
+        navigateToDetail(bookingId);
+      }, 100);
     },
     [navigateToDetail]
   );
@@ -595,29 +607,7 @@ export function BookingWizardScreen({
               {/* Stepper progress */}
               <StepperBar currentStep={currentStep} />
 
-              {/* Contest Banner */}
-              <View className="mb-4 flex-row items-center justify-between rounded-2xl border border-[#ffedd5] dark:border-[#431407]/40 bg-[#fff7ed] dark:bg-[#1e130c] p-3.5 shadow-sm">
-                <View className="flex-1 flex-row items-start gap-3 mr-2">
-                  <View className="size-9 items-center justify-center rounded-xl border border-orange-200 dark:border-orange-900 bg-white dark:bg-slate-900">
-                    <Trophy color="#f97316" size={16} />
-                  </View>
-                  <View className="flex-1">
-                    <Text className="text-[13px] text-orange-900 dark:text-orange-300 font-bold">
-                      Bạn tham gia giải đấu?
-                    </Text>
-                    <Text className="text-[10px] text-orange-850 dark:text-orange-400 mt-0.5 leading-4 font-semibold">
-                      Thuê xe thi đấu cho contest đang mở – chọn giải, chi nhánh, khung giờ và dòng
-                      xe trong một bước.
-                    </Text>
-                  </View>
-                </View>
-                <Pressable
-                  onPress={() => router.push(`/cafe-detail/${cafeId}`)}
-                  className="h-8 justify-center items-center px-3 rounded-lg border border-orange-200 dark:border-orange-900 bg-white dark:bg-slate-900 active:bg-orange-100/50"
-                >
-                  <Text className="text-[11px] text-[#f97316] font-bold">Thuê xe thi đấu</Text>
-                </Pressable>
-              </View>
+
 
               {/* Steps Container */}
               {currentStep === 1 && (

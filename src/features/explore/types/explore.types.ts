@@ -88,11 +88,16 @@ export interface Review {
   rating: number;
   comment: string;
   createdAt: string;
+  customerId?: string;
   user?: {
     fullName: string;
     avatarUrl?: string | null;
   } | null;
   ownerResponse?: string | null;
+  vehicleScore?: number | null;
+  staffScore?: number | null;
+  facilityScore?: number | null;
+  cafeName?: string;
 }
 
 export interface ActivePromotion {

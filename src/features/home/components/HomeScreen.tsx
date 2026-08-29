@@ -30,9 +30,9 @@ import { Text } from '@/shared/ui/Text';
 import { requestMainTab, createScrollHandler } from '@/shared/ui/main-tab-events';
 import { getMyBookings, type BookingListItem } from '@/features/bookings/api/booking.api';
 import { getMyPackages, type MyPackageResponse } from '@/features/packages/api/package.api';
-import { getCafes } from '@/features/explore/api/explore.api';
+import { getCafes, getRecentReviews } from '@/features/explore/api/explore.api';
 import { NotificationBellButton } from '@/features/notifications/components/NotificationBellButton';
-import type { Cafe } from '@/features/explore/types/explore.types';
+import type { Cafe, Review } from '@/features/explore/types/explore.types';
 
 function getInitials(name: string) {
   return name
@@ -79,29 +79,7 @@ function formatExpiryDate(isoString: string) {
   }
 }
 
-const REVIEWS = [
-  {
-    id: '1',
-    name: 'Hoàng Minh Tuấn',
-    role: 'RC Enthusiast • Hà Nội',
-    content: 'Trước đây tôi phải nhắn tin Facebook để đặt lịch, nhiều khi chờ cả tiếng không thấy rep. Giờ đặt xong là có lịch ngay, còn biết chính xác xe nào mình sẽ dùng.',
-    avatar: 'HT',
-  },
-  {
-    id: '2',
-    name: 'Ngọc Linh',
-    role: 'BYOC Player • TP. HCM',
-    content: 'Tôi hay mang xe riêng đi chơi, tính năng BYOC rất tiện. Đặt chỗ trước, đến nơi check-in là chạy luôn không cần chờ nhân viên sắp xếp.',
-    avatar: 'NL',
-  },
-  {
-    id: '3',
-    name: 'Minh Khoa',
-    role: 'Chạy tuần 2 lần • Đà Nẵng',
-    content: 'Phần kiểm tra xe 4 góc lúc đầu nghĩ phức tạp nhưng thực ra rất nhanh. Và lần đầu tiên tôi không lo ngại khi trả xe vì mọi thứ đã được ghi nhận rõ ràng.',
-    avatar: 'MK',
-  },
-];
+
 
 const STEPS = [
   {
@@ -144,6 +122,7 @@ export function HomeScreen() {
   const [upcomingBooking, setUpcomingBooking] = useState<BookingListItem | null>(null);
   const [activePackages, setActivePackages] = useState<MyPackageResponse[]>([]);
   const [featuredCafes, setFeaturedCafes] = useState<Cafe[]>([]);
+  const [recentReviews, setRecentReviews] = useState<Review[]>([]);
 
   const displayName = user?.fullName ?? user?.email ?? 'Khách hàng';
   const greeting = useMemo(() => getGreeting(), []);
@@ -153,26 +132,38 @@ export function HomeScreen() {
     setLoading(true);
     try {
       if (!isAuthenticated || !isCustomer) {
-        const cafesResult = await getCafes();
+        const [cafesResult, reviewsResult] = await Promise.all([
+          getCafes(),
+          getRecentReviews(5),
+        ]);
         setUpcomingBooking(null);
         setActivePackages([]);
         setFeaturedCafes(cafesResult.slice(0, 5));
+        setRecentReviews(reviewsResult);
         return;
       }
 
-      const [bookingsResult, packagesResult, cafesResult] = await Promise.all([
+      const [bookingsResult, packagesResult, cafesResult, reviewsResult] = await Promise.all([
         getMyBookings({ limit: 10 }),
         getMyPackages('ACTIVE'),
         getCafes(),
+        getRecentReviews(5),
       ]);
 
       const now = new Date();
+      const active = bookingsResult.data.find(
+        (b) => b.session && ['ACTIVE', 'EXTENDING', 'CHECKED_IN', 'CHECKING_OUT'].includes(b.session.status)
+      );
+      const awaitingPayment = bookingsResult.data.find((b) => b.status === 'AWAITING_PAYMENT');
       const upcoming = bookingsResult.data
         .filter((b) => (b.status === 'CONFIRMED' || b.status === 'PENDING') && new Date(b.slotStart) > now)
         .sort((a, b) => new Date(a.slotStart).getTime() - new Date(b.slotStart).getTime())[0] || null;
-      setUpcomingBooking(upcoming);
+
+      const targetBooking = active || awaitingPayment || upcoming;
+      setUpcomingBooking(targetBooking);
       setActivePackages(packagesResult);
       setFeaturedCafes(cafesResult.slice(0, 5));
+      setRecentReviews(reviewsResult);
     } catch (err) {
       console.error('[HomeScreen] Error loading dashboard:', err);
     } finally {
@@ -319,85 +310,207 @@ export function HomeScreen() {
 
           {/* Upcoming Booking / Payment Alert */}
           <View className="mb-6">
-            <Text className="text-[13px] text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2.5 font-bold">
-              Lịch đặt sắp tới
-            </Text>
+            {(() => {
+              if (!upcomingBooking) {
+                return (
+                  <>
+                    <Text className="text-[13px] text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2.5 font-bold">
+                      Lịch đặt sắp tới
+                    </Text>
+                    <View className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/30 p-5 items-center">
+                      <Text className="text-[13px] text-slate-800 dark:text-slate-300 font-bold">Chưa có lịch đặt sân nào</Text>
+                      <Text className="mt-1 text-[11px] text-slate-500 dark:text-slate-400 text-center leading-4 font-semibold text-center">
+                        Tìm sân đua gần bạn và lên lịch chạy ngay hôm nay!
+                      </Text>
+                      <Pressable
+                        onPress={handleNavigateToExplore}
+                        className="mt-3.5 flex-row h-8.5 items-center justify-center rounded-xl bg-[#ea580c] active:bg-[#f97316] px-4 gap-1 shadow-sm"
+                      >
+                        <Text className="text-[11px] text-white" weight="700">
+                          Khám phá sân đua
+                        </Text>
+                        <ArrowRight color="#ffffff" size={12} />
+                      </Pressable>
+                    </View>
+                  </>
+                );
+              }
 
-            {upcomingBooking ? (
-              upcomingBooking.status === 'PENDING' ? (
-                <View className="rounded-2xl border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-950/15 p-4 flex-row gap-3">
-                  <View className="h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 border border-amber-500/20">
-                    <AlertTriangle color="#f59e0b" size={20} />
-                  </View>
-                  <View className="flex-1 pr-2 justify-between">
-                    <View>
-                      <Text className="text-[14px] text-amber-500" weight="700">
-                        Chờ thanh toán
+              const isPending = upcomingBooking.status === 'PENDING';
+              const isAwaitingPayment = upcomingBooking.status === 'AWAITING_PAYMENT';
+              const sessStatus = upcomingBooking.session?.status;
+              const isSessionActive = sessStatus && ['ACTIVE', 'EXTENDING', 'CHECKED_IN', 'CHECKING_OUT'].includes(sessStatus);
+
+              let sectionTitle = 'Lịch đặt sắp tới';
+              if (isSessionActive) sectionTitle = 'Lượt chơi đang diễn ra';
+              else if (isAwaitingPayment) sectionTitle = 'Thanh toán phát sinh';
+
+              const handleNavigateToDetail = () => {
+                router.push({
+                  pathname: '/booking/[id]',
+                  params: { id: upcomingBooking.id },
+                } as any);
+              };
+
+              if (isSessionActive) {
+                let statusLabel = 'Đang chơi';
+                if (sessStatus === 'EXTENDING') statusLabel = 'Đang gia hạn';
+                if (sessStatus === 'CHECKED_IN') statusLabel = 'Đang nhận xe';
+                if (sessStatus === 'CHECKING_OUT') statusLabel = 'Đang trả xe';
+
+                return (
+                  <>
+                    <Text className="text-[13px] text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2.5 font-bold">
+                      {sectionTitle}
+                    </Text>
+                    <Pressable 
+                      onPress={handleNavigateToDetail}
+                      className="rounded-2xl border border-orange-200 dark:border-orange-950 bg-orange-500/5 dark:bg-orange-950/10 p-4 flex-row gap-3 active:opacity-90"
+                    >
+                      <View className="h-10 w-10 items-center justify-center rounded-xl bg-orange-500/10 border border-orange-500/20">
+                        <Gamepad2 color="#f97316" size={20} />
+                      </View>
+                      <View className="flex-1">
+                        <View className="flex-row justify-between items-center">
+                          <Text className="text-[14px] text-orange-600 dark:text-orange-400 font-bold">
+                            {statusLabel}
+                          </Text>
+                          <View className="rounded bg-orange-500/20 px-1.5 py-0.5">
+                            <Text className="text-[9px] text-orange-600 dark:text-orange-400 font-bold">
+                              {upcomingBooking.playMode === 'RENTAL' ? 'Thuê xe' : 'Xe riêng'}
+                            </Text>
+                          </View>
+                        </View>
+                        <Text className="text-[12px] text-slate-500 dark:text-slate-350 mt-1">
+                          Chi nhánh: <Text className="text-slate-800 dark:text-white font-bold">{upcomingBooking.cafe?.name ?? 'RCField Branch'}</Text>
+                        </Text>
+                        <Text className="text-[13px] text-slate-900 dark:text-white mt-1 font-bold">
+                          {formatTimeRange(upcomingBooking.slotStart, upcomingBooking.slotEnd)}
+                        </Text>
+                        <View className="mt-3 flex-row items-center gap-1">
+                          <Text className="text-[12px] text-orange-600 dark:text-orange-400 font-bold">Xem phiên chơi</Text>
+                          <ArrowRight color="#f97316" size={13} />
+                        </View>
+                      </View>
+                    </Pressable>
+                  </>
+                );
+              }
+
+              if (isAwaitingPayment) {
+                return (
+                  <>
+                    <Text className="text-[13px] text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2.5 font-bold">
+                      {sectionTitle}
+                    </Text>
+                    <Pressable 
+                      onPress={handleNavigateToDetail}
+                      className="rounded-2xl border border-rose-200 dark:border-rose-900/40 bg-rose-50 dark:bg-rose-950/15 p-4 flex-row gap-3 active:opacity-90"
+                    >
+                      <View className="h-10 w-10 items-center justify-center rounded-xl bg-rose-500/10 border border-rose-500/20">
+                        <AlertTriangle color="#ef4444" size={20} />
+                      </View>
+                      <View className="flex-1">
+                        <View className="flex-row justify-between items-center">
+                          <Text className="text-[14px] text-rose-600 dark:text-rose-400 font-bold">
+                            Chờ trả thêm
+                          </Text>
+                          <View className="rounded bg-rose-500/20 px-1.5 py-0.5">
+                            <Text className="text-[9px] text-rose-600 dark:text-rose-400 font-bold">
+                              {upcomingBooking.playMode === 'RENTAL' ? 'Thuê xe' : 'Xe riêng'}
+                            </Text>
+                          </View>
+                        </View>
+                        <Text className="text-[11px] text-slate-600 dark:text-rose-500/80 mt-0.5 leading-4 font-semibold">
+                          Phiên chơi kết thúc. Vui lòng thanh toán phí phát sinh để hoàn tất.
+                        </Text>
+                        <Text className="text-[13px] text-slate-900 dark:text-white mt-2 font-bold">
+                          {formatTimeRange(upcomingBooking.slotStart, upcomingBooking.slotEnd)}
+                        </Text>
+                        <View className="mt-3 flex-row items-center gap-1">
+                          <Text className="text-[12px] text-rose-600 dark:text-rose-400 font-bold">Thanh toán ngay</Text>
+                          <ArrowRight color="#ef4444" size={13} />
+                        </View>
+                      </View>
+                    </Pressable>
+                  </>
+                );
+              }
+
+              if (isPending) {
+                return (
+                  <>
+                    <Text className="text-[13px] text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2.5 font-bold">
+                      {sectionTitle}
+                    </Text>
+                    <Pressable 
+                      onPress={handleNavigateToDetail}
+                      className="rounded-2xl border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-950/15 p-4 flex-row gap-3 active:opacity-90"
+                    >
+                      <View className="h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 border border-amber-500/20">
+                        <AlertTriangle color="#f59e0b" size={20} />
+                      </View>
+                      <View className="flex-1 pr-2 justify-between">
+                        <View>
+                          <Text className="text-[14px] text-amber-500" weight="700">
+                            Chờ thanh toán
+                          </Text>
+                          <Text className="text-[11px] text-slate-600 dark:text-amber-500/80 mt-0.5 leading-4 font-semibold">
+                            Lịch đặt của bạn sẽ bị hủy nếu không thanh toán trước khi hết hạn.
+                          </Text>
+                          <Text className="text-[12px] text-slate-800 dark:text-slate-200 mt-2 font-bold">
+                            {formatTimeRange(upcomingBooking.slotStart, upcomingBooking.slotEnd)}
+                          </Text>
+                        </View>
+                        <View className="mt-3 flex-row items-center gap-1">
+                          <Text className="text-[12px] text-amber-600 dark:text-amber-500 font-bold">Thanh toán ngay</Text>
+                          <ArrowRight color="#f59e0b" size={13} />
+                        </View>
+                      </View>
+                    </Pressable>
+                  </>
+                );
+              }
+
+              // CONFIRMED (Sắp diễn ra)
+              return (
+                <>
+                  <Text className="text-[13px] text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2.5 font-bold">
+                    {sectionTitle}
+                  </Text>
+                  <Pressable 
+                    onPress={handleNavigateToDetail}
+                    className="rounded-2xl border border-emerald-200 dark:border-emerald-950 bg-emerald-50 dark:bg-emerald-950/10 p-4 flex-row gap-3 active:opacity-90"
+                  >
+                    <View className="h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                      <Clock color="#10b981" size={20} />
+                    </View>
+                    <View className="flex-1">
+                      <View className="flex-row justify-between items-center">
+                        <Text className="text-[14px] text-emerald-600 dark:text-emerald-400 font-bold">
+                          Sắp diễn ra
+                        </Text>
+                        <View className="rounded bg-emerald-500/20 px-1.5 py-0.5">
+                          <Text className="text-[9px] text-emerald-600 dark:text-emerald-400 font-bold">
+                            {upcomingBooking.playMode === 'RENTAL' ? 'Thuê xe' : 'Xe riêng'}
+                          </Text>
+                        </View>
+                      </View>
+                      <Text className="text-[12px] text-slate-500 dark:text-slate-300 mt-1">
+                        Chi nhánh: <Text className="text-slate-800 dark:text-white font-bold">{upcomingBooking.cafe?.name ?? 'RCField Branch'}</Text>
                       </Text>
-                      <Text className="text-[11px] text-slate-600 dark:text-amber-500/80 mt-0.5 leading-4 font-semibold">
-                        Lịch đặt của bạn sẽ bị hủy nếu không thanh toán trước khi hết hạn.
-                      </Text>
-                      <Text className="text-[12px] text-slate-800 dark:text-slate-200 mt-2 font-bold">
+                      <Text className="text-[13px] text-slate-900 dark:text-white mt-0.5 font-bold">
                         {formatTimeRange(upcomingBooking.slotStart, upcomingBooking.slotEnd)}
                       </Text>
-                    </View>
-                    <Pressable
-                      onPress={handleNavigateToBookings}
-                      className="mt-3 bg-amber-500 rounded-lg py-1.5 px-3 self-start active:bg-amber-600"
-                    >
-                      <Text className="text-[11px] text-[#0f172a] font-bold">Thanh toán ngay</Text>
-                    </Pressable>
-                  </View>
-                </View>
-              ) : (
-                <View className="rounded-2xl border border-emerald-200 dark:border-emerald-950 bg-emerald-50 dark:bg-emerald-950/10 p-4 flex-row gap-3">
-                  <View className="h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-                    <Clock color="#10b981" size={20} />
-                  </View>
-                  <View className="flex-1">
-                    <View className="flex-row justify-between items-center">
-                      <Text className="text-[14px] text-emerald-600 dark:text-emerald-400 font-bold">
-                        Sắp diễn ra
-                      </Text>
-                      <View className="rounded bg-emerald-500/20 px-1.5 py-0.5">
-                        <Text className="text-[9px] text-emerald-600 dark:text-emerald-400 font-bold">
-                          {upcomingBooking.playMode}
-                        </Text>
+                      <View className="mt-3 flex-row items-center gap-1">
+                        <Text className="text-[12px] text-emerald-600 dark:text-emerald-400 font-bold">Xem vé check-in</Text>
+                        <ArrowRight color="#10b981" size={13} />
                       </View>
                     </View>
-                    <Text className="text-[12px] text-slate-500 dark:text-slate-300 mt-1">
-                      Thời gian:
-                    </Text>
-                    <Text className="text-[13px] text-slate-900 dark:text-white mt-0.5 font-bold">
-                      {formatTimeRange(upcomingBooking.slotStart, upcomingBooking.slotEnd)}
-                    </Text>
-                    <Pressable
-                      onPress={handleNavigateToBookings}
-                      className="mt-3 flex-row items-center gap-1 active:opacity-75"
-                    >
-                      <Text className="text-[12px] text-emerald-600 dark:text-emerald-400 font-bold">Xem vé check-in</Text>
-                      <ArrowRight color="#10b981" size={13} />
-                    </Pressable>
-                  </View>
-                </View>
-              )
-            ) : (
-              <View className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/30 p-5 items-center">
-                <Text className="text-[13px] text-slate-800 dark:text-slate-300 font-bold">Chưa có lịch đặt sân nào</Text>
-                <Text className="mt-1 text-[11px] text-slate-500 dark:text-slate-400 text-center leading-4 font-semibold">
-                  Tìm sân đua gần bạn và lên lịch chạy ngay hôm nay!
-                </Text>
-                <Pressable
-                  onPress={handleNavigateToExplore}
-                  className="mt-3.5 flex-row h-8.5 items-center justify-center rounded-xl bg-[#ea580c] active:bg-[#f97316] px-4 gap-1 shadow-sm"
-                >
-                  <Text className="text-[11px] text-white" weight="700">
-                    Khám phá sân đua
-                  </Text>
-                  <ArrowRight color="#ffffff" size={12} />
-                </Pressable>
-              </View>
-            )}
+                  </Pressable>
+                </>
+              );
+            })()}
           </View>
 
           {/* Active Packages (Gói hội viên đang dùng) */}
@@ -519,57 +632,74 @@ export function HomeScreen() {
           </View>
 
           {/* Người chơi nói gì */}
-          <View className="mb-6">
-            <View className="flex-row items-center gap-1.5 mb-2.5">
-              <MessageSquare color="#f97316" size={15} />
-              <Text className="text-[13px] text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold">
-                Người chơi nói gì
-              </Text>
+          {recentReviews.length > 0 && (
+            <View className="mb-6">
+              <View className="flex-row items-center gap-1.5 mb-2.5">
+                <MessageSquare color="#f97316" size={15} />
+                <Text className="text-[13px] text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold">
+                  Người chơi nói gì
+                </Text>
+              </View>
+
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerClassName="gap-3.5"
+                className="py-1"
+              >
+                {recentReviews.map((rev) => {
+                  const reviewerName = rev.user?.fullName || 'Người chơi';
+                  return (
+                    <View
+                      key={rev.id}
+                      className="w-64 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/40 p-4 shadow-sm"
+                    >
+                      {/* Sao đánh giá */}
+                      <View className="flex-row gap-0.5 mb-2">
+                        {[1, 2, 3, 4, 5].map((s) => (
+                          <Star 
+                            key={s} 
+                            color="#f59e0b" 
+                            fill={s <= rev.rating ? "#f59e0b" : "transparent"} 
+                            size={11} 
+                          />
+                        ))}
+                      </View>
+
+                      <Text className="text-[11px] text-slate-700 dark:text-slate-300 italic leading-4.5 font-semibold" numberOfLines={3}>
+                        &quot;{rev.comment}&quot;
+                      </Text>
+
+                      {/* Divider */}
+                      <View className="h-[1px] bg-slate-200 dark:bg-slate-800/60 my-3" />
+
+                      {/* Info reviewer */}
+                      <View className="flex-row items-center gap-2.5">
+                        <View className="h-7 w-7 items-center justify-center rounded-full bg-[#ea580c]/10 border border-[#ea580c]/30">
+                          <Text className="text-[9px] font-bold text-[#f97316]">
+                            {getInitials(reviewerName)}
+                          </Text>
+                        </View>
+                        <View className="flex-1">
+                          <Text className="text-[11px] text-slate-900 dark:text-white" weight="700" numberOfLines={1}>
+                            {reviewerName}
+                          </Text>
+                          <Text className="text-[9px] text-slate-500 dark:text-slate-400 font-semibold" numberOfLines={1}>
+                            Đã đánh giá: {new Date(rev.createdAt).toLocaleDateString('vi-VN')}
+                          </Text>
+                          {rev.cafeName ? (
+                            <Text className="text-[9px] text-[#f97316] font-bold mt-0.5" numberOfLines={1}>
+                              Sân: {rev.cafeName}
+                            </Text>
+                          ) : null}
+                        </View>
+                      </View>
+                    </View>
+                  );
+                })}
+              </ScrollView>
             </View>
-
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerClassName="gap-3.5"
-              className="py-1"
-            >
-              {REVIEWS.map((rev) => (
-                <View
-                  key={rev.id}
-                  className="w-64 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/40 p-4 shadow-sm"
-                >
-                  {/* Sao đánh giá */}
-                  <View className="flex-row gap-0.5 mb-2">
-                    {[1, 2, 3, 4, 5].map((s) => (
-                      <Star key={s} color="#f59e0b" fill="#f59e0b" size={11} />
-                    ))}
-                  </View>
-
-                  <Text className="text-[11px] text-slate-700 dark:text-slate-300 italic leading-4.5 font-semibold">
-                    &quot;{rev.content}&quot;
-                  </Text>
-
-                  {/* Divider */}
-                  <View className="h-[1px] bg-slate-200 dark:bg-slate-800/60 my-3" />
-
-                  {/* Info reviewer */}
-                  <View className="flex-row items-center gap-2.5">
-                    <View className="h-7 w-7 items-center justify-center rounded-full bg-[#ea580c]/10 border border-[#ea580c]/30">
-                      <Text className="text-[9px] font-bold text-[#f97316]">{rev.avatar}</Text>
-                    </View>
-                    <View className="flex-1">
-                      <Text className="text-[11px] text-slate-900 dark:text-white" weight="700" numberOfLines={1}>
-                        {rev.name}
-                      </Text>
-                      <Text className="text-[9px] text-slate-500 dark:text-slate-400 font-semibold" numberOfLines={1}>
-                        {rev.role}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              ))}
-            </ScrollView>
-          </View>
+          )}
 
           {/* Featured Cafes */}
           <View className="mb-6">
@@ -610,7 +740,9 @@ export function HomeScreen() {
                       <View className="flex-row justify-between items-center mt-3">
                         <View className="flex-row items-center gap-0.5 bg-amber-500/10 px-1.5 py-0.5 rounded">
                           <Star color="#f59e0b" fill="#f59e0b" size={10} />
-                          <Text className="text-[9px] text-amber-500 font-bold">5.0</Text>
+                          <Text className="text-[9px] text-amber-500 font-bold">
+                            {cafe.rating > 0 ? cafe.rating.toFixed(1) : '—'}
+                          </Text>
                         </View>
                         <Text className="text-[12px] text-[#f97316]" weight="700">
                           {cafe.priceRange.split(' ')[0]}

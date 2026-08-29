@@ -720,8 +720,8 @@ export function StaffSessionTools({
         </ToolCard>
       )}
 
-      {/* 3. ĐỔI XE TRONG PHIÊN */}
-      {rentalVehicles.length ? (
+      {/* 3. ĐỔI XE TRONG PHIÊN (Ẩn trên giao diện, giữ nguyên logic) */}
+      {false && rentalVehicles.length ? (
         <ToolCard
           icon={<Repeat2 color="#f97316" size={18} />}
           title="Đổi xe trong phiên"

@@ -10,7 +10,6 @@ import {
   Layers,
   Building2,
   Sparkles,
-  Zap,
 } from 'lucide-react-native';
 
 import { Text } from '@/shared/ui/Text';
@@ -627,7 +626,8 @@ export function PaymentStep({
           )}
         </View>
 
-        {/* Mock Payment button for Dev */}
+        {/* Mock Payment button for Dev (Hidden on UI) */}
+        {/*
         <Pressable
           disabled={isMockSubmitting}
           onPress={onMockPayment}
@@ -644,6 +644,7 @@ export function PaymentStep({
             </View>
           )}
         </Pressable>
+        */}
       </View>
     </View>
   );

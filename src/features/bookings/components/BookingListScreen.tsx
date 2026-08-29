@@ -185,7 +185,10 @@ export function BookingListScreen() {
   }, [bookings, activeTab, playModeFilter]);
 
   const handleCardPress = (id: string) => {
-    router.push(`/booking/${id}` as any);
+    router.push({
+      pathname: '/booking/[id]',
+      params: { id },
+    } as any);
   };
 
   const renderBookingItem = ({ item }: { item: BookingListItem }) => {

@@ -37,13 +37,34 @@ export interface UpdateByocDeclarationPayload {
   photos?: string[];
 }
 
-export interface ContestRentalOption {
+export interface ContestRentalCafeOption {
   id: string;
   name: string;
-  description: string | null;
+  city: string | null;
+  district: string | null;
+}
+
+export interface ContestRentalVehicleCatalog {
+  id: string;
+  cafe_id: string;
+  name: string;
   tier: string;
-  hourlyRate: string | number;
-  coverImageUrl: string | null;
+  hourly_rate: number;
+  cover_image_url: string | null;
+}
+
+export interface ContestRentalOptions {
+  cafes: ContestRentalCafeOption[];
+  vehicle_catalogs: ContestRentalVehicleCatalog[];
+}
+
+export interface ContestAvailableRentalCatalogGroup {
+  catalog_id: string;
+  catalog_name: string;
+  tier: string;
+  cover_image_url: string | null;
+  total_units: number;
+  remaining_slots: number;
 }
 
 export const contestsApi = {
@@ -80,13 +101,26 @@ export const contestsApi = {
     }
   },
 
-  // GET /contests/:contestId/rental-options - Lấy danh sách dòng xe được phép thuê trong giải đấu
-  getRentalOptions: async (contestId: string): Promise<ContestRentalOption[]> => {
+  // GET /contests/:contestId/rental-options - Lấy danh sách chi nhánh và dòng xe được phép thuê trong giải đấu
+  getRentalOptions: async (contestId: string): Promise<ContestRentalOptions | null> => {
     try {
       const response = await api.get(`/contests/${contestId}/rental-options`);
-      return response.data?.data || [];
+      return response.data?.data || null;
     } catch (error) {
       console.error(`[ContestsAPI] Error fetching rental options for contest ${contestId}:`, error);
+      return null;
+    }
+  },
+
+  // GET /contests/:contestId/available-rental-vehicles - Lấy danh sách xe thi đấu khả dụng theo chi nhánh
+  getAvailableRentalVehicles: async (contestId: string, cafeId: string): Promise<ContestAvailableRentalCatalogGroup[]> => {
+    try {
+      const response = await api.get(`/contests/${contestId}/available-rental-vehicles`, {
+        params: { cafe_id: cafeId }
+      });
+      return response.data?.data || [];
+    } catch (error) {
+      console.error(`[ContestsAPI] Error fetching available rental vehicles for contest ${contestId}:`, error);
       return [];
     }
   },

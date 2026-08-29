@@ -8,12 +8,13 @@ import {
   ScrollView,
   TextInput,
   View,
+  Dimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Map, MapPin, Search, Star, Compass, RotateCcw, Heart } from 'lucide-react-native';
+import { Map, MapPin, Search, Star, Compass, RotateCcw, Heart, Trophy } from 'lucide-react-native';
 
-import { getCafes } from '../api/explore.api';
+import { getCafes, listFeaturedPopups } from '../api/explore.api';
 import { favoriteApi, favoriteLocal } from '../api/favorite.api';
 import type { Cafe } from '../types/explore.types';
 import { useLocation } from '@/shared/hooks/useLocation';
@@ -37,17 +38,129 @@ function getHaversineDistance(lat1: number, lon1: number, lat2: number, lon2: nu
   return R * c;
 }
 
+interface FeaturedCarouselProps {
+  items: any[];
+  router: any;
+}
+
+function FeaturedCarousel({ items, router }: FeaturedCarouselProps) {
+  const [activeIdx, setActiveIdx] = useState(0);
+  const { width: SCREEN_WIDTH } = Dimensions.get('window');
+  const itemWidth = SCREEN_WIDTH - 40; // Lề trái phải 20
+
+  if (!items || items.length === 0) return null;
+
+  return (
+    <View className="mb-4 mt-2">
+      <View className="flex-row items-center justify-between px-5 mb-2.5">
+        <View className="flex-row items-center gap-1.5 bg-orange-500/10 border border-orange-500/20 px-2.5 py-0.5 rounded-full">
+          <Trophy color="#ea580c" size={11} />
+          <Text className="text-[10.5px] text-[#ea580c] font-black uppercase">Đặc biệt cho bạn</Text>
+        </View>
+        <Text className="text-[10px] text-slate-400 font-bold">
+          {items.length} sự kiện nổi bật
+        </Text>
+      </View>
+
+      <ScrollView
+        horizontal
+        pagingEnabled
+        decelerationRate="fast"
+        snapToInterval={SCREEN_WIDTH - 30}
+        snapToAlignment="center"
+        showsHorizontalScrollIndicator={false}
+        onScroll={(e) => {
+          const contentOffset = e.nativeEvent.contentOffset.x;
+          const idx = Math.round(contentOffset / (SCREEN_WIDTH - 30));
+          if (idx >= 0 && idx < items.length && idx !== activeIdx) {
+            setActiveIdx(idx);
+          }
+        }}
+        scrollEventThrottle={16}
+        contentContainerStyle={{ paddingHorizontal: 20 }}
+      >
+        {items.map((item) => {
+          const image = item.image_url || item.contest?.banner_image_url;
+          const title = item.contest?.name || item.title;
+          const subtitle = item.subtitle;
+
+          return (
+            <Pressable
+              key={item.id}
+              onPress={() => {
+                if (item.contest_id) {
+                  router.push(`/customer/contest-detail/${item.contest_id}` as any);
+                } else {
+                  router.push('/customer/contests' as any);
+                }
+              }}
+              style={{ width: itemWidth, marginRight: items.length > 1 ? 10 : 0 }}
+              className="h-44 rounded-2xl overflow-hidden relative shadow-sm bg-slate-900"
+            >
+              {image ? (
+                <Image source={{ uri: image }} className="absolute inset-0 w-full h-full object-cover" />
+              ) : (
+                <View className="absolute inset-0 bg-[#1e293b] justify-center items-center" />
+              )}
+              <View className="absolute inset-0 bg-black/45" />
+
+              <View className="absolute inset-0 p-4 justify-between">
+                <View className="flex-row">
+                  <View className="bg-orange-500 px-2 py-0.5 rounded-lg">
+                    <Text className="text-[8px] text-white font-black uppercase">QUẢNG BÁ</Text>
+                  </View>
+                </View>
+
+                <View>
+                  {item.contest?.contest_format?.name && (
+                    <Text className="text-[9px] text-[#f97316] font-bold uppercase tracking-wider">
+                      {item.contest.contest_format.name}
+                    </Text>
+                  )}
+                  <Text className="text-[17px] text-white font-black mt-0.5" numberOfLines={2}>
+                    {title}
+                  </Text>
+                  {subtitle && (
+                    <Text className="text-[10.5px] text-slate-300 font-semibold mt-1" numberOfLines={2}>
+                      {subtitle}
+                    </Text>
+                  )}
+                </View>
+              </View>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+
+      {items.length > 1 && (
+        <View className="flex-row justify-center gap-1.5 mt-2.5">
+          {items.map((_, index) => (
+            <View
+              key={index}
+              className={`h-1.5 rounded-full transition-all ${
+                index === activeIdx ? 'w-4 bg-[#ea580c]' : 'w-1.5 bg-slate-200 dark:bg-slate-800'
+              }`}
+            />
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
 const CITIES = ['Tất cả', 'Hồ Chí Minh', 'Hà Nội', 'Đà Nẵng'];
 const TRACK_TYPES = ['Tất cả', 'Drift', 'Off-Road', 'Speed'];
 
 export function ExploreScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const handleScroll = useRef(createScrollHandler()).current;
   const { location: userLocation } = useLocation();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   const [cafes, setCafes] = useState<Cafe[]>([]);
   const [filteredCafes, setFilteredCafes] = useState<Cafe[]>([]);
+  const [featuredPopups, setFeaturedPopups] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCity, setSelectedCity] = useState('Tất cả');
@@ -58,9 +171,18 @@ export function ExploreScreen() {
 
   const fetchCafes = async () => {
     setLoading(true);
-    const data = await getCafes();
-    setCafes(data);
-    setLoading(false);
+    try {
+      const [cafesData, featuredData] = await Promise.all([
+        getCafes(),
+        listFeaturedPopups(),
+      ]);
+      setCafes(cafesData);
+      setFeaturedPopups(featuredData);
+    } catch (e) {
+      console.error('[ExploreScreen] Error fetching cafes/featured:', e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // 1. Tải và đồng bộ hóa Favorites khi load trang hoặc trạng thái login thay đổi
@@ -228,7 +350,7 @@ export function ExploreScreen() {
             <View className="flex-row items-center gap-1 bg-amber-500/10 px-2 py-1 rounded-lg">
               <Star color="#f59e0b" fill="#f59e0b" size={12} />
               <Text className="text-[11px] text-amber-500 font-bold">
-                {item.rating > 0 ? item.rating.toFixed(1) : '5.0'}
+                {item.rating > 0 ? item.rating.toFixed(1) : '—'}
               </Text>
             </View>
           </View>
@@ -417,16 +539,6 @@ export function ExploreScreen() {
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#f97316" />
         </View>
-      ) : filteredCafes.length === 0 ? (
-        <View className="flex-1 items-center justify-center px-8">
-          <View className="size-16 items-center justify-center rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 mb-4">
-            <Compass color="#94a3b8" size={28} />
-          </View>
-          <Text className="text-[15px] text-slate-800 dark:text-slate-300 font-bold">Không tìm thấy chi nhánh nào</Text>
-          <Text className="text-[11px] text-slate-500 dark:text-slate-400 text-center mt-1 leading-4 font-semibold">
-            Thử thay đổi từ khoá tìm kiếm hoặc đặt lại các bộ lọc xem sao nhé.
-          </Text>
-        </View>
       ) : (
         <FlatList
           data={filteredCafes}
@@ -438,14 +550,39 @@ export function ExploreScreen() {
           scrollEventThrottle={16}
           onRefresh={fetchCafes}
           refreshing={loading}
+          ListHeaderComponent={
+            <>
+              {featuredPopups.length > 0 && (
+                <FeaturedCarousel items={featuredPopups} router={router} />
+              )}
+              {filteredCafes.length > 0 && (
+                <View className="px-5 pb-2.5">
+                  <Text className="text-[14px] text-slate-800 dark:text-slate-300 font-bold uppercase tracking-wider">
+                    Tất cả chi nhánh
+                  </Text>
+                </View>
+              )}
+            </>
+          }
+          ListEmptyComponent={
+            <View className="flex-1 items-center justify-center px-8 py-12">
+              <View className="size-16 items-center justify-center rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 mb-4">
+                <Compass color="#94a3b8" size={28} />
+              </View>
+              <Text className="text-[15px] text-slate-800 dark:text-slate-300 font-bold">Không tìm thấy chi nhánh nào</Text>
+              <Text className="text-[11px] text-slate-500 dark:text-slate-400 text-center mt-1 leading-4 font-semibold">
+                Thử thay đổi từ khoá tìm kiếm hoặc đặt lại các bộ lọc xem sao nhé.
+              </Text>
+            </View>
+          }
         />
       )}
 
-      {/* Nút nổi Bản đồ */}
+      {/* Nút nổi Bản đồ - luôn cao hơn bottom tab */}
       <Pressable
         onPress={handleOpenMap}
-        className="absolute bottom-6 right-5 h-14 w-14 items-center justify-center rounded-full bg-[#ea580c] active:bg-[#f97316] shadow-xl"
-        style={{ elevation: 5 }}
+        className="absolute right-5 h-14 w-14 items-center justify-center rounded-full bg-[#ea580c] active:bg-[#f97316] shadow-xl"
+        style={{ elevation: 5, bottom: insets.bottom + 72 }}
       >
         <Map color="#ffffff" size={24} />
       </Pressable>

@@ -6,6 +6,9 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Calendar, MapPin, ShieldAlert, Trophy, CreditCard, Flag } from 'lucide-react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { contestsApi } from '../api/contests.api';
+import { getVnpayReturnUrl } from '@/shared/lib/vnpay-return-url';
+import { openVnpayPaymentSession } from '@/shared/lib/vnpay-browser';
+import { bookingWizardApi } from '@/features/bookings/api/booking-wizard.api';
 import { TournamentBracket } from '../components/TournamentBracket';
 import type { Contest, ContestMatch } from '../types/contests.types';
 
@@ -31,6 +34,17 @@ export const ContestDetailScreen: React.FC = () => {
     setLoading(true);
     try {
       const detail = await contestsApi.getContestDetail(id);
+      console.log('[ContestDetailScreen] fetchContestData success:', {
+        id: detail?.id,
+        name: detail?.name,
+        status: detail?.status,
+        my_registration: detail?.my_registration ? {
+          id: detail.my_registration.id,
+          status: detail.my_registration.status,
+          payment_status: detail.my_registration.payment_status,
+          booking_id: detail.my_registration.booking_id
+        } : null
+      });
       setContest(detail);
 
       // Nếu giải đấu đã bốc thăm, tải các trận đấu
@@ -58,22 +72,70 @@ export const ContestDetailScreen: React.FC = () => {
 
   const handlePaymentPress = async () => {
     const regId = contest?.my_registration?.id;
+    const bookingId = contest?.my_registration?.booking_id;
     if (!regId) return;
 
     setActionLoading(true);
     try {
-      const returnUrl = 'rcfield://payment-return';
-      const result = await contestsApi.createEntryFeePayment(regId, returnUrl);
+      const returnUrl = getVnpayReturnUrl() || 'rcfield://payment-return';
+      let result;
+      
+      if (bookingId) {
+        result = await bookingWizardApi.createCheckout(bookingId, returnUrl, 'vnpay');
+      } else {
+        result = await contestsApi.createEntryFeePayment(regId, returnUrl);
+      }
       
       if (result && result.payment_url) {
-        await WebBrowser.openBrowserAsync(result.payment_url);
-        fetchContestData();
+        await openVnpayPaymentSession(result.payment_url!);
+        
+        // Polling để đợi Backend cập nhật trạng thái thanh toán từ VNPay IPN
+        let attempts = 0;
+        const maxAttempts = 4;
+        const interval = 1500;
+        
+        const poll = async () => {
+          try {
+            const detail = await contestsApi.getContestDetail(id);
+            console.log(`[ContestDetailScreen] Polling payment status attempt ${attempts + 1}:`, {
+              status: detail?.my_registration?.status,
+              payment_status: detail?.my_registration?.payment_status
+            });
+            
+            if (
+              detail?.my_registration?.payment_status === 'MARKED_PAID' ||
+              detail?.my_registration?.status === 'CONFIRMED'
+            ) {
+              console.log('[ContestDetailScreen] Payment confirmed via polling!');
+              setContest(detail);
+              if (detail && detail.status !== 'DRAFT') {
+                const matchData = await contestsApi.getContestMatches(id);
+                setMatches(matchData);
+              }
+              return;
+            }
+          } catch (e) {
+            console.error('[ContestDetailScreen] Polling error:', e);
+          }
+          
+          attempts++;
+          if (attempts < maxAttempts) {
+            setTimeout(poll, interval);
+          } else {
+            console.log('[ContestDetailScreen] Polling finished, performing final data fetch.');
+            fetchContestData();
+          }
+        };
+        
+        // Chờ 500ms trước khi bắt đầu check lần đầu
+        setTimeout(poll, 500);
       } else {
         Alert.alert('Thất bại', 'Không thể tạo liên kết thanh toán VNPay.');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('[ContestDetailScreen] Payment error:', error);
-      Alert.alert('Lỗi', 'Đã xảy ra lỗi trong quá trình xử lý thanh toán.');
+      const errMsg = error?.response?.data?.message || 'Đã xảy ra lỗi trong quá trình xử lý thanh toán.';
+      Alert.alert('Không thể thanh toán', errMsg);
     } finally {
       setActionLoading(false);
     }
@@ -469,7 +531,7 @@ export const ContestDetailScreen: React.FC = () => {
 
             {activeSubTab === 'BRACKET' && (
               <View>
-                <TournamentBracket matches={matches} isDark={isDark} />
+                <TournamentBracket matches={matches} isDark={isDark} myRegistrationId={myReg?.id} />
               </View>
             )}
 
@@ -519,8 +581,8 @@ export const ContestDetailScreen: React.FC = () => {
           className="p-4 border-t border-gray-100 dark:border-slate-800/80 bg-white dark:bg-[#0b0f19]"
           style={{ paddingBottom: Math.max(insets.bottom, 16) }}
         >
-          {/* Trường hợp Chưa đăng ký và giải đang mở */}
-          {!myReg && contest.status === 'OPEN' && (
+          {/* Trường hợp Chưa đăng ký hoặc đã hủy, và giải đang mở */}
+          {(!myReg || myReg.status === 'CANCELLED') && contest.status === 'OPEN' && (
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={handleRegisterPress}
@@ -570,8 +632,8 @@ export const ContestDetailScreen: React.FC = () => {
             </View>
           )}
 
-          {/* Giải đấu đã đóng đăng ký / Đang chạy / Đã xong mà khách chưa đăng ký */}
-          {!myReg && contest.status !== 'OPEN' && (
+          {/* Giải đấu đã đóng đăng ký / Đang chạy / Đã xong mà khách chưa đăng ký hoặc đã hủy */}
+          {(!myReg || myReg.status === 'CANCELLED') && contest.status !== 'OPEN' && (
             <View className="w-full bg-gray-50 dark:bg-slate-900/30 border border-gray-100 dark:border-slate-800/80 p-3.5 rounded-xl items-center justify-center">
               <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 italic">
                 {contest.status === 'COMPLETED' ? 'Giải đấu đã kết thúc' : 'Đã hết thời gian đăng ký giải đấu này.'}

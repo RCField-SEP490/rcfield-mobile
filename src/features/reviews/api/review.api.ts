@@ -17,3 +17,11 @@ export async function submitReview(payload: SubmitReviewPayload): Promise<any> {
 export async function dismissReview(bookingId: string): Promise<void> {
   await api.post(`/customer/reviews/${bookingId}/dismiss`);
 }
+
+export async function getMyReviews(page = 1, limit = 20): Promise<{ data: any[]; total: number }> {
+  const response = await api.get('/customer/reviews', { params: { page, limit } });
+  return {
+    data: response.data?.data || [],
+    total: response.data?.total || 0,
+  };
+}

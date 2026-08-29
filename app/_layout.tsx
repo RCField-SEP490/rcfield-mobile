@@ -29,7 +29,21 @@ export default function RootLayout() {
           animation: 'slide_from_right',
           gestureEnabled: true,
         }}
-      />
+      >
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="booking/create" />
+        <Stack.Screen name="booking/[id]" />
+        <Stack.Screen name="cafe-detail/[id]" />
+        <Stack.Screen name="customer/contest-detail/[id]" />
+        <Stack.Screen name="customer/contest-register/[id]" />
+        <Stack.Screen name="customer/extension/[sessionId]" />
+        <Stack.Screen name="customer/inspections/[sessionId]" />
+        <Stack.Screen name="customer/review/[bookingId]" />
+        <Stack.Screen name="staff/inspection/[sessionId]" />
+        <Stack.Screen name="staff/session/[sessionId]" />
+        <Stack.Screen name="+not-found" />
+      </Stack>
     </AppProvider>
   );
 }
