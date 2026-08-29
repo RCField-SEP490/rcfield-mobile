@@ -2,6 +2,7 @@
   "expo": {
     "name": "RCField",
     "slug": "rcfield-mobile",
+    "owner": "thtun0709",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
