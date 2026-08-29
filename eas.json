@@ -1,6 +1,7 @@
 {
   "cli": {
-    "version": ">= 12.0.0"
+    "version": ">= 12.0.0",
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
@@ -12,7 +13,6 @@
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.rcfield.site/api/v1",
         "EXPO_PUBLIC_ENV": "production",
-        "EXPO_PUBLIC_EAS_PROJECT_ID": "ac1ceb9e-df2e-4875-a5e4-2d655ce5e086",
         "EXPO_PUBLIC_GOOGLE_CLIENT_ID": "669137140227-jnsh1g2i0ugjhcol20pel1ce1gqgi8gs.apps.googleusercontent.com",
         "EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID": "669137140227-jnsh1g2i0ugjhcol20pel1ce1gqgi8gs.apps.googleusercontent.com",
         "EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS": "669137140227-jnsh1g2i0ugjhcol20pel1ce1gqgi8gs.apps.googleusercontent.com"
@@ -22,7 +22,6 @@
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.rcfield.site/api/v1",
         "EXPO_PUBLIC_ENV": "production",
-        "EXPO_PUBLIC_EAS_PROJECT_ID": "ac1ceb9e-df2e-4875-a5e4-2d655ce5e086",
         "EXPO_PUBLIC_GOOGLE_CLIENT_ID": "669137140227-jnsh1g2i0ugjhcol20pel1ce1gqgi8gs.apps.googleusercontent.com",
         "EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID": "669137140227-jnsh1g2i0ugjhcol20pel1ce1gqgi8gs.apps.googleusercontent.com",
         "EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS": "669137140227-jnsh1g2i0ugjhcol20pel1ce1gqgi8gs.apps.googleusercontent.com"
