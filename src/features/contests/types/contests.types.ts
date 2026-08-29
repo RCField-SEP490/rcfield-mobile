@@ -54,7 +54,10 @@ export interface ContestRegistration {
   participant_email?: string | null;
   participant_avatar_url?: string | null;
   driver_handle?: string | null;
-  customer_journey_status?: string;
+  customer_journey_status?: string | null;
+  entry_fee_hold_expires_at?: string | null;
+  cancellation_reason?: string | null;
+  checked_in_at?: string | null;
 }
 
 export interface LeaderboardEntry {

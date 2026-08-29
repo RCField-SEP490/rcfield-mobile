@@ -30,7 +30,7 @@ export const ContestCard: React.FC<ContestCardProps> = ({ contest, registeredCou
   const getStatusText = (status: string) => {
     switch (status) {
       case 'OPEN':
-        return 'Đang đăng ký';
+        return 'Đang mở đăng ký';
       case 'CLOSED':
         return 'Đóng đăng ký';
       case 'RUNNING':
