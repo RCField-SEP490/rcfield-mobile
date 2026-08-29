@@ -80,11 +80,7 @@
       "typedRoutes": true
     },
     "extra": {
-      "router": {},
-      "eas": {
-        "projectId": "ac1ceb9e-df2e-4875-a5e4-2d655ce5e086"
-      }
-    },
-    "owner": "tomishere0712"
+      "router": {}
+    }
   }
 }
