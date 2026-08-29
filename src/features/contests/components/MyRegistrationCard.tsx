@@ -16,41 +16,49 @@ export const MyRegistrationCard: React.FC<MyRegistrationCardProps> = ({
   onPayPress,
   onCancelPress,
   onEditByocPress,
-  onPressCard
+  onPressCard,
 }) => {
   const [isQrZoomed, setIsQrZoomed] = useState(false);
   const contest = registration.contest;
   if (!contest) return null;
 
-  const getRegStatusStyle = (status: string) => {
-    switch (status) {
-      case 'PENDING':
-        return 'bg-amber-50 text-amber-700 border border-amber-200';
-      case 'CONFIRMED':
-        return 'bg-blue-50 text-blue-700 border border-blue-200';
-      case 'CHECKED_IN':
-        return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
-      case 'CANCELLED':
-        return 'bg-red-50 text-red-600 border border-red-100';
-      default:
-        return 'bg-gray-50 text-gray-600 border border-gray-100';
+  const now = Date.now();
+  const isPaid =
+    registration.payment_status === 'MARKED_PAID' ||
+    (registration.payment_status as string) === 'PAID';
+  const holdExpiresAt = registration.entry_fee_hold_expires_at
+    ? new Date(registration.entry_fee_hold_expires_at).getTime()
+    : null;
+  const isHoldExpired = holdExpiresAt ? holdExpiresAt <= now : false;
+  const contestStarted = contest.starts_at ? new Date(contest.starts_at).getTime() < now : false;
+
+  const isEffectiveCancelled =
+    !isPaid &&
+    (registration.status === 'CANCELLED' ||
+      (registration.payment_status === 'PENDING_PAYMENT' && isHoldExpired));
+
+  const getUnifiedBadge = () => {
+    if (isEffectiveCancelled) {
+      return { label: 'Đã hủy', style: 'bg-red-50 text-red-600 border border-red-100' };
     }
+    if ((registration.status === 'CONFIRMED' || isPaid) && contestStarted && !registration.checked_in_at) {
+      return { label: 'Không đến', style: 'bg-orange-50 text-orange-700 border border-orange-200' };
+    }
+    if (registration.payment_status === 'PENDING_PAYMENT' && !isHoldExpired && registration.status !== 'CANCELLED') {
+      return { label: 'Chờ thanh toán lệ phí', style: 'bg-amber-50 text-amber-700 border border-amber-200' };
+    }
+    const journeyStatus = registration.customer_journey_status;
+    if (journeyStatus === 'ADVANCED') return { label: 'Đã vào vòng tiếp', style: 'bg-indigo-50 text-indigo-700 border border-indigo-200' };
+    if (journeyStatus === 'IN_BRACKET') return { label: 'Đang trong nhánh đấu', style: 'bg-purple-50 text-purple-700 border border-purple-200' };
+    if (journeyStatus === 'ELIMINATED') return { label: 'Đã bị loại', style: 'bg-slate-100 text-slate-600 border border-slate-200' };
+    if (journeyStatus === 'FINISHED') return { label: 'Hoàn thành', style: 'bg-emerald-50 text-emerald-700 border border-emerald-200' };
+    if (journeyStatus === 'READY_TO_RACE') return { label: 'Sẵn sàng đua', style: 'bg-teal-50 text-teal-700 border border-teal-200' };
+    if (journeyStatus === 'APPROVED_WAITING_CHECKIN') return { label: 'Chờ check-in', style: 'bg-blue-50 text-blue-700 border border-blue-200' };
+    if (registration.status === 'CONFIRMED' || isPaid) return { label: 'Đã xác nhận', style: 'bg-emerald-50 text-emerald-700 border border-emerald-200' };
+    return { label: 'Chờ duyệt', style: 'bg-yellow-50 text-yellow-700 border border-yellow-200' };
   };
 
-  const getRegStatusText = (status: string) => {
-    switch (status) {
-      case 'PENDING':
-        return 'Chờ duyệt';
-      case 'CONFIRMED':
-        return 'Đã xác nhận';
-      case 'CHECKED_IN':
-        return 'Đã Check-in';
-      case 'CANCELLED':
-        return 'Đã hủy';
-      default:
-        return status;
-    }
-  };
+  const badge = getUnifiedBadge();
 
   const getPaymentStatusText = (status: string) => {
     switch (status) {
@@ -110,9 +118,11 @@ export const MyRegistrationCard: React.FC<MyRegistrationCardProps> = ({
     );
   };
 
-  const canCancel = registration.status !== 'CANCELLED' && contest.status === 'OPEN';
-  const canEditByoc = registration.vehicle_source === 'BYOC' && registration.status === 'PENDING';
-  const showPayButton = registration.payment_status === 'PENDING_PAYMENT' && registration.status !== 'CANCELLED';
+  const canCancel = registration.status === 'PENDING' && registration.payment_status === 'PENDING_PAYMENT' && !isHoldExpired;
+  const canEditByoc = registration.vehicle_source === 'BYOC' && registration.status === 'PENDING' && !isEffectiveCancelled;
+  const showPayButton = registration.payment_status === 'PENDING_PAYMENT' && !isHoldExpired && registration.status !== 'CANCELLED';
+
+  const showQr = !isEffectiveCancelled && (registration.status === 'CONFIRMED' || isPaid) && Boolean(registration.check_in_code);
 
   return (
     <View className="mb-4 overflow-hidden rounded-2xl border border-gray-100 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-4 shadow-sm">
@@ -139,15 +149,67 @@ export const MyRegistrationCard: React.FC<MyRegistrationCardProps> = ({
           </View>
         </View>
         
-        {/* Status Tag */}
+        {/* Unified Status Badge */}
         <View className="ml-2">
-          <View className={`rounded-full px-2 py-0.5 ${getRegStatusStyle(registration.status)}`}>
+          <View className={`rounded-full px-2 py-0.5 ${badge.style}`}>
             <Text className="text-[10px] font-extrabold uppercase">
-              {getRegStatusText(registration.status)}
+              {badge.label}
             </Text>
           </View>
         </View>
       </TouchableOpacity>
+
+      {/* Alert Boxes */}
+      {/* 1. Suất được giữ đến (Còn hạn) */}
+      {registration.payment_status === 'PENDING_PAYMENT' &&
+      registration.entry_fee_hold_expires_at &&
+      !isHoldExpired &&
+      !isEffectiveCancelled ? (
+        <View className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
+          <Text className="text-xs font-bold text-amber-900">
+            Suất được giữ đến{' '}
+            {new Date(registration.entry_fee_hold_expires_at).toLocaleTimeString('vi-VN', {
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
+          </Text>
+          <Text className="mt-1 text-[11px] font-medium text-amber-800">
+            Chưa thanh toán lệ phí trước giờ đó thì suất sẽ trả lại cho người khác.
+          </Text>
+        </View>
+      ) : null}
+
+      {/* 2. Đã hết thời gian thanh toán lại (Hết hạn giữ chỗ) */}
+      {!isPaid && registration.entry_fee_hold_expires_at && isHoldExpired ? (
+        <View className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3">
+          <Text className="text-xs font-bold text-red-900">
+            Đã hết thời gian giữ chỗ thanh toán lệ phí (hết hạn lúc{' '}
+            {new Date(registration.entry_fee_hold_expires_at).toLocaleTimeString('vi-VN', {
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
+            )
+          </Text>
+          <Text className="mt-1 text-[11px] font-medium text-red-800">
+            Đơn đã chuyển sang trạng thái đã hủy do quá thời gian thanh toán lại.
+          </Text>
+        </View>
+      ) : null}
+
+      {/* 3. Lý do hủy khác */}
+      {!isPaid &&
+      registration.status === 'CANCELLED' &&
+      registration.cancellation_reason &&
+      !isHoldExpired ? (
+        <View className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
+          <Text className="text-xs font-bold text-amber-900">
+            Lý do hủy: {registration.cancellation_reason}
+          </Text>
+          <Text className="mt-1 text-[11px] font-medium text-amber-800">
+            Suất đã được trả lại. Giải còn mở đăng ký thì bạn vẫn đăng ký lại được từ đầu.
+          </Text>
+        </View>
+      ) : null}
 
       {/* Detail Grid */}
       <View className="my-3 space-y-2">
@@ -182,8 +244,8 @@ export const MyRegistrationCard: React.FC<MyRegistrationCardProps> = ({
         </View>
       </View>
 
-      {/* QR Code and checkInCode (Only when confirmed or checked in) */}
-      {registration.status !== 'CANCELLED' && (
+      {/* QR Code and checkInCode (Only when confirmed or checked in and not cancelled) */}
+      {showQr && (
         <View className="my-2 items-center justify-center rounded-xl bg-gray-50 dark:bg-slate-900/30 p-4 border border-gray-100/60 dark:border-slate-800/80">
           <TouchableOpacity activeOpacity={0.8} onPress={() => setIsQrZoomed(true)}>
             <Image
@@ -251,48 +313,50 @@ export const MyRegistrationCard: React.FC<MyRegistrationCardProps> = ({
       </Modal>
 
       {/* Action Buttons */}
-      <View className="flex-row gap-2 mt-2 items-center">
-        {/* Nút sửa xe BYOC */}
-        {canEditByoc && (
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => onEditByocPress(registration)}
-            className="flex-1 flex-row items-center justify-center rounded-xl border border-gray-200 dark:border-slate-700 py-2.5 bg-white dark:bg-slate-900/40"
-          >
-            <Edit size={14} color="#4b5563" style={{ marginRight: 6 }} />
-            <Text className="text-xs font-bold text-gray-700 dark:text-slate-350">Sửa xe BYOC</Text>
-          </TouchableOpacity>
-        )}
+      {(canEditByoc || showPayButton || canCancel) && (
+        <View className="flex-row gap-2 mt-2 items-center">
+          {/* Nút sửa xe BYOC */}
+          {canEditByoc && (
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => onEditByocPress(registration)}
+              className="flex-1 flex-row items-center justify-center rounded-xl border border-gray-200 dark:border-slate-700 py-2.5 bg-white dark:bg-slate-900/40"
+            >
+              <Edit size={14} color="#4b5563" style={{ marginRight: 6 }} />
+              <Text className="text-xs font-bold text-gray-700 dark:text-slate-350">Sửa xe BYOC</Text>
+            </TouchableOpacity>
+          )}
 
-        {/* Nút thanh toán */}
-        {showPayButton && (
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => onPayPress(registration.id)}
-            className="flex-1 flex-row items-center justify-center rounded-xl bg-emerald-600 py-2.5"
-          >
-            <CreditCard size={14} color="#ffffff" style={{ marginRight: 6 }} />
-            <Text className="text-xs font-extrabold text-white">Thanh toán VNPay</Text>
-          </TouchableOpacity>
-        )}
+          {/* Nút thanh toán */}
+          {showPayButton && (
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => onPayPress(registration.id)}
+              className="flex-1 flex-row items-center justify-center rounded-xl bg-emerald-600 py-2.5"
+            >
+              <CreditCard size={14} color="#ffffff" style={{ marginRight: 6 }} />
+              <Text className="text-xs font-extrabold text-white">Thanh toán VNPay</Text>
+            </TouchableOpacity>
+          )}
 
-        {/* Spacer để đẩy nút Hủy sang phải khi không có nút nào khác */}
-        {canCancel && !canEditByoc && !showPayButton && (
-          <View className="flex-1" />
-        )}
+          {/* Spacer để đẩy nút Hủy sang phải khi không có nút nào khác */}
+          {canCancel && !canEditByoc && !showPayButton && (
+            <View className="flex-1" />
+          )}
 
-        {/* Nút hủy - luôn nằm bên phải */}
-        {canCancel && (
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={showCancelConfirm}
-            className="flex-row items-center justify-center rounded-xl bg-red-600 px-4 py-2.5"
-          >
-            <Trash2 size={14} color="#ffffff" style={{ marginRight: 4 }} />
-            <Text className="text-xs font-bold text-white">Hủy</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+          {/* Nút hủy - luôn nằm bên phải */}
+          {canCancel && (
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={showCancelConfirm}
+              className="flex-row items-center justify-center rounded-xl bg-red-600 px-4 py-2.5"
+            >
+              <Trash2 size={14} color="#ffffff" style={{ marginRight: 4 }} />
+              <Text className="text-xs font-bold text-white">Hủy</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
     </View>
   );
 };
