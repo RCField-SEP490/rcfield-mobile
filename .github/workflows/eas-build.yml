@@ -24,9 +24,14 @@ jobs:
       - name: Install EAS CLI
         run: npm install -g eas-cli
 
+      - name: Initialize EAS Project
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: eas init --non-interactive || true
+
       - name: Start EAS Build
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           EXPO_PUBLIC_API_URL: ${{ secrets.EXPO_PUBLIC_API_URL }}
           EAS_BUILD_NO_EXPO_GO_WARNING: "true"
-        run: eas build --platform all --non-interactive --auto-create-project
+        run: eas build --platform all --non-interactive
