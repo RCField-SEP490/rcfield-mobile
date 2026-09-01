@@ -31,7 +31,7 @@ jobs:
       - name: Initialize EAS Project
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: eas init --account thtun0709 --non-interactive || true
+        run: eas init --account rcfield-sep490 --non-interactive || true
 
       - name: Start EAS Build (Android APK)
         env:
