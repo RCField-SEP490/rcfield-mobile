@@ -268,7 +268,7 @@ export function MyPackagesScreen() {
                     <View className="flex-row justify-between items-baseline mb-1.5">
                       <Text className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">Tình trạng sử dụng</Text>
                       <Text className="text-[12px] text-slate-900 dark:text-white" weight="700">
-                        Còn {pkg.slots_remaining} / {pkg.slots_total} slots
+                        Còn {Math.round(Number(pkg.slots_remaining))} / {Math.round(Number(pkg.slots_total))} slots
                       </Text>
                     </View>
                     <View className="h-2 w-full rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">

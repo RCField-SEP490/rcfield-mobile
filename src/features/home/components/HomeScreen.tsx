@@ -233,25 +233,25 @@ export function HomeScreen() {
           }
         >
           {/* Header Section */}
-          <View className="flex-row items-center justify-between mb-5">
-            <View className="flex-row items-center gap-3.5">
+          <View className="flex-row items-center justify-between mb-5 gap-2">
+            <View className="flex-row items-center gap-3.5 flex-1 min-w-0">
               {isAuthenticated && user?.avatarUrl ? (
                 <Image
                   source={{ uri: user.avatarUrl }}
-                  className="h-11 w-11 rounded-full border border-[#f97316]/30 shadow-md"
+                  className="h-11 w-11 shrink-0 rounded-full border border-[#f97316]/30 shadow-md"
                 />
               ) : (
-                <View className="h-11 w-11 items-center justify-center rounded-full bg-[#ea580c]/10 border border-[#ea580c]/30">
+                <View className="h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#ea580c]/10 border border-[#ea580c]/30">
                   <Text className="text-[13px] font-bold text-[#f97316]">
                     {isAuthenticated ? getInitials(displayName) : 'G'}
                   </Text>
                 </View>
               )}
-              <View>
-                <Text className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">
+              <View className="flex-1 min-w-0">
+                <Text className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold" numberOfLines={1}>
                   {isAuthenticated ? `${greeting},` : 'Chào mừng bạn đến với'}
                 </Text>
-                <Text className="text-[16px] text-slate-900 dark:text-white" weight="700">
+                <Text className="text-[15px] sm:text-[16px] text-slate-900 dark:text-white" weight="700" numberOfLines={1}>
                   {isAuthenticated ? displayName : 'RCField Platform'}
                 </Text>
               </View>
@@ -261,7 +261,7 @@ export function HomeScreen() {
             ) : (
               <Pressable
                 onPress={() => router.push('/(auth)/login')}
-                className="rounded-xl bg-[#ea580c] px-3.5 py-1.5 active:bg-[#f97316] shadow-sm"
+                className="shrink-0 rounded-xl bg-[#ea580c] px-3 py-1.5 sm:px-3.5 active:bg-[#f97316] shadow-sm"
               >
                 <Text className="text-[11px] text-white font-bold">Đăng nhập</Text>
               </Pressable>
@@ -552,7 +552,7 @@ export function HomeScreen() {
                         <View className="flex-row justify-between items-baseline mb-1">
                           <Text className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">Tình trạng sử dụng</Text>
                           <Text className="text-[12px] text-slate-800 dark:text-white" weight="700">
-                            {pkg.slots_remaining} / {pkg.slots_total} slots
+                            {Math.round(Number(pkg.slots_remaining))} / {Math.round(Number(pkg.slots_total))} slots
                           </Text>
                         </View>
                         <View className="h-2 w-full rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">

@@ -27,12 +27,13 @@ const fontFamilyByWeight: Record<TextWeight, string> = {
 };
 
 export const Text = forwardRef<NativeText, TextProps>(function Text(
-  { className, variant = 'body', weight = '400', style, ...props },
+  { className, variant = 'body', weight = '400', style, maxFontSizeMultiplier = 1.25, ...props },
   ref,
 ) {
   return (
     <NativeText
       ref={ref}
+      maxFontSizeMultiplier={maxFontSizeMultiplier}
       className={cn(variantClassNames[variant], className)}
       style={[{ fontFamily: fontFamilyByWeight[weight] }, style]}
       {...props}
