@@ -33,23 +33,97 @@ function getProjectId() {
   );
 }
 
+export function normalizeMobileNotificationRoute(rawRoute: unknown): string {
+  if (typeof rawRoute !== 'string' || !rawRoute.startsWith('/')) return '';
+
+  const [pathname, queryString] = rawRoute.split('?');
+
+  // Customer review request with query param e.g. /customer/bookings?reviewBookingId=xxx
+  if (queryString) {
+    const params = new URLSearchParams(queryString);
+    const reviewBookingId = params.get('reviewBookingId');
+    if (reviewBookingId) {
+      return `/customer/review/${encodeURIComponent(reviewBookingId)}`;
+    }
+  }
+
+  // Customer booking detail: /customer/bookings/:id, /customer/booking/:id, /booking/:id
+  const customerBookingMatch = pathname.match(/^\/(?:customer\/)?bookings?\/([^/?#]+)$/);
+  if (customerBookingMatch) {
+    const bookingId = customerBookingMatch[1];
+    return `/booking/${bookingId}`;
+  }
+
+  // Customer bookings list: /customer/bookings, /bookings
+  if (pathname === '/customer/bookings' || pathname === '/bookings') {
+    return '/(tabs)/bookings';
+  }
+
+  // Customer review: /customer/review/:id
+  const reviewMatch = pathname.match(/^\/customer\/review\/([^/?#]+)$/);
+  if (reviewMatch) {
+    return `/customer/review/${reviewMatch[1]}`;
+  }
+
+  // Customer extension: /customer/extension/:id, /customer/extension-response/:id
+  const extensionMatch = pathname.match(/^\/customer\/(?:extension|extension-response)\/([^/?#]+)$/);
+  if (extensionMatch) {
+    return `/customer/extension/${extensionMatch[1]}`;
+  }
+
+  // Customer inspection: /customer/inspections/:id, /customer/inspection/:id, /customer/sessions/:id
+  const inspectionMatch = pathname.match(/^\/customer\/(?:inspections?|sessions?)\/([^/?#]+)$/);
+  if (inspectionMatch) {
+    return `/customer/inspections/${inspectionMatch[1]}`;
+  }
+
+  // Staff session: /staff/sessions/:id, /staff/session/:id
+  const staffSessionMatch = pathname.match(/^\/staff\/sessions?\/([^/?#]+)$/);
+  if (staffSessionMatch) {
+    return `/staff/session/${staffSessionMatch[1]}`;
+  }
+
+  // Staff inspection: /staff/inspections/:id, /staff/inspection/:id
+  const staffInspectionMatch = pathname.match(/^\/staff\/inspections?\/([^/?#]+)$/);
+  if (staffInspectionMatch) {
+    return `/staff/inspection/${staffInspectionMatch[1]}`;
+  }
+
+  // Staff bookings / today-bookings / fnb
+  if (pathname === '/staff/today-bookings' || pathname === '/staff/bookings') {
+    return '/staff/bookings';
+  }
+  if (pathname === '/staff/fnb-orders' || pathname === '/staff/fnb') {
+    return '/staff/fnb';
+  }
+
+  return rawRoute;
+}
+
 export function getRouteFromNotificationData(data: Record<string, unknown>) {
   if (typeof data.route === 'string' && data.route.length > 0) {
-    return data.route;
+    const normalized = normalizeMobileNotificationRoute(data.route);
+    if (normalized) return normalized;
   }
 
   const type = String(data.type || '');
-  const sessionId = typeof data.sessionId === 'string' ? data.sessionId : '';
-  const inspectionId = typeof data.inspectionId === 'string' ? data.inspectionId : '';
-  const bookingId = typeof data.bookingId === 'string' ? data.bookingId : '';
+  const sessionId =
+    typeof data.sessionId === 'string'
+      ? data.sessionId
+      : typeof data.session_id === 'string'
+        ? data.session_id
+        : '';
+  const bookingId =
+    typeof data.bookingId === 'string'
+      ? data.bookingId
+      : typeof data.booking_id === 'string'
+        ? data.booking_id
+        : '';
 
-  if (
-    (type === 'SESSION_CHECKIN_INSPECTION' || type === 'SESSION_CHECKOUT_INSPECTION') &&
-    sessionId
-  ) {
-    return inspectionId
-      ? `/customer/inspections/${sessionId}?inspectionId=${inspectionId}`
-      : `/customer/inspections/${sessionId}`;
+  if (type === 'SESSION_CHECKIN_INSPECTION' || type === 'SESSION_CHECKOUT_INSPECTION') {
+    if (bookingId) return `/booking/${bookingId}`;
+    if (sessionId) return `/customer/inspections/${sessionId}`;
+    return '/(tabs)/bookings';
   }
 
   if (type === 'SESSION_EXTENSION_PROPOSED' && sessionId) {
