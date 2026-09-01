@@ -1,17 +1,13 @@
-name: EAS Build on PR & Merge
+name: EAS Build on Main Merge
 
 on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
-      - develop
 
 jobs:
   build:
-    name: Build Android APK
+    name: Build Android Production APK
     runs-on: ubuntu-latest
     steps:
       - name: Check for Git repository changes
@@ -38,11 +34,4 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           EXPO_PUBLIC_API_URL: ${{ secrets.EXPO_PUBLIC_API_URL }}
           EAS_BUILD_NO_EXPO_GO_WARNING: "true"
-        run: |
-          if [ "${{ github.ref_name }}" = "main" ] || [ "${{ github.base_ref }}" = "main" ]; then
-            PROFILE="production"
-          else
-            PROFILE="preview"
-          fi
-          echo "Building with profile: $PROFILE"
-          eas build --platform android --profile $PROFILE --non-interactive
+        run: eas build --platform android --profile production --non-interactive
