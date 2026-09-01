@@ -78,6 +78,7 @@ export function BookingWizardScreen({
   const [companions, setCompanions] = useState<Companion[]>([]);
   const [selectedVehicleIds, setSelectedVehicleIds] = useState<string[]>([]);
   const [fnbQuantities, setFnbQuantities] = useState<Record<string, number>>(() => preselectedFnb ?? {});
+  const [fnbNotes, setFnbNotes] = useState<Record<string, string>>({});
 
   const [selectedPackageId, setSelectedPackageId] = useState<string | null>(null);
   const [appliedPromo, setAppliedPromo] = useState<PromoValidationResult | null>(null);
@@ -206,10 +207,11 @@ export function BookingWizardScreen({
             }
           }
         }
-        return { name, qty, price: unitPrice };
+        const note = fnbNotes[key]?.trim();
+        return { name, qty, price: unitPrice, note };
       })
       .filter((m) => m.qty > 0);
-  }, [fnbQuantities, menuItems]);
+  }, [fnbQuantities, fnbNotes, menuItems]);
 
   // Final Total calculation for Step 4 Preview
   const finalTotalAmount = useMemo(() => {
@@ -415,10 +417,12 @@ export function BookingWizardScreen({
         .filter(([, qty]) => qty > 0)
         .map(([key, quantity]) => {
           const [menu_item_id, variant_id] = key.split('__');
+          const notes = fnbNotes[key]?.trim();
           return {
             menu_item_id,
             ...(variant_id ? { variant_id } : {}),
             quantity,
+            ...(notes ? { notes } : {}),
           };
         }),
       track_type_id: selectedTrackConfig?.track_type_id,
@@ -448,6 +452,16 @@ export function BookingWizardScreen({
     try {
       const payload = getBookingPayload();
       const booking = await bookingWizardApi.createBooking(payload);
+
+      // Pay Later Flow (30 min Hold)
+      if (selectedPaymentMethod === 'pay_later') {
+        Alert.alert(
+          'Giữ chỗ thành công',
+          'Lịch đặt của bạn đã được giữ chỗ trong 30 phút! Bạn có thể thanh toán online sau hoặc thanh toán tại quầy khi đến sân.',
+          [{ text: 'Xem lịch đặt', onPress: () => navigateToDetail(booking.booking_id) }]
+        );
+        return;
+      }
 
       const customReturnUrl = getVnpayReturnUrl();
 
@@ -539,6 +553,7 @@ export function BookingWizardScreen({
 
   const confirmButtonLabel = useMemo(() => {
     if (finalTotalAmount === 0 || selectedPackageId) return 'Xác nhận đặt lịch';
+    if (selectedPaymentMethod === 'pay_later') return 'Xác nhận giữ chỗ (Thanh toán sau)';
     if (selectedPaymentMethod === 'bank_transfer') return 'Chuyển khoản VietQR';
     return 'Thanh toán VNPay';
   }, [finalTotalAmount, selectedPackageId, selectedPaymentMethod]);
@@ -650,6 +665,8 @@ export function BookingWizardScreen({
                   cafeId={cafeId}
                   fnbQuantities={fnbQuantities}
                   setFnbQuantities={setFnbQuantities}
+                  fnbNotes={fnbNotes}
+                  setFnbNotes={setFnbNotes}
                 />
               )}
 

@@ -79,7 +79,12 @@ export function StaffSessionTools({
   const canProposeExtension = session.status === 'ACTIVE';
   const extensionWindowClosed = operationalTiming.state === 'OVERDUE';
   const extensionPending = session.extensionProposal?.status === 'PENDING' || session.status === 'EXTENDING';
-  const directExtension = session.bookingSource === 'STAFF_MANUAL';
+  const directExtension =
+    session.bookingSource === 'STAFF_MANUAL' ||
+    session.bookingSource === 'WALK_IN' ||
+    (session as any).source === 'STAFF_MANUAL' ||
+    (session as any).source === 'WALK_IN';
+  const isWalkIn = directExtension;
 
   const [loadingResources, setLoadingResources] = useState(false);
   const [menuItems, setMenuItems] = useState<StaffMenuItem[]>([]);
@@ -286,6 +291,23 @@ export function StaffSessionTools({
     );
   };
 
+  const handleSimulateExtension = async (approved: boolean) => {
+    setSubmitting('extension');
+    try {
+      await staffApi.simulateClientExtension(session.sessionId, { approved });
+      Alert.alert(
+        'Thành công',
+        approved ? 'Đã xác nhận gia hạn ca chơi thành công!' : 'Đã ghi nhận khách từ chối gia hạn.'
+      );
+      await onUpdated();
+    } catch (error: any) {
+      const message = error?.response?.data?.message || 'Không thể xử lý phản hồi gia hạn.';
+      Alert.alert('Lỗi', message);
+    } finally {
+      setSubmitting(null);
+    }
+  };
+
   const handleAddFnb = async () => {
     if (!selectedMenuItem) {
       Alert.alert('Chưa chọn món', 'Vui lòng chọn món trước khi thêm vào phiên.');
@@ -382,7 +404,7 @@ export function StaffSessionTools({
       >
         {extensionWindowClosed ? (
           <View className="rounded-xl border border-red-500/25 bg-red-500/10 p-3">
-            <Text className="text-[12px] text-red-500" weight="700">
+            <Text className="text-[12px] text-red-500 font-bold">
               Gia hạn đã được khóa
             </Text>
             <Text className="mt-1 text-[11px] leading-4 text-slate-500">
@@ -390,13 +412,48 @@ export function StaffSessionTools({
             </Text>
           </View>
         ) : extensionPending ? (
-          <View className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-3">
-            <Text className="text-[12px] text-amber-300" weight="700">
-              Đang chờ khách phản hồi gia hạn {session.extensionProposal?.extraMinutes || ''} phút
+          <View className="rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-3.5">
+            <View className="flex-row items-center justify-between gap-2 mb-1">
+              <Text className="text-[13px] text-amber-950 dark:text-amber-100 font-bold">
+                Đang chờ phản hồi gia hạn +{session.extensionProposal?.extraMinutes || ''} phút
+              </Text>
+              <View className="bg-amber-200/80 dark:bg-amber-900/60 px-2 py-0.5 rounded-full">
+                <Text className="text-[9px] text-amber-900 dark:text-amber-200 font-bold uppercase">
+                  Chờ phản hồi
+                </Text>
+              </View>
+            </View>
+            <Text className="text-[11px] leading-4 text-amber-900 dark:text-amber-200 font-medium">
+              {isWalkIn
+                ? '⚡ Khách vãng lai: Nhân viên xác nhận trực tiếp tại quầy theo quyết định của khách.'
+                : '📱 Khách đặt trước: Khách có thể xác nhận trên App hoặc nhân viên hỗ trợ xác nhận tại quầy bên dưới.'}
             </Text>
-            <Text className="mt-1 text-[11px] leading-4 text-amber-100/70">
-              Khi khách đồng ý hoặc từ chối, màn hình sẽ tự động cập nhật.
-            </Text>
+            <View className="mt-3 flex-row gap-2">
+              <Pressable
+                disabled={submitting === 'extension'}
+                onPress={() => handleSimulateExtension(true)}
+                className="flex-1 h-10 flex-row items-center justify-center gap-1.5 rounded-xl bg-emerald-600 active:bg-emerald-700 shadow-sm"
+              >
+                {submitting === 'extension' ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <CheckCircle2 color="#ffffff" size={14} />
+                )}
+                <Text className="text-[11px] font-bold text-white">
+                  Khách đồng ý gia hạn
+                </Text>
+              </Pressable>
+
+              <Pressable
+                disabled={submitting === 'extension'}
+                onPress={() => handleSimulateExtension(false)}
+                className="h-10 px-3.5 flex-row items-center justify-center rounded-xl bg-slate-200 dark:bg-slate-800 active:bg-slate-300"
+              >
+                <Text className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                  Từ chối
+                </Text>
+              </Pressable>
+            </View>
           </View>
         ) : (
           <View className="gap-2">
@@ -412,22 +469,22 @@ export function StaffSessionTools({
                       : 'border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-950 opacity-60'
                   }`}
                 >
-                  <Text className="text-center text-[13px] text-[#fb923c]" weight="700">
+                  <Text className="text-center text-[13px] text-[#fb923c] font-bold">
                     +{option.extraMinutes} phút
                   </Text>
                   <Text className="mt-1 text-center text-[10px] text-slate-500">
                     {option.available ? `→ ${formatTime(option.newPlannedEnd)}` : 'Không khả dụng'}
                   </Text>
-                  <Text className="mt-1 text-center text-[10px] text-slate-900 dark:text-white" weight="700">
+                  <Text className="mt-1 text-center text-[10px] text-slate-900 dark:text-white font-bold">
                     {option.blockedReason || formatCurrency(option.additionalFee)}
                   </Text>
                 </Pressable>
               ))}
             </View>
             <Text className="text-[10px] leading-4 text-slate-500">
-              {directExtension
-                ? 'Đơn đăng ký tại quầy: nhân viên xác nhận gia hạn trực tiếp tại quầy.'
-                : 'Đơn đặt trước: khách cần xác nhận yêu cầu gia hạn trên ứng dụng.'}
+              {isWalkIn
+                ? '⚡ Đơn khách vãng lai: nhân viên gia hạn trực tiếp tại quầy và ghi nợ quyết toán.'
+                : '📱 Đơn đặt qua app: khách có thể xác nhận gia hạn trên ứng dụng hoặc tại quầy.'}
             </Text>
           </View>
         )}
@@ -437,8 +494,14 @@ export function StaffSessionTools({
       {!extensionWindowClosed && (
         <ToolCard
           icon={<Coffee color="#f97316" size={18} />}
-          title="Gọi thêm đồ ăn, thức uống"
-          subtitle={loadingResources ? 'Đang tải thực đơn...' : `${menuItems.length} món khả dụng`}
+          title={isWalkIn ? 'Thêm món tại quầy (Khách vãng lai)' : 'Gọi thêm đồ ăn, thức uống'}
+          subtitle={
+            isWalkIn
+              ? '⚡ Tự động ghi nợ vào quyết toán ca chơi tại quầy'
+              : loadingResources
+                ? 'Đang tải thực đơn...'
+                : `${menuItems.length} món khả dụng`
+          }
         >
           {loadingResources ? (
             <ActivityIndicator color="#f97316" />
