@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { CalendarDays, Car, ChevronLeft, ChevronRight, Eye, LogIn, UserRound, type LucideIcon } from 'lucide-react-native';
+import { CalendarDays, Car, ChevronLeft, ChevronRight, Eye, LogIn, Smartphone, UserRound, Zap, type LucideIcon } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useColorScheme } from 'nativewind';
 
@@ -112,37 +112,40 @@ export function StaffBookingsScreen() {
   }, []);
 
   useEffect(() => {
-    const unsubscribe = wsClient.subscribe((event) => {
+    const unsubscribe = wsClient.subscribe((event, data) => {
       if (
-        [
-          'NEW_BOOKING',
+        ![
+          'BOOKING_CREATED',
+          'BOOKING_UPDATED',
+          'BOOKING_CANCELLED',
+          'BOOKING_STATUS_CHANGED',
           'CUSTOMER_PAYMENT_CONFIRMED',
+          'CUSTOMER_CHECKIN_CONFIRMED',
           'CUSTOMER_CHECKOUT_CONFIRMED',
-          'SESSION_EXTENSION_EXPIRED',
+          'CUSTOMER_INSPECTION_DISPUTED',
         ].includes(event)
       ) {
-        loadBookings(true);
+        return;
       }
+
+      loadBookings(true);
     });
+
     return unsubscribe;
   }, [loadBookings]);
 
   const filteredBookings = useMemo(() => {
-    const sorted = [...bookings].sort(
-      (a, b) => new Date(a.slotStart).getTime() - new Date(b.slotStart).getTime()
-    );
-
-    return sorted.filter((booking) => {
+    return bookings.filter((booking) => {
       const session = booking.sessions?.[0];
       const displayStatus = getDisplayBookingStatus(booking.status, booking.slotStart, session);
-      const matchesStatus =
-        activeFilter === 'ALL'
-          ? true
-          : activeFilter === 'CHECKED_IN'
-            ? !!getSessionId(booking) && !isCheckInWindowExpired(booking.status, booking.slotStart, session)
-            : displayStatus === activeFilter || session?.status === activeFilter;
-      const matchesPlayMode = playModeFilter === 'ALL' || booking.playMode === playModeFilter;
-      return matchesStatus && matchesPlayMode;
+
+      if (playModeFilter !== 'ALL' && booking.playMode !== playModeFilter) {
+        return false;
+      }
+
+      if (activeFilter === 'ALL') return true;
+      if (activeFilter === 'CHECKED_IN') return Boolean(session);
+      return displayStatus === activeFilter;
     });
   }, [activeFilter, bookings, playModeFilter]);
 
@@ -342,6 +345,7 @@ function BookingCard({
           ? session?.status || 'CHECKED_IN'
           : booking.status;
   const customerName = getCustomerName(booking);
+  const isWalkIn = (booking as any).source === 'STAFF_MANUAL' || (booking as any).source === 'WALK_IN';
   const canOpenSession = !!sessionId;
   const canCheckIn = !sessionId && !checkInExpired && booking.status === 'CONFIRMED';
   const actionLabel = canOpenSession
@@ -366,9 +370,26 @@ function BookingCard({
     >
       <View className="mb-3 flex-row items-start justify-between gap-3">
         <View className="flex-1">
-          <Text className="text-[15px] text-slate-900 dark:text-white" weight="700" numberOfLines={1}>
-            {customerName}
-          </Text>
+          <View className="flex-row items-center gap-1.5 flex-wrap">
+            <Text className="text-[15px] text-slate-900 dark:text-white" weight="700" numberOfLines={1}>
+              {customerName}
+            </Text>
+            {isWalkIn ? (
+              <View className="flex-row items-center gap-1 rounded-full border border-orange-300 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/60 px-2 py-0.5">
+                <Zap color="#ea580c" size={9} />
+                <Text className="text-[9px] text-[#ea580c] font-black uppercase">
+                  Vãng lai
+                </Text>
+              </View>
+            ) : (
+              <View className="flex-row items-center gap-1 rounded-full border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/60 px-2 py-0.5">
+                <Smartphone color="#0284c7" size={9} />
+                <Text className="text-[9px] text-sky-700 dark:text-sky-300 font-bold uppercase">
+                  App
+                </Text>
+              </View>
+            )}
+          </View>
           <Text className="mt-1 text-[11px] text-slate-500">
             #{booking.shortCode || booking.bookingId.slice(0, 8).toUpperCase()}
           </Text>

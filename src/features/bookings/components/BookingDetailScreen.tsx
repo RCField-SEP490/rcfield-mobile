@@ -14,6 +14,11 @@ import {
   CreditCard,
   Building2,
   Star,
+  ClipboardCheck,
+  FileText,
+  UtensilsCrossed,
+  Coffee,
+  QrCode,
 } from 'lucide-react-native';
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import {
@@ -130,6 +135,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
   const [bankTransferModalData, setBankTransferModalData] = useState<{
     bookingId: string;
     checkout: BankTransferCheckout;
+    isAdditionalPayment?: boolean;
   } | null>(null);
 
   useEffect(() => {
@@ -139,73 +145,114 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
     return () => clearInterval(interval);
   }, [booking?.session?.status, booking?.session?.plannedEndAt]);
 
-  const checkInPhotos = useMemo(() => {
-    if (!sessionDetail?.inspections) return [];
-    const insp = sessionDetail.inspections.find((i: any) => i.type === 'CHECK_IN');
-    return insp?.photos || [];
+  const mainScrollRef = useRef<ScrollView>(null);
+  const [inspectionCardY, setInspectionCardY] = useState(0);
+  const [inspectionPhotoTab, setInspectionPhotoTab] = useState<'CHECK_IN' | 'CHECK_OUT'>('CHECK_IN');
+
+  const checkInInspection = useMemo(() => {
+    if (!sessionDetail?.inspections) return null;
+    return sessionDetail.inspections.find((i: any) => i.type === 'CHECK_IN') || null;
   }, [sessionDetail]);
 
-  const checkOutPhotos = useMemo(() => {
-    if (!sessionDetail?.inspections) return [];
-    const insp = sessionDetail.inspections.find((i: any) => i.type === 'CHECK_OUT');
-    return insp?.photos || [];
+  const checkOutInspection = useMemo(() => {
+    if (!sessionDetail?.inspections) return null;
+    return sessionDetail.inspections.find((i: any) => i.type === 'CHECK_OUT') || null;
   }, [sessionDetail]);
 
-  const renderPhotoGrid = (photos: any[], label: string) => {
+  const checkInPhotos = useMemo(() => checkInInspection?.photos || [], [checkInInspection]);
+  const checkOutPhotos = useMemo(() => checkOutInspection?.photos || [], [checkOutInspection]);
+  const checkInChecklist = useMemo(() => checkInInspection?.checklist || [], [checkInInspection]);
+  const checkOutChecklist = useMemo(() => checkOutInspection?.checklist || [], [checkOutInspection]);
+  const checkInStaffNotes = useMemo(() => checkInInspection?.staffNotes?.trim() || '', [checkInInspection]);
+  const checkOutStaffNotes = useMemo(() => checkOutInspection?.staffNotes?.trim() || '', [checkOutInspection]);
+
+  const handleScrollToInspection = (tab: 'CHECK_IN' | 'CHECK_OUT' = 'CHECK_OUT') => {
+    setInspectionPhotoTab(tab);
+    if (mainScrollRef.current && inspectionCardY > 0) {
+      mainScrollRef.current.scrollTo({ y: Math.max(0, inspectionCardY - 20), animated: true });
+    }
+  };
+
+  const renderPhotoGrid = (photos: any[], label: string, type: 'CHECK_IN' | 'CHECK_OUT') => {
     const isByoc = booking?.playMode === 'BYOC';
 
+    if (photos.length === 0) {
+      return (
+        <View className="w-full py-8 px-4 rounded-2xl bg-slate-50 dark:bg-slate-900/40 border border-dashed border-slate-200 dark:border-slate-800 justify-center items-center gap-2">
+          <View className="size-11 rounded-full bg-slate-200/70 dark:bg-slate-800 items-center justify-center">
+            <Camera color={colorScheme === 'dark' ? '#94a3b8' : '#64748b'} size={20} />
+          </View>
+          <Text className="text-slate-700 dark:text-slate-300 text-xs font-bold">
+            Chưa có ảnh {type === 'CHECK_OUT' ? 'bàn giao trả xe' : 'nhận xe'}
+          </Text>
+          <Text className="text-slate-400 dark:text-slate-500 text-[11px] text-center max-w-[240px]">
+            {type === 'CHECK_OUT'
+              ? 'Nhân viên sẽ chụp ảnh đối chiếu 4-6 góc khi quý khách kết thúc ca chơi.'
+              : 'Chưa có hình ảnh kiểm tra nhận xe.'}
+          </Text>
+        </View>
+      );
+    }
+
+    if (isByoc) {
+      return (
+        <View className="space-y-2">
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Phóng to ${label}`}
+            onPress={() =>
+              setPreviewPhoto({
+                url: photos[0].url,
+                title: `${label} · ${getInspectionPhotoLabel(photos[0].angle)}`,
+              })
+            }
+            className="w-full aspect-video rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 overflow-hidden relative shadow-xs active:opacity-90"
+          >
+            <Image
+              source={{ uri: photos[0].url }}
+              className="w-full h-full object-cover"
+            />
+            <View className="absolute bottom-2 left-2 bg-black/75 px-2.5 py-1 rounded-md">
+              <Text className="text-[10px] text-white uppercase font-black tracking-wide">
+                {getInspectionPhotoLabel(photos[0].angle)}
+              </Text>
+            </View>
+          </Pressable>
+        </View>
+      );
+    }
+
     return (
-      <View className="flex-1 space-y-2">
-        <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider text-center mb-1">
-          {label}
-        </Text>
-        {photos.length > 0 ? (
-          isByoc ? (
+      <View className="space-y-2">
+        <View className="flex-row flex-wrap gap-2.5 justify-between">
+          {photos.map((p: any, idx: number) => (
             <Pressable
+              key={idx}
               accessibilityRole="button"
-              accessibilityLabel={`Phóng to ${label}`}
-              onPress={() => setPreviewPhoto({ url: photos[0].url, title: `${label} · ${getInspectionPhotoLabel(photos[0].angle)}` })}
-              className="w-full aspect-square rounded-lg bg-slate-900 border border-slate-800 overflow-hidden relative"
+              accessibilityLabel={`Phóng to ${label} ${idx + 1}`}
+              onPress={() =>
+                setPreviewPhoto({
+                  url: p.url,
+                  title: `${label} · ${getInspectionPhotoLabel(p.angle, idx)}`,
+                })
+              }
+              className="w-[48%] aspect-[4/3] rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 overflow-hidden relative shadow-xs active:opacity-85"
             >
               <Image
-                source={{ uri: photos[0].url }}
+                source={{ uri: p.url }}
                 className="w-full h-full object-cover"
               />
-              <View className="absolute bottom-1 left-1 bg-black/70 px-1 py-0.5 rounded">
-                <Text className="text-[7.5px] text-slate-300 uppercase font-black tracking-wide">
-                  {getInspectionPhotoLabel(photos[0].angle)}
+              <View className="absolute bottom-1.5 left-1.5 bg-black/75 px-2 py-0.5 rounded-md">
+                <Text className="text-[9px] text-white uppercase font-black tracking-wide">
+                  {getInspectionPhotoLabel(p.angle, idx)}
                 </Text>
               </View>
             </Pressable>
-          ) : (
-            <View className="flex-row flex-wrap gap-1.5 justify-start">
-              {photos.map((p: any, idx: number) => (
-                <Pressable
-                  key={idx}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Phóng to ${label} ${idx + 1}`}
-                  onPress={() => setPreviewPhoto({ url: p.url, title: `${label} · ${getInspectionPhotoLabel(p.angle, idx)}` })}
-                  className="w-[48%] aspect-square rounded-lg bg-slate-900 border border-slate-800 overflow-hidden relative"
-                >
-                  <Image
-                    source={{ uri: p.url }}
-                    className="w-full h-full object-cover"
-                  />
-                  <View className="absolute bottom-1 left-1 bg-black/70 px-1 py-0.5 rounded">
-                    <Text className="text-[7.5px] text-slate-300 uppercase font-black tracking-wide">
-                      {getInspectionPhotoLabel(p.angle, idx)}
-                    </Text>
-                  </View>
-                </Pressable>
-              ))}
-            </View>
-          )
-        ) : (
-          <View className="w-full aspect-square rounded-xl bg-slate-950 border border-slate-850 justify-center items-center gap-1.5 p-4">
-            <Camera color="#475569" size={24} />
-            <Text className="text-slate-500 text-[9px] font-bold">Chưa cập nhật ảnh</Text>
-          </View>
-        )}
+          ))}
+        </View>
+        <Text className="text-slate-400 dark:text-slate-500 text-[10px] text-center italic mt-1 font-medium">
+          💡 Chạm vào bất kỳ ảnh nào để xem phóng to
+        </Text>
       </View>
     );
   };
@@ -259,6 +306,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
             'CUSTOMER_CHECKIN_CONFIRMED',
             'CUSTOMER_CHECKOUT_CONFIRMED',
             'CUSTOMER_PAYMENT_CONFIRMED',
+            'CUSTOMER_INSPECTION_DISPUTED',
             'SESSION_EXTENSION_PROPOSED',
             'SESSION_EXTENSION_UPDATED',
             'SESSION_EXTENSION_EXPIRED',
@@ -267,6 +315,10 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
             'SESSION_FNB_ORDER_UPDATED',
             'FNB_ORDER_SERVED',
             'BOOKING_REVIEW_REQUEST',
+            'SESSION_UPDATED',
+            'INSPECTION_UPDATED',
+            'BOOKING_UPDATED',
+            'BOOKING_PAYMENT_UPDATED',
           ].includes(event)
         ) {
           console.log(`[BookingDetailScreen] WebSocket event '${event}' received for current booking, reloading...`);
@@ -327,6 +379,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
         setBankTransferModalData({
           bookingId,
           checkout: res.bank_transfer,
+          isAdditionalPayment: false,
         });
         return;
       }
@@ -345,22 +398,31 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
     }
   };
 
-  // Thanh toán phí phát sinh VNPay
-  const handlePaymentAdditional = async () => {
+  // Thanh toán phí phát sinh (VietQR hoặc VNPay)
+  const handlePaymentAdditional = async (method: 'vnpay' | 'bank_transfer' = 'vnpay') => {
     if (submittingAdditionalPayment) return;
     setSubmittingAdditionalPayment(true);
     try {
       const returnUrl = getVnpayReturnUrl();
-      const res = await bookingWizardApi.createCheckoutAdditionalPayment(bookingId, returnUrl);
+      const res = await bookingWizardApi.createCheckoutAdditionalPayment(bookingId, returnUrl, method);
+
+      if (res.bank_transfer && method === 'bank_transfer') {
+        setBankTransferModalData({
+          bookingId,
+          checkout: res.bank_transfer,
+          isAdditionalPayment: true,
+        });
+        return;
+      }
 
       if (res.payment_url) {
         await openVnpayPaymentSession(res.payment_url);
         loadBookingDetail();
       } else {
-        Alert.alert('Lỗi', 'Không tìm thấy URL thanh toán VNPay.');
+        Alert.alert('Lỗi', 'Không tìm thấy thông tin thanh toán.');
       }
     } catch (error: any) {
-      const errMsg = error?.response?.data?.message || 'Khởi tạo thanh toán VNPay thất bại.';
+      const errMsg = error?.response?.data?.message || 'Khởi tạo thanh toán phát sinh thất bại.';
       Alert.alert('Lỗi thanh toán', errMsg);
     } finally {
       setSubmittingAdditionalPayment(false);
@@ -439,9 +501,9 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
         <Text className="text-slate-900 dark:text-white text-lg font-bold mt-4">Không tìm thấy đơn đặt sân</Text>
         <Pressable
           className="mt-6 px-6 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 active:bg-slate-200 dark:active:bg-slate-700"
-          onPress={() => router.back()}
+          onPress={() => router.navigate('/(tabs)/bookings')}
         >
-          <Text className="text-slate-900 dark:text-white text-xs font-bold">Quay lại</Text>
+          <Text className="text-slate-900 dark:text-white text-xs font-bold">Quay lại danh sách</Text>
         </Pressable>
       </SafeAreaView>
     );
@@ -491,24 +553,13 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
   const displayBookingStatus = getDisplayBookingStatus(booking.status, booking.slotStart, session);
   const isSessionActive =
     !checkInExpired && session && ['ACTIVE', 'EXTENDING', 'CHECKED_IN', 'CHECKING_OUT'].includes(session.status);
-  const pendingInspection = sessionDetail?.inspections?.find(
-    (inspection: any) => inspection.customerConfirmed !== true && inspection.type === 'CHECK_OUT'
+  const isCheckoutPending = ['CHECKED_IN', 'ACTIVE', 'EXTENDING', 'CHECKING_OUT'].includes(
+    sessionDetail?.status ?? session?.status ?? ''
   );
   const pendingExtension =
     sessionDetail?.extensionProposal?.status === 'PENDING' && operationalTiming.state !== 'OVERDUE'
       ? sessionDetail.extensionProposal
       : null;
-
-  const handleOpenInspectionReview = () => {
-    if (!session?.id || !pendingInspection?.inspectionId) return;
-    router.push({
-      pathname: '/customer/inspections/[sessionId]',
-      params: {
-        sessionId: session.id,
-        inspectionId: pendingInspection.inspectionId,
-      },
-    } as any);
-  };
 
   const handleOpenExtensionResponse = () => {
     if (!session?.id || !pendingExtension) return;
@@ -525,6 +576,52 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
     } as any);
   };
 
+  // Review Status & Eligibility
+  const hasReviewed = !!booking.review;
+  const isBookingOrSessionDone = booking.status === 'COMPLETED' || session?.status === 'COMPLETED';
+  const effectiveCompletionTime =
+    booking.completedAt ||
+    booking.completed_at ||
+    session?.actualEndAt ||
+    (isBookingOrSessionDone ? booking.slotEnd : null);
+  const isReviewExpired =
+    booking.is_review_expired ??
+    (effectiveCompletionTime
+      ? Date.now() - new Date(effectiveCompletionTime).getTime() > 5 * 24 * 60 * 60 * 1000
+      : false);
+  const isReviewDismissed = !!(booking.reviewDismissedAt || booking.review_dismissed_at);
+  const canShowReviewPrompt = isBookingOrSessionDone && !hasReviewed && !isReviewExpired && !isReviewDismissed;
+
+  // F&B Orders
+  const customerFnbOrders: any[] = booking?.fnb_orders ?? [];
+  const preorderFnbOrders = customerFnbOrders.filter((o: any) => o.orderType === 'PRE_ORDER');
+  const onsiteFnbOrders = customerFnbOrders.filter(
+    (o: any) =>
+      o.orderType === 'ON_SITE' ||
+      o.orderType === 'SESSION' ||
+      o.orderType === 'EXTRA' ||
+      (!o.orderType && o.sessionId)
+  );
+
+  const preorderFnbPaid =
+    booking.status !== 'PENDING' &&
+    booking.status !== 'CANCELLED' &&
+    !booking.payment_components?.some(
+      (c: any) =>
+        (c.type === 'FNB_PREORDER' || c.type === 'FB_PREORDER') &&
+        c.status === 'PENDING'
+    );
+
+  const onsiteFnbPaid =
+    onsiteFnbOrders.length > 0 &&
+    (booking.status === 'COMPLETED' ||
+      session?.status === 'COMPLETED' ||
+      !booking.payment_components?.some(
+        (c: any) =>
+          (c.type === 'FNB_ON_SITE' || c.type === 'FNB_PREORDER' || c.type === 'FB_PREORDER') &&
+          c.status === 'PENDING'
+      ));
+
   // Quyết toán cuối phiên (Counter Bill & Reconciliation)
   const onsiteComponents = booking.payment_components?.filter((c: any) =>
     !['SLOT_FEE', 'RENTAL_FEE', 'SECURITY_DEPOSIT'].includes(c.type) &&
@@ -533,20 +630,6 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
 
   const damageComponent = onsiteComponents.find((c: any) => c.type === 'DAMAGE_CHARGE');
   const damageCharge = Number(damageComponent?.amount ?? 0);
-
-  const depositConsumedByDamage = Math.min(depositAmount, damageCharge);
-  const depositRefundAmount = depositAmount - depositConsumedByDamage;
-  const damageExceedingDeposit = Math.max(0, damageCharge - depositAmount);
-
-  const counterComponents = onsiteComponents.filter((c: any) => c.type !== 'DAMAGE_CHARGE');
-  const totalCounterServiceBill = counterComponents.reduce((sum: number, c: any) => sum + Number(c.amount), 0);
-  const totalCounterBill = totalCounterServiceBill + damageExceedingDeposit;
-
-  const pendingAdditionalAmount = onsiteComponents
-    .filter((c: any) => c.status === 'PENDING')
-    .reduce((sum: number, c: any) => sum + Number(c.amount), 0);
-
-  const isPaid = !booking.payment_components?.some((c: any) => c.status === 'PENDING');
 
   const approvedExtensions = sessionDetail?.approvedExtensions ?? [];
   const totalMinutes = approvedExtensions.reduce((sum: number, ext: any) => sum + Number(ext.extraMinutes), 0);
@@ -559,6 +642,76 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
     const nextEnd = previousEnd ? new Date(previousEnd.getTime() + Number(extension.extraMinutes) * 60_000) : null;
     return [...rows, { extension, previousEnd, nextEnd }];
   }, []);
+
+  // Additional items list for in-depth breakdown
+  const onsiteFnbTotal = onsiteFnbOrders.reduce((sum: number, o: any) => sum + Number(o.totalAmount || 0), 0);
+  const onsiteFnbComponent = onsiteComponents.find(
+    (c: any) => c.type === 'FNB_ON_SITE' || c.type === 'FB_PREORDER' || c.type === 'FNB_PREORDER'
+  );
+  const fnbOnsiteAmount = onsiteFnbComponent ? Number(onsiteFnbComponent.amount) : onsiteFnbTotal;
+  const isFnbOnsitePaid = onsiteFnbComponent ? onsiteFnbComponent.status !== 'PENDING' : onsiteFnbPaid;
+  const allOnsiteItems = onsiteFnbOrders.flatMap((o: any) => o.items || []);
+
+  const extensionComponent = onsiteComponents.find((c: any) => c.type === 'EXTENSION_FEE');
+  const extAmount = extensionComponent ? Number(extensionComponent.amount) : totalFee;
+  const isExtPaid = extensionComponent ? extensionComponent.status !== 'PENDING' : false;
+  const minsExtended = totalMinutes || sessionDetail?.extensionProposal?.extraMinutes || session?.approvedExtensionMinutes;
+
+  const dmgAmount = damageComponent ? Number(damageComponent.amount) : damageCharge;
+  const isDmgPaid = damageComponent ? damageComponent.status !== 'PENDING' : false;
+
+  const additionalLines: any[] = [];
+  if (fnbOnsiteAmount > 0) {
+    additionalLines.push({
+      id: 'fnb_onsite',
+      type: 'FNB_ON_SITE',
+      label: 'Đồ ăn & Thức uống gọi tại quầy',
+      amount: fnbOnsiteAmount,
+      isPaid: isFnbOnsitePaid,
+      items: allOnsiteItems,
+    });
+  }
+  if (extAmount > 0) {
+    additionalLines.push({
+      id: 'extension',
+      type: 'EXTENSION_FEE',
+      label: minsExtended ? `Phí gia hạn ca chơi (+${minsExtended} phút)` : 'Phí gia hạn ca chơi',
+      amount: extAmount,
+      isPaid: isExtPaid,
+    });
+  }
+  if (dmgAmount > 0) {
+    additionalLines.push({
+      id: 'damage',
+      type: 'DAMAGE_CHARGE',
+      label: 'Phí bồi thường hư hỏng xe',
+      amount: dmgAmount,
+      isPaid: isDmgPaid,
+      items: damageLineItems,
+    });
+  }
+
+  // Any other uncategorized onsite components
+  onsiteComponents.forEach((c: any) => {
+    if (!['FNB_ON_SITE', 'FB_PREORDER', 'FNB_PREORDER', 'EXTENSION_FEE', 'DAMAGE_CHARGE'].includes(c.type)) {
+      additionalLines.push({
+        id: c.id || String(Math.random()),
+        type: c.type,
+        label: c.label || 'Khoản phát sinh khác',
+        amount: Number(c.amount),
+        isPaid: c.status !== 'PENDING',
+      });
+    }
+  });
+
+  const additionalTotal = additionalLines.reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
+  const additionalOutstandingAmount = additionalLines
+    .filter((l: any) => !l.isPaid)
+    .reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
+
+  const prepaidPaidAmount = booking.status !== 'PENDING' ? totalPrepaid : 0;
+  const totalPaidAmount = prepaidPaidAmount + Math.max(0, additionalTotal - additionalOutstandingAmount);
+  const isPaid = !booking.payment_components?.some((c: any) => c.status === 'PENDING') && additionalOutstandingAmount === 0;
 
   const transactions = booking.payment_transactions ?? [];
   const gatewayLabel = (gateway?: string | null) => {
@@ -594,11 +747,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
         <Pressable
           className="size-9 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 justify-center items-center active:bg-slate-100 dark:active:bg-slate-800"
           onPress={() => {
-            if (router.canGoBack()) {
-              router.back();
-            } else {
-              router.replace('/(tabs)/bookings');
-            }
+            router.navigate('/(tabs)/bookings');
           }}
         >
           <ArrowLeft color={colorScheme === 'dark' ? '#ffffff' : '#475569'} size={18} />
@@ -608,6 +757,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
       </View>
 
       <ScrollView
+        ref={mainScrollRef}
         contentContainerClassName="px-5 py-5 pb-12"
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -725,26 +875,28 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
           </View>
         )}
 
-        {pendingInspection ? (
-          <View className="mb-6 rounded-2xl border border-[#ffedd5] dark:border-[#431407]/40 bg-[#fff7ed] dark:bg-[#1e130c] p-4 shadow-sm">
+        {checkOutInspection || sessionDetail?.status === 'CHECKING_OUT' ? (
+          <View className="mb-6 rounded-2xl border border-emerald-200 dark:border-emerald-900/40 bg-emerald-50/70 dark:bg-emerald-950/20 p-4 shadow-sm">
             <View className="flex-row items-start gap-3">
-              <AlertTriangle color="#f97316" size={20} style={{ marginTop: 2 }} />
+              <ClipboardCheck color="#10b981" size={20} style={{ marginTop: 2 }} />
               <View className="flex-1">
-                <Text className="text-orange-400 text-[14px]" weight="700">
-                  Cần xác nhận biên bản trả xe
+                <Text className="text-emerald-800 dark:text-emerald-300 text-[14px]" weight="700">
+                  {checkOutInspection ? 'Biên bản bàn giao trả xe' : 'Nhân viên đang kiểm tra xe'}
                 </Text>
                 <Text className="mt-1 text-xs leading-4 text-slate-700 dark:text-slate-300 font-semibold">
-                  Nhân viên đã gửi biên bản checkout. Bạn cần xem và đồng ý để phiên chơi hoàn tất.
+                  {checkOutInspection
+                    ? 'Nhân viên trực ca đã hoàn tất kiểm tra và cập nhật ảnh hiện trạng xe. Bạn có thể xem đối chiếu chi tiết bên dưới.'
+                    : 'Nhân viên đang kiểm tra kỹ thuật và chụp ảnh hiện trạng xe trả tại quầy.'}
                 </Text>
               </View>
             </View>
             <Pressable
-              className="mt-3 h-10 flex-row items-center justify-center rounded-xl bg-[#ea580c] active:bg-[#f97316] gap-1.5 shadow-md"
-              onPress={handleOpenInspectionReview}
+              className="mt-3 h-10 flex-row items-center justify-center rounded-xl bg-emerald-600 active:bg-emerald-700 gap-1.5 shadow-md"
+              onPress={() => handleScrollToInspection('CHECK_OUT')}
             >
-              <CheckCircle2 color="#ffffff" size={15} />
+              <ClipboardCheck color="#ffffff" size={15} />
               <Text className="text-white text-xs font-bold">
-                Xem và xác nhận biên bản
+                Xem biên bản bàn giao xe
               </Text>
             </Pressable>
           </View>
@@ -775,7 +927,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
           </View>
         ) : null}
 
-        {((booking.status === 'COMPLETED' || session?.status === 'COMPLETED') && !booking.review) ? (
+        {canShowReviewPrompt ? (
           <View className="mb-6 rounded-2xl border border-[#fde68a] dark:border-[#451a03]/50 bg-[#fffbeb] dark:bg-[#1c1912] p-4 shadow-sm">
             <View className="flex-row items-start gap-3">
               <Star color="#d97706" fill="#d97706" size={20} style={{ marginTop: 2 }} />
@@ -784,7 +936,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                   Đánh giá trải nghiệm sau phiên
                 </Text>
                 <Text className="mt-1 text-xs leading-4 text-amber-800/80 dark:text-amber-300/80 font-semibold">
-                  Gửi đánh giá về sân, xe và nhân viên sau khi checkout hoàn tất.
+                  Gửi đánh giá về sân, xe và nhân viên sau khi hoàn tất phiên chơi (trong vòng 5 ngày).
                 </Text>
               </View>
             </View>
@@ -800,7 +952,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
           </View>
         ) : null}
 
-        {((booking.status === 'COMPLETED' || session?.status === 'COMPLETED') && booking.review) ? (
+        {hasReviewed ? (
           <View className="mb-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-4 shadow-sm">
             <View className="flex-row items-start gap-3">
               <Star color="#eab308" fill="#eab308" size={20} style={{ marginTop: 2 }} />
@@ -808,15 +960,20 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                 <Text className="text-slate-900 dark:text-white text-[14px]" weight="700">
                   Đánh giá của bạn
                 </Text>
-                <View className="flex-row items-center gap-0.5 mt-1">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <Star
-                      key={i}
-                      color="#eab308"
-                      fill={i < booking.review.overallScore ? '#eab308' : 'transparent'}
-                      size={12}
-                    />
-                  ))}
+                <View className="flex-row items-center gap-1 mt-1">
+                  <View className="flex-row items-center gap-0.5">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <Star
+                        key={i}
+                        color="#eab308"
+                        fill={i < booking.review.overallScore ? '#eab308' : 'transparent'}
+                        size={13}
+                      />
+                    ))}
+                  </View>
+                  <Text className="ml-1 text-xs text-slate-500 font-bold">
+                    {booking.review.overallScore}/5 sao
+                  </Text>
                 </View>
                 {booking.review.note ? (
                   <Text className="mt-2 text-xs leading-4 text-slate-600 dark:text-slate-300 font-medium">
@@ -1139,7 +1296,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                   {v.coverImageUrl ? (
                     <Image source={{ uri: v.coverImageUrl }} className="size-11 rounded-lg bg-slate-100 dark:bg-slate-900" />
                   ) : (
-                    <View className="size-11 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 justify-center items-center">
+                      <View className="size-11 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 justify-center items-center">
                       <Car color="#475569" size={18} />
                     </View>
                   )}
@@ -1162,44 +1319,427 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
           </View>
         )}
 
-        {/* Trình đối chiếu hình ảnh Check-in/Check-out (Handover Photos) */}
-        {session && (session.status === 'ACTIVE' || session.status === 'COMPLETED' || session.status === 'CHECKING_OUT') && (
-          <View className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-5 shadow-xl mb-6">
-            <View className="flex-row items-center gap-2 mb-3.5 border-b border-slate-200 dark:border-slate-800/80 pb-2">
-              <Camera color="#f97316" size={16} />
-              <Text className="text-[12px] font-bold text-slate-900 dark:text-white uppercase tracking-wider">
-                {booking.playMode === 'BYOC' ? 'Ảnh xe bàn giao Check-in' : 'Đối chiếu bàn giao xe (Side-by-Side)'}
-              </Text>
+        {/* Danh sách Đồ ăn & Nước uống (F&B Orders) */}
+        {customerFnbOrders.length > 0 && (
+          <View className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-5 shadow-xl mb-6">
+            <View className="flex-row items-center gap-2.5 mb-3.5 border-b border-slate-200 dark:border-slate-800/80 pb-2.5">
+              <View className="size-8 rounded-xl bg-orange-500/10 border border-orange-500/20 justify-center items-center">
+                <UtensilsCrossed color="#f97316" size={16} />
+              </View>
+              <View className="flex-1">
+                <Text className="text-[12px] font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                  Đồ ăn & Thức uống ({customerFnbOrders.flatMap((o: any) => o.items || []).reduce((a: number, b: any) => a + Number(b.quantity || 1), 0)} món)
+                </Text>
+                <Text className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  Chi tiết các món đã đặt trước và gọi thêm tại sân
+                </Text>
+              </View>
             </View>
 
-            <View className="space-y-4">
-              <View className="flex-row gap-4">
-                {/* Check-in Photos Grid */}
-                {renderPhotoGrid(checkInPhotos, 'Ảnh bàn giao Check-in')}
+            <View className="gap-3.5">
+              {/* 1. Đặt trước khi đến sân */}
+              {preorderFnbOrders.length > 0 && (
+                <View className="rounded-2xl border border-emerald-200 dark:border-emerald-900/40 bg-emerald-50/50 dark:bg-emerald-950/20 p-3.5 gap-2.5">
+                  <View className="flex-row justify-between items-center border-b border-emerald-200/60 dark:border-emerald-800/40 pb-2">
+                    <View className="flex-row items-center gap-1.5">
+                      <UtensilsCrossed color="#10b981" size={14} />
+                      <Text className="text-xs font-bold text-emerald-950 dark:text-emerald-200">
+                        Đặt trước khi đến sân
+                      </Text>
+                    </View>
+                    <View className="px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-900/60 border border-emerald-300 dark:border-emerald-700">
+                      <Text className="text-[9px] font-bold text-emerald-800 dark:text-emerald-300 uppercase">
+                        {preorderFnbPaid ? 'Đã thanh toán' : 'Chờ thanh toán'}
+                      </Text>
+                    </View>
+                  </View>
 
-                {/* Check-out Photos Grid */}
-                {booking.playMode !== 'BYOC' && renderPhotoGrid(checkOutPhotos, 'Ảnh bàn giao Check-out')}
-              </View>
-              {sessionDetail?.damageNotes && (
-                <View className="rounded-lg bg-red-500/5 border border-red-500/10 p-2.5">
-                  <Text className="text-red-400 text-[10px] font-bold uppercase tracking-wide">Ghi chú hư hại từ nhân viên:</Text>
-                  <Text className="text-slate-700 dark:text-slate-300 text-xs font-semibold leading-4 mt-0.5">{sessionDetail.damageNotes}</Text>
+                  <View className="gap-2">
+                    {preorderFnbOrders.flatMap((o: any) => o.items || []).map((item: any, idx: number) => (
+                      <View key={item.id || idx} className="flex-row justify-between items-start bg-white dark:bg-[#0f172a] p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
+                        <View className="flex-1 pr-2">
+                          <Text className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                            {item.itemName ?? 'Món F&B'} {item.variantName ? <Text className="text-slate-500 font-normal text-[11px]">({item.variantName})</Text> : null}
+                          </Text>
+                          {item.notes ? (
+                            <Text className="text-[10px] text-slate-400 italic mt-0.5">Ghi chú: {item.notes}</Text>
+                          ) : null}
+                        </View>
+                        <View className="items-end">
+                          <Text className="text-xs font-bold text-slate-900 dark:text-white">
+                            {Number(item.subtotal ?? (Number(item.unitPrice || 0) * Number(item.quantity || 1))).toLocaleString('vi-VN')}đ
+                          </Text>
+                          <Text className="text-[10px] text-slate-400">
+                            ×{item.quantity} · {Number(item.unitPrice || 0).toLocaleString('vi-VN')}đ
+                          </Text>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              {/* 2. Gọi thêm trong phiên chơi */}
+              {onsiteFnbOrders.length > 0 && (
+                <View className="rounded-2xl border border-orange-200 dark:border-orange-900/40 bg-orange-50/50 dark:bg-orange-950/20 p-3.5 gap-2.5">
+                  <View className="flex-row justify-between items-center border-b border-orange-200/60 dark:border-orange-800/40 pb-2">
+                    <View className="flex-row items-center gap-1.5">
+                      <Coffee color="#ea580c" size={14} />
+                      <Text className="text-xs font-bold text-orange-950 dark:text-orange-200">
+                        Gọi thêm trong phiên chơi
+                      </Text>
+                    </View>
+                    <View className="px-2 py-0.5 rounded-md bg-orange-100 dark:bg-orange-900/60 border border-orange-300 dark:border-orange-700">
+                      <Text className="text-[9px] font-bold text-orange-800 dark:text-orange-300 uppercase">
+                        {onsiteFnbPaid ? 'Đã thanh toán' : 'Chờ thanh toán'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View className="gap-2">
+                    {onsiteFnbOrders.flatMap((o: any) => o.items || []).map((item: any, idx: number) => (
+                      <View key={item.id || idx} className="flex-row justify-between items-start bg-white dark:bg-[#0f172a] p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
+                        <View className="flex-1 pr-2">
+                          <Text className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                            {item.itemName ?? 'Món F&B'} {item.variantName ? <Text className="text-slate-500 font-normal text-[11px]">({item.variantName})</Text> : null}
+                          </Text>
+                          {item.notes ? (
+                            <Text className="text-[10px] text-slate-400 italic mt-0.5">Ghi chú: {item.notes}</Text>
+                          ) : null}
+                        </View>
+                        <View className="items-end">
+                          <Text className="text-xs font-bold text-orange-600 dark:text-orange-400">
+                            +{Number(item.subtotal ?? (Number(item.unitPrice || 0) * Number(item.quantity || 1))).toLocaleString('vi-VN')}đ
+                          </Text>
+                          <Text className="text-[10px] text-slate-400">
+                            ×{item.quantity} · {Number(item.unitPrice || 0).toLocaleString('vi-VN')}đ
+                          </Text>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
                 </View>
               )}
             </View>
           </View>
         )}
 
+        {/* Trình đối chiếu hình ảnh & Biên bản bàn giao Check-in/Check-out */}
+        {session && (session.status === 'ACTIVE' || session.status === 'COMPLETED' || session.status === 'CHECKING_OUT') && (
+          <View
+            onLayout={(e) => setInspectionCardY(e.nativeEvent.layout.y)}
+            className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-5 shadow-xl mb-6"
+          >
+            <View className="flex-row items-center justify-between mb-4 border-b border-slate-200 dark:border-slate-800/80 pb-3">
+              <View className="flex-row items-center gap-2.5">
+                <View className="size-8 rounded-xl bg-orange-500/10 border border-orange-500/20 justify-center items-center">
+                  <Camera color="#f97316" size={16} />
+                </View>
+                <View>
+                  <Text className="text-[12px] font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                    {booking.playMode === 'BYOC' ? 'Biên bản xe Check-in' : 'Biên bản & đối chiếu bàn giao xe'}
+                  </Text>
+                  <Text className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    {inspectionPhotoTab === 'CHECK_IN'
+                      ? 'Hiện trạng kỹ thuật & ảnh xe lúc nhận ban đầu'
+                      : 'Hiện trạng kỹ thuật & ảnh xe lúc trả sau ca chơi'}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Segmented Control Tabs */}
+            <View className="flex-row rounded-xl bg-slate-200/70 dark:bg-slate-800/80 p-1 gap-1 mb-4">
+              <Pressable
+                onPress={() => setInspectionPhotoTab('CHECK_IN')}
+                className={cn(
+                  "flex-1 py-2 rounded-lg items-center justify-center",
+                  inspectionPhotoTab === 'CHECK_IN'
+                    ? "bg-white dark:bg-[#0f172a] shadow-xs"
+                    : "opacity-75"
+                )}
+              >
+                <Text
+                  className={cn(
+                    "text-[11px] font-bold",
+                    inspectionPhotoTab === 'CHECK_IN'
+                      ? "text-[#ea580c] dark:text-[#f97316]"
+                      : "text-slate-600 dark:text-slate-400"
+                  )}
+                >
+                  📸 Nhận xe (Check-in)
+                </Text>
+              </Pressable>
+              {booking.playMode !== 'BYOC' && (
+                <Pressable
+                  onPress={() => setInspectionPhotoTab('CHECK_OUT')}
+                  className={cn(
+                    "flex-1 py-2 rounded-lg items-center justify-center",
+                    inspectionPhotoTab === 'CHECK_OUT'
+                      ? "bg-white dark:bg-[#0f172a] shadow-xs"
+                      : "opacity-75"
+                  )}
+                >
+                  <Text
+                    className={cn(
+                      "text-[11px] font-bold",
+                      inspectionPhotoTab === 'CHECK_OUT'
+                        ? "text-[#ea580c] dark:text-[#f97316]"
+                        : "text-slate-600 dark:text-slate-400"
+                    )}
+                  >
+                    🏁 Trả xe (Check-out)
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+
+            {/* Content for TAB 1: CHECK_IN */}
+            {inspectionPhotoTab === 'CHECK_IN' ? (
+              <View className="gap-4">
+                {/* Check-in Staff Notes */}
+                {Boolean(checkInStaffNotes) && (
+                  <View className="rounded-2xl border border-amber-200 dark:border-amber-800/40 bg-amber-50/70 dark:bg-amber-950/20 p-3.5 flex-row items-start gap-2.5">
+                    <FileText color="#d97706" size={16} style={{ marginTop: 2 }} />
+                    <View className="flex-1">
+                      <Text className="text-amber-950 dark:text-amber-300 text-[11px] font-bold">
+                        Ghi chú nhận xe của nhân viên (Check-in):
+                      </Text>
+                      <Text className="text-amber-900 dark:text-amber-400 text-xs mt-1 leading-4">
+                        {checkInStaffNotes}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+
+                {/* Check-in Technical Checklist */}
+                {checkInChecklist.length > 0 && (
+                  <View className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/40 p-4 gap-3">
+                    <View className="flex-row items-center justify-between">
+                      <View className="flex-row items-center gap-1.5">
+                        <ClipboardCheck color="#10b981" size={16} />
+                        <Text className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                          Checklist kiểm tra nhận xe (Check-in)
+                        </Text>
+                      </View>
+                      <View className="bg-emerald-100 dark:bg-emerald-950/50 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+                        <Text className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
+                          {
+                            checkInChecklist.filter(
+                              (c: any) => c.checked !== false && c.status !== 'DAMAGED' && c.status !== 'NOT_OK'
+                            ).length
+                          }/{checkInChecklist.length} Đạt
+                        </Text>
+                      </View>
+                    </View>
+                    <View className="gap-2">
+                      {checkInChecklist.map((item: any, idx: number) => {
+                        const isOk = item.checked !== false && item.status !== 'DAMAGED' && item.status !== 'NOT_OK';
+                        return (
+                          <View
+                            key={item.itemKey || item.label || idx}
+                            className="flex-row items-start justify-between bg-white dark:bg-[#0f172a] p-2.5 rounded-xl border border-slate-100 dark:border-slate-800/80"
+                          >
+                            <View className="flex-1 pr-2">
+                              <View className="flex-row items-center gap-2">
+                                <View className={cn("size-2 rounded-full", isOk ? "bg-emerald-500" : "bg-red-500")} />
+                                <Text className="text-slate-800 dark:text-slate-200 text-xs font-bold">
+                                  {item.itemLabel || item.label || item.itemKey}
+                                </Text>
+                              </View>
+                              {item.notes || item.note ? (
+                                <Text className="text-slate-500 dark:text-slate-400 text-[11px] mt-1 pl-4">
+                                  {item.notes || item.note}
+                                </Text>
+                              ) : null}
+                            </View>
+                            <View className="px-2 py-0.5 rounded bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                              <Text className={cn("text-[9px] font-bold", isOk ? "text-emerald-600 dark:text-emerald-400" : "text-red-500")}>
+                                {isOk ? 'Đạt' : 'Cần chú ý'}
+                              </Text>
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  </View>
+                )}
+
+                {/* Check-in Photos Grid */}
+                <View className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 p-3.5 gap-3">
+                  <View className="flex-row items-center gap-1.5">
+                    <Camera color="#f97316" size={14} />
+                    <Text className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                      Hình ảnh nhận xe ({checkInPhotos.length} góc chụp)
+                    </Text>
+                  </View>
+                  {renderPhotoGrid(checkInPhotos, 'Ảnh bàn giao Check-in', 'CHECK_IN')}
+                </View>
+              </View>
+            ) : (
+              /* Content for TAB 2: CHECK_OUT */
+              <View className="gap-4">
+                {checkOutInspection ? (
+                  <>
+                    {/* Check-out Staff Notes */}
+                    {Boolean(checkOutStaffNotes) && (
+                      <View className="rounded-2xl border border-amber-200 dark:border-amber-800/40 bg-amber-50/70 dark:bg-amber-950/20 p-3.5 flex-row items-start gap-2.5">
+                        <FileText color="#d97706" size={16} style={{ marginTop: 2 }} />
+                        <View className="flex-1">
+                          <Text className="text-amber-950 dark:text-amber-300 text-[11px] font-bold">
+                            Ghi chú trả xe của nhân viên (Check-out):
+                          </Text>
+                          <Text className="text-amber-900 dark:text-amber-400 text-xs mt-1 leading-4">
+                            {checkOutStaffNotes}
+                          </Text>
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Damage Notes */}
+                    {sessionDetail?.damageNotes && (
+                      <View className="rounded-2xl bg-red-500/10 border border-red-500/20 p-3.5 flex-row items-start gap-2.5">
+                        <AlertTriangle color="#ef4444" size={16} style={{ marginTop: 2 }} />
+                        <View className="flex-1">
+                          <Text className="text-red-600 dark:text-red-400 text-[11px] font-bold uppercase tracking-wide">
+                            Ghi chú hư hại từ nhân viên:
+                          </Text>
+                          <Text className="text-slate-800 dark:text-slate-200 text-xs font-semibold leading-4 mt-1">
+                            {sessionDetail.damageNotes}
+                          </Text>
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Check-out Technical Checklist */}
+                    {checkOutChecklist.length > 0 && (
+                      <View className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/40 p-4 gap-3">
+                        <View className="flex-row items-center justify-between">
+                          <View className="flex-row items-center gap-1.5">
+                            <ClipboardCheck color="#10b981" size={16} />
+                            <Text className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                              Checklist kiểm tra trả xe (Check-out)
+                            </Text>
+                          </View>
+                          <View className="bg-slate-100 dark:bg-slate-800 px-2.5 py-0.5 rounded-full border border-slate-200 dark:border-slate-700">
+                            <Text className="text-[10px] font-bold text-slate-700 dark:text-slate-300">
+                              {
+                                checkOutChecklist.filter(
+                                  (c: any) => c.checked !== false && c.status !== 'DAMAGED' && c.status !== 'NOT_OK'
+                                ).length
+                              }/{checkOutChecklist.length} Đạt
+                            </Text>
+                          </View>
+                        </View>
+                        <View className="gap-2">
+                          {checkOutChecklist.map((item: any, idx: number) => {
+                            const isOk = item.checked !== false && item.status !== 'DAMAGED' && item.status !== 'NOT_OK';
+                            return (
+                              <View
+                                key={item.itemKey || item.label || idx}
+                                className="flex-row items-start justify-between bg-white dark:bg-[#0f172a] p-2.5 rounded-xl border border-slate-100 dark:border-slate-800/80"
+                              >
+                                <View className="flex-1 pr-2">
+                                  <View className="flex-row items-center gap-2">
+                                    <View className={cn("size-2 rounded-full", isOk ? "bg-emerald-500" : "bg-rose-500")} />
+                                    <Text className="text-slate-800 dark:text-slate-200 text-xs font-bold">
+                                      {item.itemLabel || item.label || item.itemKey}
+                                    </Text>
+                                  </View>
+                                  {item.notes || item.note ? (
+                                    <Text className="text-rose-500 dark:text-rose-400 text-[11px] font-medium mt-1 pl-4">
+                                      Ghi chú: {item.notes || item.note}
+                                    </Text>
+                                  ) : null}
+                                </View>
+                                <View className={cn(
+                                  "px-2 py-0.5 rounded border",
+                                  isOk ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800" : "bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800"
+                                )}>
+                                  <Text className={cn("text-[9px] font-bold", isOk ? "text-emerald-700 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
+                                    {isOk ? 'Đạt' : 'Cần xử lý'}
+                                  </Text>
+                                </View>
+                              </View>
+                            );
+                          })}
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Check-out Photos Grid */}
+                    <View className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 p-3.5 gap-3">
+                      <View className="flex-row items-center gap-1.5">
+                        <Camera color="#ea580c" size={14} />
+                        <Text className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                          Hình ảnh đối chiếu trả xe ({checkOutPhotos.length} góc chụp)
+                        </Text>
+                      </View>
+                      {renderPhotoGrid(checkOutPhotos, 'Ảnh bàn giao Check-out', 'CHECK_OUT')}
+                    </View>
+
+                    {/* Bảng kê hư hỏng linh kiện nếu có */}
+                    {damageLineItems && damageLineItems.length > 0 && (
+                      <View className="rounded-2xl border border-rose-200 dark:border-rose-900/30 bg-rose-50/50 dark:bg-rose-950/20 p-4 gap-2.5">
+                        <View className="flex-row items-center gap-1.5">
+                          <AlertTriangle color="#ef4444" size={14} />
+                          <Text className="text-xs font-bold text-rose-900 dark:text-rose-200">
+                            Bảng kê chi phí hư hại / thay thế linh kiện
+                          </Text>
+                        </View>
+                        <View className="gap-2">
+                          {damageLineItems.map((item: any, idx: number) => {
+                            const name = getPartTypeName(item.partType, item.customPartName);
+                            const partsPrice = Number(item.partsPrice || 0);
+                            const laborPrice = Number(item.laborPrice || 0);
+                            const lineTotal = Number(item.subtotal ?? item.lineTotal ?? (partsPrice + laborPrice));
+                            return (
+                              <View key={item.id || idx} className="flex-row justify-between items-start bg-white dark:bg-[#0f172a] p-2.5 rounded-xl border border-rose-100 dark:border-rose-900/40">
+                                <View className="flex-1 pr-2">
+                                  <Text className="text-xs font-bold text-slate-900 dark:text-slate-100">{name}</Text>
+                                  <Text className="text-[10.5px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                    Linh kiện: {partsPrice.toLocaleString('vi-VN')}đ · Công: {laborPrice.toLocaleString('vi-VN')}đ
+                                  </Text>
+                                </View>
+                                <Text className="text-xs font-bold text-rose-600 dark:text-rose-400">
+                                  {lineTotal.toLocaleString('vi-VN')}đ
+                                </Text>
+                              </View>
+                            );
+                          })}
+                        </View>
+                      </View>
+                    )}
+                  </>
+                ) : (
+                  /* Waiting for Check-out State */
+                  <View className="py-10 px-4 rounded-2xl bg-slate-50/70 dark:bg-slate-900/30 border border-dashed border-slate-200 dark:border-slate-800 justify-center items-center gap-2.5">
+                    <View className="size-12 rounded-full bg-slate-200/70 dark:bg-slate-800 items-center justify-center">
+                      <Camera color={colorScheme === 'dark' ? '#94a3b8' : '#64748b'} size={22} />
+                    </View>
+                    <Text className="text-slate-800 dark:text-slate-200 text-xs font-bold text-center">
+                      Chưa có biên bản trả xe (Check-out)
+                    </Text>
+                    <Text className="text-slate-500 dark:text-slate-400 text-[11px] text-center max-w-[260px] leading-4">
+                      Khi kết thúc ca chơi, nhân viên tại quầy sẽ kiểm tra tình trạng xe, chụp ảnh 4 góc và lập biên bản bàn giao xe cùng bạn.
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+          </View>
+        )}
+
         {/* Section: Thanh toán & Quyết toán (Billing & Settlement) */}
-        <View className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-5 shadow-xl mb-6">
-          <View className="flex-row items-center gap-2 mb-4 border-b border-slate-200 dark:border-slate-800/80 pb-2.5">
+        <View className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-5 shadow-xl mb-6">
+          <View className="flex-row items-center gap-2 mb-4 border-b border-slate-200 dark:border-slate-800/80 pb-3">
             <CreditCard color="#f97316" size={16} />
             <Text className="text-[12px] font-bold text-slate-900 dark:text-white uppercase tracking-wider">
               Thanh toán & Quyết toán
             </Text>
           </View>
 
-          {/* Block 1: Trả trước qua cổng thanh toán */}
+          {/* Block 1: Khoản trả trước khi đặt lịch */}
           <View className="space-y-3">
             <View className="flex-row items-center gap-2">
               <CheckCircle2 color={booking.status === 'PENDING' ? '#f59e0b' : '#10b981'} size={15} />
@@ -1239,185 +1779,205 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
               )}
               {depositAmount > 0 && (
                 <View className="flex-row justify-between">
-                  <Text className="text-slate-500 dark:text-slate-400 text-xs font-semibold">Tiền cọc xe giữ</Text>
+                  <Text className="text-slate-500 dark:text-slate-400 text-xs font-semibold">Tiền cọc an toàn giữ xe</Text>
                   <Text className="text-slate-900 dark:text-white text-xs font-bold">{depositAmount.toLocaleString('vi-VN')}đ</Text>
                 </View>
               )}
               {discountAmount > 0 && (
                 <View className="flex-row justify-between">
-                  <Text className="text-slate-500 dark:text-slate-400 text-xs font-semibold">Mã giảm giá</Text>
+                  <Text className="text-slate-500 dark:text-slate-400 text-xs font-semibold">Ưu đãi áp dụng</Text>
                   <Text className="text-emerald-500 text-xs font-bold">-{discountAmount.toLocaleString('vi-VN')}đ</Text>
                 </View>
               )}
 
-              {/* Dòng gạch chân mờ và Tổng đã trả */}
+              {/* Dòng gạch chân và Tổng đã trả trước */}
               <View className="w-full h-[1px] bg-slate-200 dark:bg-slate-800/60 my-1" />
               <View className="flex-row justify-between">
-                <Text className="text-slate-700 dark:text-slate-200 text-xs font-bold">Tổng đã trả</Text>
-                <Text className="text-slate-900 dark:text-white text-xs font-bold">{totalPrepaid.toLocaleString('vi-VN')}đ</Text>
+                <Text className="text-slate-700 dark:text-slate-200 text-xs font-bold">
+                  {booking.status === 'PENDING' ? 'Tổng cần thanh toán' : 'Đã thanh toán khi đặt lịch'}
+                </Text>
+                <Text className="text-slate-900 dark:text-white text-xs font-bold">{prepaidPaidAmount.toLocaleString('vi-VN')}đ</Text>
               </View>
             </View>
           </View>
 
-          {/* Block 2: Quyết toán cuối phiên chơi (Active, Awaiting payment hoặc Completed) */}
-          {(isSessionActive || booking.status === 'COMPLETED' || booking.status === 'AWAITING_PAYMENT') && (depositAmount > 0 || totalCounterBill > 0 || damageCharge > 0) && (
+          {/* Block 2: Chi tiết các khoản phát sinh trong ca chơi (In-session Additional Fees) */}
+          {(additionalLines.length > 0 || isSessionActive || booking.status === 'COMPLETED' || booking.status === 'AWAITING_PAYMENT') && (
             <View className="mt-5 pt-4 border-t border-slate-200 dark:border-slate-800/80 space-y-3">
               <View className="flex-row items-center gap-2">
-                <Clock color="#94a3b8" size={15} />
-                <Text className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wide">
-                  {isSessionActive ? 'Khi kết thúc phiên (ước tính)' : 'Quyết toán tại quầy'}
+                <Clock color="#f97316" size={15} />
+                <Text className="text-slate-700 dark:text-slate-300 text-xs font-bold uppercase tracking-wide">
+                  Chi tiết phí phát sinh tại sân
                 </Text>
               </View>
 
-              <View className="pl-5 space-y-2">
-                {depositRefundAmount > 0 && (
-                  <View className="flex-row justify-between">
-                    <Text className="text-slate-500 dark:text-slate-400 text-xs font-semibold">Hoàn cọc xe</Text>
-                    <Text className="text-emerald-400 text-xs font-bold">+{depositRefundAmount.toLocaleString('vi-VN')}đ</Text>
-                  </View>
-                )}
-                {depositConsumedByDamage > 0 && (
-                  <View className="flex-row justify-between">
-                    <Text className="text-slate-500 dark:text-slate-400 text-xs font-semibold">Khấu trừ cọc hư hỏng</Text>
-                    <Text className="text-rose-400 text-xs font-bold">-{depositConsumedByDamage.toLocaleString('vi-VN')}đ</Text>
-                  </View>
-                )}
-                {counterComponents.map((c: any, idx: number) => {
-                  let label = c.label || 'Phí phát sinh';
-                  if (c.type === 'EXTENSION_FEE') {
-                    const extraMins = c.extraMinutes || sessionDetail?.extensionProposal?.extraMinutes || c.durationMinutes || sessionDetail?.extensionProposal?.extra_minutes;
-                    label = extraMins ? `Phí gia hạn giờ (+${extraMins} phút)` : 'Phí gia hạn giờ';
-                  }
-                  if (c.type === 'FB_PREORDER' || c.type === 'FNB_PREORDER') label = 'F&B gọi thêm tại quầy';
-                  
-                  const isPaidComp = c.status !== 'PENDING';
-
-                  return (
-                    <View key={c.id || idx} className="flex-row justify-between items-start">
-                      <View className="flex-1 pr-2">
-                        <Text className="text-slate-500 dark:text-slate-400 text-xs font-semibold">{label}</Text>
-                        <Text className={cn(
-                          "text-[10px] font-bold mt-0.5",
-                          isPaidComp ? "text-emerald-500" : "text-amber-500"
-                        )}>
-                          {isPaidComp ? "Đã thanh toán" : "Chờ thanh toán"}
+              <View className="pl-5 space-y-3">
+                {additionalLines.length > 0 ? (
+                  additionalLines.map((line: any) => (
+                    <View key={line.id} className="rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200/80 dark:border-slate-800 p-3 gap-2">
+                      <View className="flex-row justify-between items-start">
+                        <View className="flex-1 pr-2">
+                          <Text className="text-slate-800 dark:text-slate-200 text-xs font-bold">{line.label}</Text>
+                          <View className="flex-row items-center gap-1.5 mt-0.5">
+                            <View className={cn("size-2 rounded-full", line.isPaid ? "bg-emerald-500" : "bg-amber-500")} />
+                            <Text className={cn(
+                              "text-[10.5px] font-semibold",
+                              line.isPaid ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"
+                            )}>
+                              {line.isPaid ? "Đã thanh toán" : "Chờ thanh toán"}
+                            </Text>
+                          </View>
+                        </View>
+                        <Text className="text-orange-600 dark:text-orange-400 text-xs font-black">
+                          +{Number(line.amount).toLocaleString('vi-VN')}đ
                         </Text>
                       </View>
-                      <Text className="text-rose-400 text-xs font-bold">+{Number(c.amount).toLocaleString('vi-VN')}đ</Text>
-                    </View>
-                  );
-                })}
-                {damageExceedingDeposit > 0 && (
-                  <View className="flex-row justify-between">
-                    <Text className="text-slate-500 dark:text-slate-400 text-xs font-semibold">Phí đền bù hư hỏng xe</Text>
-                    <Text className="text-rose-400 text-xs font-bold">+{damageExceedingDeposit.toLocaleString('vi-VN')}đ</Text>
-                  </View>
-                )}
-              </View>
 
-              {/* Thẻ Chi Tiết Đền Bù Hư Hỏng Xe */}
-              {damageCharge > 0 && (
-                <View className="mt-3 rounded-2xl border border-rose-200 dark:border-rose-900/35 bg-rose-50 dark:bg-rose-950/15 p-3.5 space-y-2">
-                  <View className="flex-row justify-between items-center mb-1">
-                    <Text className="text-rose-600 dark:text-rose-400 text-xs font-bold uppercase tracking-wider">
-                      Phí đền bù hư hỏng xe
-                    </Text>
-                  </View>
-                  {damageLineItems.length > 0 ? (
-                    <View className="space-y-2 pt-1">
-                      {damageLineItems.map((item: any, idx: number) => {
-                        const name = getPartTypeName(item.partType, item.customPartName);
-                        const partsPrice = Number(item.partsPrice || 0);
-                        const laborPrice = Number(item.laborPrice || 0);
-                        const lineTotal = Number(item.subtotal ?? item.lineTotal ?? (partsPrice + laborPrice));
-                        return (
-                          <View key={item.id || idx} className="rounded-xl border border-rose-100 dark:border-rose-900/20 bg-white dark:bg-slate-900/50 p-2.5">
-                            <View className="flex-row justify-between items-center">
-                              <Text className="text-rose-900 dark:text-rose-200 text-xs font-bold flex-1 pr-2">
-                                {name}
+                      {/* Sub-breakdown cho món F&B tại quầy */}
+                      {line.type === 'FNB_ON_SITE' && line.items && line.items.length > 0 && (
+                        <View className="mt-1 pt-2 border-t border-slate-200/60 dark:border-slate-800/60 gap-1.5">
+                          {line.items.map((item: any, idx: number) => (
+                            <View key={item.id || idx} className="flex-row justify-between text-[11px]">
+                              <Text className="text-slate-600 dark:text-slate-400 text-[11px] flex-1 pr-2">
+                                • {item.itemName ?? 'Món'} {item.variantName ? `(${item.variantName})` : ''} <Text className="text-slate-400">×{item.quantity}</Text>
+                              </Text>
+                              <Text className="text-slate-700 dark:text-slate-300 text-[11px] font-semibold">
+                                {Number(item.subtotal ?? (Number(item.unitPrice || 0) * Number(item.quantity || 1))).toLocaleString('vi-VN')}đ
                               </Text>
                             </View>
-                            <View className="flex-row items-center gap-3 mt-1">
-                              {partsPrice > 0 && (
-                                <Text className="text-rose-600/80 dark:text-rose-300/70 text-[10.5px] font-semibold">
-                                  Linh kiện: {partsPrice.toLocaleString('vi-VN')}đ
+                          ))}
+                        </View>
+                      )}
+
+                      {/* Sub-breakdown cho phí hư hại linh kiện */}
+                      {line.type === 'DAMAGE_CHARGE' && line.items && line.items.length > 0 && (
+                        <View className="mt-1 pt-2 border-t border-slate-200/60 dark:border-slate-800/60 gap-1.5">
+                          {line.items.map((item: any, idx: number) => {
+                            const name = getPartTypeName(item.partType, item.customPartName);
+                            const partsPrice = Number(item.partsPrice || 0);
+                            const laborPrice = Number(item.laborPrice || 0);
+                            const lineTotal = Number(item.subtotal ?? item.lineTotal ?? (partsPrice + laborPrice));
+                            return (
+                              <View key={item.id || idx} className="flex-row justify-between items-center text-[11px]">
+                                <Text className="text-slate-600 dark:text-slate-400 text-[11px] flex-1 pr-2">
+                                  • {name} {partsPrice > 0 ? `(Linh kiện: ${partsPrice.toLocaleString('vi-VN')}đ)` : ''}
                                 </Text>
-                              )}
-                              {laborPrice > 0 && (
-                                <Text className="text-rose-600/80 dark:text-rose-300/70 text-[10.5px] font-semibold">
-                                  Công: {laborPrice.toLocaleString('vi-VN')}đ
+                                <Text className="text-rose-600 dark:text-rose-400 text-[11px] font-semibold">
+                                  {lineTotal.toLocaleString('vi-VN')}đ
                                 </Text>
-                              )}
-                              {partsPrice === 0 && laborPrice === 0 && lineTotal > 0 && (
-                                <Text className="text-rose-600/80 dark:text-rose-300/70 text-[10.5px] font-semibold">
-                                  Chi phí: {lineTotal.toLocaleString('vi-VN')}đ
-                                </Text>
-                              )}
-                            </View>
-                          </View>
-                        );
-                      })}
+                              </View>
+                            );
+                          })}
+                        </View>
+                      )}
                     </View>
-                  ) : (
-                    <Text className="text-rose-600/80 dark:text-rose-300/70 text-[11px] font-medium pt-1">
-                      Ghi nhận hư hại từ nhân viên trực ca
-                    </Text>
-                  )}
+                  ))
+                ) : (
+                  <Text className="text-slate-400 text-xs italic">
+                    Chưa phát sinh phí phụ thu trong phiên chơi.
+                  </Text>
+                )}
+
+                <View className="w-full h-[1px] bg-slate-200 dark:bg-slate-800/60 my-1" />
+                <View className="flex-row justify-between">
+                  <Text className="text-slate-700 dark:text-slate-200 text-xs font-bold">Tổng phí phát sinh</Text>
+                  <Text className="text-orange-600 dark:text-orange-400 text-xs font-black">
+                    +{additionalTotal.toLocaleString('vi-VN')}đ
+                  </Text>
                 </View>
-              )}
+              </View>
             </View>
           )}
 
-          {/* Tổng số tiền của cả hóa đơn */}
+          {/* Block 3: Tổng đã thanh toán & Quyết toán phát sinh */}
           <View className="w-full h-[1px] bg-slate-200 dark:bg-slate-800/60 my-4" />
-          <View className="flex-row justify-between items-center mb-1">
-            <Text className="text-slate-900 dark:text-white text-xs font-bold uppercase tracking-wide">Tổng số tiền</Text>
-            <Text className="text-[#f97316] text-base font-black">
-              {((totalPrepaid ?? 0) + (totalCounterBill ?? 0) - (depositRefundAmount ?? 0)).toLocaleString('vi-VN')}đ
+          <View className="flex-row justify-between items-center bg-slate-50 dark:bg-slate-900/60 p-3 rounded-2xl border border-slate-200/60 dark:border-slate-800">
+            <Text className="text-slate-800 dark:text-slate-200 text-xs font-bold uppercase tracking-wide">Tổng đã thanh toán</Text>
+            <Text className="text-slate-950 dark:text-white text-base font-black">
+              {totalPaidAmount.toLocaleString('vi-VN')}đ
             </Text>
           </View>
 
-          {/* Block 3: Trạng thái quyết toán nợ phát sinh */}
-          {totalCounterBill > 0 && (
-            <View className="mt-4">
-              {!isPaid ? (
-                <View className="space-y-3">
-                  <View className="rounded-xl bg-amber-500/5 border border-amber-500/10 p-3 flex-row items-center gap-2">
-                    <AlertTriangle color="#f59e0b" size={16} />
-                    <Text className="text-amber-500 text-xs font-semibold flex-1">
-                      Còn <Text className="font-bold text-amber-400">{pendingAdditionalAmount.toLocaleString('vi-VN')}đ</Text> phí phát sinh chưa thanh toán.
+          {/* Action & Alerts cho phí phát sinh chưa trả */}
+          {additionalOutstandingAmount > 0 ? (
+            <View className="mt-4 gap-3">
+              {isCheckoutPending ? (
+                <View className="rounded-2xl border border-amber-300 dark:border-amber-800/60 bg-amber-100/90 dark:bg-amber-950/30 p-3.5 flex-row items-start gap-2.5">
+                  <AlertTriangle color="#b45309" size={16} style={{ marginTop: 2 }} />
+                  <View className="flex-1">
+                    <Text className="text-amber-950 dark:text-amber-200 text-xs font-bold">
+                      Chờ nhân viên kiểm tra & xác nhận trả xe
+                    </Text>
+                    <Text className="text-amber-900 dark:text-amber-400 text-[11px] leading-4 mt-0.5">
+                      Còn {additionalOutstandingAmount.toLocaleString('vi-VN')}đ phí phát sinh. Vui lòng chờ Nhân viên xác nhận hoàn tất kiểm tra trả xe tại quầy trước khi thanh toán.
                     </Text>
                   </View>
-                  <Pressable
-                    className="h-10 flex-row items-center justify-center rounded-xl bg-orange-500 active:bg-orange-600 gap-1.5 shadow-md"
-                    onPress={handlePaymentAdditional}
-                    disabled={submittingAdditionalPayment}
-                  >
-                    {submittingAdditionalPayment ? (
-                      <ActivityIndicator color="#ffffff" size="small" />
-                    ) : (
-                      <>
-                        <CreditCard color="#ffffff" size={14} />
-                        <Text className="text-white text-xs font-bold">Thanh toán VNPay phí phát sinh</Text>
-                      </>
-                    )}
-                  </Pressable>
                 </View>
               ) : (
-                <View className="rounded-xl bg-emerald-500/5 border border-emerald-500/10 p-3 flex-row items-center justify-center gap-2">
-                  <CheckCircle2 color="#10b981" size={16} />
-                  <Text className="text-emerald-400 text-xs font-bold">
-                    Đã thanh toán đầy đủ
-                    {(counterTx || additionalPrepaidTx) && (
-                      <Text className="font-semibold text-[11px] text-[#10b981]">
-                        {` · ${gatewayLabel((counterTx ?? additionalPrepaidTx)!.gateway)}`}
-                      </Text>
-                    )}
+                <View className="rounded-2xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 p-3.5 flex-row items-center gap-2.5">
+                  <AlertTriangle color="#f59e0b" size={16} />
+                  <Text className="text-amber-800 dark:text-amber-300 text-xs font-semibold flex-1">
+                    Còn <Text className="font-bold text-amber-600 dark:text-amber-400">{additionalOutstandingAmount.toLocaleString('vi-VN')}đ</Text> phí phát sinh cần thanh toán.
                   </Text>
                 </View>
               )}
+
+              {/* Các nút thanh toán phát sinh */}
+              <View className="gap-2 pt-1">
+                {/* Nút 1: Quét mã VietQR */}
+                <Pressable
+                  className={cn(
+                    "h-11 flex-row items-center justify-center rounded-2xl gap-2 shadow-sm border",
+                    isCheckoutPending
+                      ? "bg-amber-100/90 border-amber-300 dark:bg-amber-950/20 dark:border-amber-900/40 opacity-75"
+                      : "bg-[#ea580c] active:bg-[#c2410c] border-[#ea580c]"
+                  )}
+                  onPress={() => handlePaymentAdditional('bank_transfer')}
+                  disabled={submittingAdditionalPayment || isCheckoutPending}
+                >
+                  <QrCode color={isCheckoutPending ? "#b45309" : "#ffffff"} size={16} />
+                  <Text className={cn("text-xs font-bold", isCheckoutPending ? "text-amber-950 dark:text-amber-300" : "text-white")}>
+                    {isCheckoutPending ? "Quét mã VietQR (Chờ xác nhận trả xe)" : "Quét mã VietQR thanh toán"}
+                  </Text>
+                </Pressable>
+
+                {/* Nút 2: Thanh toán qua VNPay */}
+                <Pressable
+                  className={cn(
+                    "h-11 flex-row items-center justify-center rounded-2xl gap-2 shadow-sm border",
+                    isCheckoutPending
+                      ? "bg-amber-100/90 border-amber-300 dark:bg-amber-950/20 dark:border-amber-900/40 opacity-75"
+                      : "bg-white dark:bg-slate-900 border-[#ea580c] active:bg-orange-50 dark:active:bg-slate-800"
+                  )}
+                  onPress={() => handlePaymentAdditional('vnpay')}
+                  disabled={submittingAdditionalPayment || isCheckoutPending}
+                >
+                  {submittingAdditionalPayment ? (
+                    <ActivityIndicator color="#ea580c" size="small" />
+                  ) : (
+                    <>
+                      <CreditCard color={isCheckoutPending ? "#b45309" : "#ea580c"} size={16} />
+                      <Text className={cn("text-xs font-bold", isCheckoutPending ? "text-amber-950 dark:text-amber-300" : "text-[#ea580c]")}>
+                        {isCheckoutPending ? "Thanh toán VNPay (Chờ xác nhận trả xe)" : "Thanh toán qua VNPay"}
+                      </Text>
+                    </>
+                  )}
+                </Pressable>
+              </View>
             </View>
-          )}
+          ) : additionalTotal > 0 && isPaid ? (
+            <View className="mt-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 p-3.5 flex-row items-center justify-center gap-2">
+              <CheckCircle2 color="#10b981" size={16} />
+              <Text className="text-emerald-600 dark:text-emerald-400 text-xs font-bold">
+                Đã thanh toán đầy đủ các khoản phát sinh
+                {(counterTx || additionalPrepaidTx) ? (
+                  <Text className="font-semibold text-[11px] text-[#10b981]">
+                    {` · ${gatewayLabel((counterTx ?? additionalPrepaidTx)!.gateway)}`}
+                  </Text>
+                ) : null}
+              </Text>
+            </View>
+          ) : null}
         </View>
 
         {/* Nút hủy đặt lịch */}
@@ -1510,6 +2070,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
         visible={bankTransferModalData !== null}
         bookingId={bankTransferModalData?.bookingId || ''}
         checkout={bankTransferModalData?.checkout || null}
+        isAdditionalPayment={bankTransferModalData?.isAdditionalPayment}
         onClose={() => {
           setBankTransferModalData(null);
           loadBookingDetail();

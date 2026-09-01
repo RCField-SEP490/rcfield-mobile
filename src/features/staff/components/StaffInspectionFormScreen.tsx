@@ -46,11 +46,11 @@ const INSPECTION_IMAGE_COMPRESS = 0.55;
 const INSPECTION_UPLOAD_TIMEOUT_MS = 90000;
 
 export const PART_TYPE_LABELS: Record<string, string> = {
-  TIRE_WHEEL: 'Bánh xe / Lốp',
-  SPOILER: 'Cánh gió',
   CHASSIS: 'Khung gầm',
-  MOTOR: 'Motor / Động cơ',
   SHELL: 'Vỏ nhựa (Shell)',
+  SPOILER: 'Cánh gió',
+  TIRE_WHEEL: 'Bánh xe / Lốp',
+  MOTOR: 'Motor / Động cơ',
   SERVO: 'Servo / Tay lái',
   REMOTE: 'Remote / Điều khiển',
   OTHER: 'Khác',
@@ -77,6 +77,7 @@ type ChecklistStateItem = {
   label: string;
   checked: boolean;
   notes?: string;
+  partType?: string;
 };
 
 function formatCurrency(value: number) {
@@ -209,22 +210,67 @@ export function StaffInspectionFormScreen({
         );
       } else if (type === 'CHECK_IN') {
         setChecklist([
-          { id: 'ck-1', label: 'Pin đủ điện, đã sạc trước ca', checked: true },
-          { id: 'ck-2', label: 'Tay lái servo phản hồi tốt, bẻ cua bình thường', checked: true },
-          { id: 'ck-3', label: 'Lốp gắn chắc, không lung lay', checked: true },
-          { id: 'ck-4', label: 'Remote bắt sóng, xe phản hồi lệnh ổn định', checked: true },
+          { id: 'ck-in-battery', label: 'Pin đủ điện, đã sạc trước ca', checked: true },
+          { id: 'ck-in-servo', label: 'Tay lái servo phản hồi tốt, bẻ cua bình thường', checked: true },
+          { id: 'ck-in-tire', label: 'Lốp và bánh xe gắn chắc chắn, không lung lay', checked: true },
+          { id: 'ck-in-remote', label: 'Remote bắt sóng nhạy, xe phản hồi lệnh ổn định', checked: true },
+          { id: 'ck-in-chassis', label: 'Khung gầm và vỏ xe nguyên vẹn trước khi giao', checked: true },
         ]);
       } else if (type === 'CHECK_OUT') {
-        setChecklist([
-          { id: 'ck-o1', label: 'Đã kiểm tra khung gầm xe (nứt, gãy, biến dạng)', checked: true },
-          { id: 'ck-o2', label: 'Đã kiểm tra cánh gió (móp méo, rơi rụng)', checked: true },
-          {
-            id: 'ck-o3',
-            label: 'Đã kiểm tra động cơ điện / motor (hoạt động, mùi khét)',
-            checked: true,
-          },
-          { id: 'ck-o4', label: 'Đã kiểm tra vỏ nhựa / shell (xước sâu, móp rách)', checked: true },
-        ]);
+        const existingCheckOut = data.inspections?.find((i: any) => i.type === 'CHECK_OUT');
+        const defaultChecklist: ChecklistStateItem[] = [
+          { id: 'ck-chassis', partType: 'CHASSIS', label: 'Khung gầm xe (nứt, gãy, cong vênh, biến dạng)', checked: true },
+          { id: 'ck-shell', partType: 'SHELL', label: 'Vỏ nhựa xe / Shell (móp méo, rách vỡ, xước sâu)', checked: true },
+          { id: 'ck-spoiler', partType: 'SPOILER', label: 'Cánh gió (gãy, biến dạng, rơi rụng)', checked: true },
+          { id: 'ck-tire', partType: 'TIRE_WHEEL', label: 'Bánh xe & Lốp (văng ốc hex, mòn rách, kẹt trục)', checked: true },
+          { id: 'ck-motor', partType: 'MOTOR', label: 'Motor / Động cơ (kẹt quay, quá nhiệt, mùi khét)', checked: true },
+          { id: 'ck-servo', partType: 'SERVO', label: 'Hệ thống lái / Servo (kẹt góc, trượt bánh răng)', checked: true },
+          { id: 'ck-remote', partType: 'REMOTE', label: 'Remote điều khiển (đủ tay cầm, cần lái nguyên vẹn)', checked: true },
+        ];
+
+        if (existingCheckOut) {
+          if (existingCheckOut.staffNotes) {
+            setStaffNotes(existingCheckOut.staffNotes);
+          }
+          if (existingCheckOut.photos?.length) {
+            setRentalPhotos(
+              existingCheckOut.photos.map((p: any, idx: number) => ({
+                id: `existing-${p.angle || idx}-${idx}`,
+                url: p.url,
+                notes: p.notes || '',
+              }))
+            );
+          }
+          if (existingCheckOut.damageFlagged && existingCheckOut.damageLineItems?.length) {
+            setDamageFlagged(true);
+            setDamageLineItems(
+              existingCheckOut.damageLineItems.map((li: any) => ({
+                partType: li.partType,
+                customPartName: li.customPartName || '',
+                partsPrice: Number(li.partsPrice || 0),
+                laborPrice: Number(li.laborPrice || 0),
+              }))
+            );
+          }
+          if (existingCheckOut.checklist?.length) {
+            const statusByKey = new Map(existingCheckOut.checklist.map((c: any) => [c.itemKey || c.id, c]));
+            setChecklist(
+              defaultChecklist.map((item) => {
+                const existingItem: any = statusByKey.get(item.id);
+                const isOk = !existingItem || existingItem.status === 'OK' || existingItem.checked === true;
+                return {
+                  ...item,
+                  checked: isOk,
+                  notes: isOk ? '' : (existingItem?.note || existingItem?.notes || ''),
+                };
+              })
+            );
+          } else {
+            setChecklist(defaultChecklist);
+          }
+        } else {
+          setChecklist(defaultChecklist);
+        }
       }
     } catch (error: any) {
       const message = error?.response?.data?.message || 'Không thể tải thông tin phiên.';
@@ -389,9 +435,36 @@ export function StaffInspectionFormScreen({
   };
 
   const toggleChecklistItem = (id: string) => {
-    setChecklist((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, checked: !item.checked } : item))
+    const item = checklist.find((i) => i.id === id);
+    if (!item) return;
+    const nextChecked = !item.checked;
+
+    const newChecklist = checklist.map((i) =>
+      i.id === id ? { ...i, checked: nextChecked, notes: nextChecked ? '' : i.notes } : i
     );
+    setChecklist(newChecklist);
+
+    if (type === 'CHECK_OUT' && item.partType) {
+      if (!nextChecked) {
+        setDamageFlagged(true);
+        setDamageLineItems((prev) => {
+          if (prev.some((d) => d.partType === item.partType)) return prev;
+          return [
+            ...prev,
+            { partType: item.partType as any, partsPrice: 0, laborPrice: 0 },
+          ];
+        });
+      } else {
+        setDamageLineItems((prev) => {
+          const next = prev.filter((d) => d.partType !== item.partType);
+          const allOk = newChecklist.every((i) => i.checked);
+          if (next.length === 0 && allOk) {
+            setDamageFlagged(false);
+          }
+          return next;
+        });
+      }
+    }
   };
 
   const handleChecklistNotes = (id: string, notes: string) => {
@@ -401,14 +474,37 @@ export function StaffInspectionFormScreen({
   };
 
   const addDamageItem = () => {
+    setDamageFlagged(true);
     setDamageLineItems((prev) => [
       ...prev,
-      { partType: 'TIRE_WHEEL', partsPrice: 0, laborPrice: 0 },
+      { partType: 'OTHER', customPartName: '', partsPrice: 0, laborPrice: 0 },
     ]);
   };
 
   const removeDamageItem = (index: number) => {
-    setDamageLineItems((prev) => prev.filter((_, i) => i !== index));
+    const itemToRemove = damageLineItems[index];
+    const nextDamageItems = damageLineItems.filter((_, i) => i !== index);
+    setDamageLineItems(nextDamageItems);
+
+    if (itemToRemove?.partType) {
+      const hasOtherSamePart = nextDamageItems.some(
+        (d) => d.partType === itemToRemove.partType
+      );
+      if (!hasOtherSamePart) {
+        setChecklist((prev) =>
+          prev.map((item) =>
+            item.partType === itemToRemove.partType
+              ? { ...item, checked: true, notes: '' }
+              : item
+          )
+        );
+      }
+    }
+
+    const allOk = checklist.every((item) => item.checked);
+    if (nextDamageItems.length === 0 && allOk) {
+      setDamageFlagged(false);
+    }
   };
 
   const updateDamageItem = (
@@ -427,7 +523,11 @@ export function StaffInspectionFormScreen({
     try {
       await staffApi.simulateClientCheckOut(sessionId);
       Alert.alert('Thành công', 'Đã đóng phiên chơi xe tự mang thành công.');
-      router.replace(`/staff/session/${sessionId}` as any);
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace(`/staff/session/${sessionId}` as any);
+      }
     } catch (error: any) {
       const msg = error?.response?.data?.message || 'Không thể đóng phiên chơi.';
       Alert.alert('Lỗi', msg);
@@ -492,7 +592,7 @@ export function StaffInspectionFormScreen({
             itemKey: item.id,
             itemLabel: item.label,
             status: item.checked ? 'OK' : 'BROKEN',
-            note: item.notes || '',
+            note: item.checked ? '' : (item.notes || '').trim(),
           })),
           staffNotes: staffNotes.trim(),
           damageFlagged: false,
@@ -511,7 +611,7 @@ export function StaffInspectionFormScreen({
             itemKey: item.id,
             itemLabel: item.label,
             status: item.checked ? 'OK' : 'BROKEN',
-            note: item.notes || '',
+            note: item.checked ? '' : (item.notes || '').trim(),
           })),
           staffNotes: staffNotes.trim(),
           damageFlagged: type === 'CHECK_OUT' && damageFlagged,
@@ -524,9 +624,13 @@ export function StaffInspectionFormScreen({
         'Thành công',
         isCheckIn
           ? 'Biên bản nhận xe đã được lưu và phiên chuyển sang trạng thái đang chơi.'
-          : 'Biên bản trả xe đã được gửi. Khách sẽ nhận thông báo để xác nhận hoàn tất phiên.'
+          : 'Biên bản trả xe đã được lưu thành công. Bạn có thể tiến hành quyết toán và hoàn tất phiên chơi tại quầy.'
       );
-      router.replace(`/staff/session/${sessionId}` as any);
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace(`/staff/session/${sessionId}` as any);
+      }
     } catch (error: any) {
       const message = error?.response?.data?.message || 'Không thể lưu biên bản kiểm định.';
       Alert.alert('Lỗi', message);

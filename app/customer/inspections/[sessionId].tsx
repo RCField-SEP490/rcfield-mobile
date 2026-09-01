@@ -5,11 +5,7 @@ import {
   Image,
   TouchableOpacity,
   Alert,
-  Modal,
-  TextInput,
   ActivityIndicator,
-  Platform,
-  KeyboardAvoidingView,
   useWindowDimensions,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -25,6 +21,7 @@ import {
 import { useColorScheme } from 'nativewind';
 import { bookingWizardApi } from '@/features/bookings/api/booking-wizard.api';
 import { getStatusLabel } from '@/features/bookings/lib/status-label';
+import { wsClient } from '@/shared/lib/websocket';
 import { ImageZoomModal } from '@/shared/ui/ImageZoomModal';
 import { Text } from '@/shared/ui/Text';
 
@@ -85,7 +82,6 @@ export default function InspectionReviewScreen() {
   const normalizedInspectionId = Array.isArray(inspectionId) ? inspectionId[0] : inspectionId;
 
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
   const [sessionDetail, setSessionDetail] = useState<any>(null);
   const [currentPhotoIdx, setCurrentPhotoIdx] = useState(0);
 
@@ -98,10 +94,6 @@ export default function InspectionReviewScreen() {
       });
     }
   }, [currentPhotoIdx, containerWidth]);
-
-  // States cho việc Từ chối
-  const [rejectModalVisible, setRejectModalVisible] = useState(false);
-  const [disagreementNote, setDisagreementNote] = useState('');
 
   // States cho Zoom ảnh
   const [zoomModalVisible, setZoomModalVisible] = useState(false);
@@ -173,48 +165,32 @@ export default function InspectionReviewScreen() {
     fetchSessionDetail();
   }, [fetchSessionDetail]);
 
-  const handleConfirm = async () => {
-    if (!inspection || !normalizedSessionId || !canRespond) return;
-    setSubmitting(true);
-    try {
-      await bookingWizardApi.confirmInspection(normalizedSessionId, inspection.inspectionId, {
-        agreed: true,
-      });
-      Alert.alert('Thành công', 'Bạn đã đồng ý biên bản trả xe và hoàn tất xác nhận checkout.');
-      router.back();
-    } catch (error) {
-      console.error('Confirm inspection failed:', error);
-      Alert.alert('Lỗi', 'Không thể gửi xác nhận. Vui lòng thử lại.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  useEffect(() => {
+    const unsubscribe = wsClient.subscribe((event, data) => {
+      const targetSessionId = data?.sessionId || data?.session_id;
+      if (!targetSessionId || targetSessionId === normalizedSessionId) {
+        if (
+          [
+            'SESSION_CHECKOUT_INSPECTION',
+            'SESSION_CHECKIN_INSPECTION',
+            'CUSTOMER_CHECKOUT_CONFIRMED',
+            'SESSION_CHECKOUT_COMPLETED',
+            'SESSION_UPDATED',
+            'INSPECTION_UPDATED',
+          ].includes(event)
+        ) {
+          console.log(`[InspectionReviewScreen] WebSocket event '${event}' received, reloading inspection...`);
+          fetchSessionDetail();
+        }
+      }
+    });
 
-  const handleReject = async () => {
-    if (!inspection || !normalizedSessionId || !canRespond) return;
-    if (!disagreementNote.trim()) {
-      Alert.alert('Lỗi', 'Vui lòng nhập lý do từ chối biên bản kiểm xe.');
-      return;
-    }
-    setSubmitting(true);
-    try {
-      await bookingWizardApi.confirmInspection(normalizedSessionId, inspection.inspectionId, {
-        agreed: false,
-        disagreementNote,
-      });
-      Alert.alert(
-        'Từ chối thành công',
-        'Đã gửi phản hồi sai lệch tới nhân viên. Vui lòng đợi nhân viên kiểm tra lại xe.'
-      );
-      setRejectModalVisible(false);
-      router.back();
-    } catch (error) {
-      console.error('Reject inspection failed:', error);
-      Alert.alert('Lỗi', 'Không thể gửi từ chối. Vui lòng thử lại.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
+    return () => {
+      unsubscribe();
+    };
+  }, [normalizedSessionId, fetchSessionDetail]);
+
+
 
   if (loading) {
     return (
@@ -249,7 +225,18 @@ export default function InspectionReviewScreen() {
     <SafeAreaView className="flex-1 bg-[#f8fafc] dark:bg-[#0b0f19]" edges={['top', 'bottom']}>
       {/* Header */}
       <View className="flex-row items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-900 bg-white/95 dark:bg-[#0b0f19]/95">
-        <TouchableOpacity onPress={() => router.back()} className="p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+        <TouchableOpacity
+          onPress={() => {
+            if (sessionDetail?.bookingId) {
+              router.replace(`/booking/${sessionDetail.bookingId}` as any);
+            } else if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/(tabs)/bookings' as any);
+            }
+          }}
+          className="p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800"
+        >
           <ArrowLeft color={colorScheme === 'dark' ? '#fff' : '#475569'} size={20} />
         </TouchableOpacity>
         <Text className="text-slate-900 dark:text-white font-bold text-base">Kiểm Xe {isCheckIn ? 'Bàn Giao' : 'Trả Xe'}</Text>
@@ -498,7 +485,7 @@ export default function InspectionReviewScreen() {
                   </View>
                   <View className="flex-1">
                     <Text className="text-slate-700 dark:text-slate-200 text-xs font-semibold">{item.label}</Text>
-                    {item.notes ? (
+                    {item.status !== 'OK' && item.notes ? (
                       <Text className="text-slate-500 text-[10px] mt-0.5">Ghi chú: {item.notes}</Text>
                     ) : null}
                   </View>
@@ -520,47 +507,26 @@ export default function InspectionReviewScreen() {
           )}
         </View>
 
-        {/* Action Buttons */}
-        {canRespond ? (
-          <View className="mt-6 gap-3">
-            <TouchableOpacity
-              disabled={submitting}
-              onPress={handleConfirm}
-              className="w-full bg-[#ea580c] active:bg-[#f97316] h-12 rounded-xl justify-center items-center shadow-lg flex-row gap-2"
-            >
-              {submitting ? (
-                <ActivityIndicator size="small" color="#ffffff" />
-              ) : (
-                <>
-                  <CheckCircle2 color="#ffffff" size={16} />
-                  <Text className="text-white font-bold text-xs uppercase tracking-wider">
-                    Tôi đồng ý biên bản trả xe & Hoàn tất
-                  </Text>
-                </>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              disabled={submitting}
-              onPress={() => setRejectModalVisible(true)}
-              className="w-full bg-red-500/10 border border-red-500/20 dark:border-red-500/10 h-12 rounded-xl justify-center items-center active:opacity-80 flex-row gap-2 mt-2"
-            >
-              <XCircle color="#ef4444" size={16} />
-              <Text className="text-red-500 dark:text-red-400 font-bold text-xs uppercase tracking-wider">
-                Tôi phát hiện sai lệch / Từ chối trả xe
-              </Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <View className="mt-6 rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-4">
-            <View className="flex-row items-center gap-2">
-              <CheckCircle2 color="#34d399" size={16} />
-              <Text className="text-emerald-600 dark:text-emerald-300 text-xs font-bold">
-                Biên bản này đã được ghi nhận, không cần thao tác thêm.
-              </Text>
-            </View>
-          </View>
-        )}
+        {/* Nút quay lại chi tiết đơn đặt sân */}
+        <View className="mt-6 gap-3">
+          <TouchableOpacity
+            onPress={() => {
+              if (sessionDetail?.bookingId) {
+                router.replace(`/booking/${sessionDetail.bookingId}` as any);
+              } else if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/(tabs)/bookings' as any);
+              }
+            }}
+            className="w-full bg-[#ea580c] active:bg-[#f97316] h-12 rounded-xl justify-center items-center shadow-lg flex-row gap-2"
+          >
+            <ArrowLeft color="#ffffff" size={16} />
+            <Text className="text-white font-bold text-xs uppercase tracking-wider">
+              Quay lại chi tiết đơn đặt sân
+            </Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
 
       <ImageZoomModal
@@ -570,63 +536,6 @@ export default function InspectionReviewScreen() {
         onClose={() => setZoomModalVisible(false)}
       />
 
-      {/* Modal từ chối (Disagreement Reason) */}
-      <Modal visible={rejectModalVisible} transparent={true} animationType="slide">
-        <View className="flex-1 bg-black/80 justify-end">
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-          >
-            <View className="bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 rounded-t-3xl p-6 pb-10 space-y-4">
-              <View className="flex-row justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-3">
-                <Text className="text-slate-900 dark:text-white font-bold text-base">Lý Do Từ Chối Biên Bản</Text>
-                <TouchableOpacity onPress={() => setRejectModalVisible(false)}>
-                  <XCircle color={colorScheme === 'dark' ? '#94a3b8' : '#64748b'} size={22} />
-                </TouchableOpacity>
-              </View>
-
-              <Text className="text-slate-500 dark:text-slate-400 text-xs leading-4">
-                Vui lòng chỉ rõ điểm không đồng ý hoặc sai lệch về hình ảnh/checklist xe để nhân viên trực ca thực hiện điều chỉnh và bàn giao lại.
-              </Text>
-
-              <TextInput
-                multiline
-                numberOfLines={4}
-                value={disagreementNote}
-                onChangeText={setDisagreementNote}
-                placeholder="Nhập lý do chi tiết (ví dụ: ảnh xe không khớp, xước cánh gió nhưng chưa note, v.v.)..."
-                placeholderTextColor={colorScheme === 'dark' ? '#475569' : '#94a3b8'}
-                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 text-slate-900 dark:text-white text-xs font-semibold leading-5 text-start"
-                style={{ minHeight: 100, textAlignVertical: 'top' }}
-              />
-
-              <View className="flex-row gap-3 pt-2">
-                <TouchableOpacity
-                  onPress={() => setRejectModalVisible(false)}
-                  className="flex-1 bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 h-11 rounded-xl justify-center items-center"
-                >
-                  <Text className="text-slate-650 dark:text-slate-450 font-bold text-xs">Hủy bỏ</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  disabled={submitting}
-                  onPress={handleReject}
-                  className="flex-1 bg-red-600 h-11 rounded-xl justify-center items-center shadow-lg active:opacity-90 flex-row gap-1.5"
-                >
-                  {submitting ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <>
-                      <XCircle color="#fff" size={14} />
-                      <Text className="text-white font-bold text-xs">Gửi từ chối</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-          </KeyboardAvoidingView>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }
