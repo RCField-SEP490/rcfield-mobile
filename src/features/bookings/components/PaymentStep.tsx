@@ -321,7 +321,7 @@ export function PaymentStep({
                       {pkg.package_name}
                     </Text>
                     <Text className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 font-semibold">
-                      Còn {pkg.slots_remaining} / {pkg.slots_total} slots • Hạn:{' '}
+                      Còn {Math.round(Number(pkg.slots_remaining))} / {Math.round(Number(pkg.slots_total))} slots • Hạn:{' '}
                       {new Date(pkg.expires_at).toLocaleDateString('vi-VN')}
                     </Text>
                   </View>
