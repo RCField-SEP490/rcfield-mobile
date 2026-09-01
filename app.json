@@ -11,6 +11,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.rcfield.mobile",
       "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
         "NSLocationWhenInUseUsageDescription": "RCField cần quyền truy cập vị trí của bạn để định vị và tìm kiếm các chi nhánh sân đua gần nhất.",
         "NSCameraUsageDescription": "RCField cần quyền camera để nhân viên quét mã QR nhận xe và chụp ảnh kiểm xe.",
         "NSPhotoLibraryUsageDescription": "RCField cần quyền thư viện ảnh để lưu mã QR thanh toán hoặc chọn ảnh kiểm xe khi nhận và trả xe.",
