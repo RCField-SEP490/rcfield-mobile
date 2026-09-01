@@ -708,18 +708,18 @@ export function ProfileScreen() {
                   onPress={() => {
                     requestMainTab(2);
                   }}
-                  className="flex-row items-center justify-between p-3.5 rounded-xl border border-slate-100 dark:border-slate-800/45 bg-slate-50/50 dark:bg-slate-900/40 active:bg-slate-100 dark:active:bg-slate-900"
+                  className="flex-row items-center justify-between p-3.5 rounded-xl border border-slate-100 dark:border-slate-800/45 bg-slate-50/50 dark:bg-slate-900/40 active:bg-slate-100 dark:active:bg-slate-900 gap-2"
                 >
-                  <View className="flex-row items-center gap-3">
-                    <View className="size-8 rounded-lg bg-orange-50 dark:bg-orange-950/20 items-center justify-center">
+                  <View className="flex-row items-center gap-3 flex-1 min-w-0">
+                    <View className="size-8 shrink-0 rounded-lg bg-orange-50 dark:bg-orange-950/20 items-center justify-center">
                       <CalendarDays color="#ea580c" size={16} />
                     </View>
-                    <View className="flex-1 pr-6">
-                      <Text className="text-xs font-bold text-slate-800 dark:text-slate-200">Lịch chơi của tôi</Text>
+                    <View className="flex-1 min-w-0">
+                      <Text className="text-xs font-bold text-slate-800 dark:text-slate-200" numberOfLines={1}>Lịch chơi của tôi</Text>
                       <Text className="text-[10px] font-semibold text-slate-400 mt-0.5" numberOfLines={1}>Quản lý lịch đặt và quét mã check-in vào sân</Text>
                     </View>
                   </View>
-                  <ChevronRight color="#94a3b8" size={16} />
+                  <ChevronRight color="#94a3b8" size={16} className="shrink-0" />
                 </Pressable>
 
                 {/* Giải đấu đã tham gia */}
@@ -727,69 +727,69 @@ export function ProfileScreen() {
                   onPress={() => {
                     router.push('/customer/my-contests' as any);
                   }}
-                  className="flex-row items-center justify-between p-3.5 rounded-xl border border-slate-100 dark:border-slate-800/45 bg-slate-50/50 dark:bg-slate-900/40 active:bg-slate-100 dark:active:bg-slate-900"
+                  className="flex-row items-center justify-between p-3.5 rounded-xl border border-slate-100 dark:border-slate-800/45 bg-slate-50/50 dark:bg-slate-900/40 active:bg-slate-100 dark:active:bg-slate-900 gap-2"
                 >
-                  <View className="flex-row items-center gap-3">
-                    <View className="size-8 rounded-lg bg-orange-50 dark:bg-orange-950/20 items-center justify-center">
+                  <View className="flex-row items-center gap-3 flex-1 min-w-0">
+                    <View className="size-8 shrink-0 rounded-lg bg-orange-50 dark:bg-orange-950/20 items-center justify-center">
                       <Trophy color="#ea580c" size={16} />
                     </View>
-                    <View className="flex-1 pr-6">
-                      <Text className="text-xs font-bold text-slate-800 dark:text-slate-200">Giải đấu đã tham gia</Text>
+                    <View className="flex-1 min-w-0">
+                      <Text className="text-xs font-bold text-slate-800 dark:text-slate-200" numberOfLines={1}>Giải đấu đã tham gia</Text>
                       <Text className="text-[10px] font-semibold text-slate-400 mt-0.5" numberOfLines={1}>Theo dõi lịch thi đấu, vé QR giải và kết quả đấu</Text>
                     </View>
                   </View>
-                  <ChevronRight color="#94a3b8" size={16} />
+                  <ChevronRight color="#94a3b8" size={16} className="shrink-0" />
                 </Pressable>
 
                 {/* Gói hội viên của tôi */}
                 <Pressable
                   onPress={() => router.push('/customer/packages' as any)}
-                  className="flex-row items-center justify-between p-3.5 rounded-xl border border-slate-100 dark:border-slate-800/45 bg-slate-50/50 dark:bg-slate-900/40 active:bg-slate-100 dark:active:bg-slate-900"
+                  className="flex-row items-center justify-between p-3.5 rounded-xl border border-slate-100 dark:border-slate-800/45 bg-slate-50/50 dark:bg-slate-900/40 active:bg-slate-100 dark:active:bg-slate-900 gap-2"
                 >
-                  <View className="flex-row items-center gap-3">
-                    <View className="size-8 rounded-lg bg-purple-50 dark:bg-purple-950/20 items-center justify-center">
+                  <View className="flex-row items-center gap-3 flex-1 min-w-0">
+                    <View className="size-8 shrink-0 rounded-lg bg-purple-50 dark:bg-purple-950/20 items-center justify-center">
                       <Gem color="#a855f7" size={16} />
                     </View>
-                    <View className="flex-1 pr-6">
-                      <Text className="text-xs font-bold text-slate-800 dark:text-slate-200">Gói hội viên của tôi</Text>
+                    <View className="flex-1 min-w-0">
+                      <Text className="text-xs font-bold text-slate-800 dark:text-slate-200" numberOfLines={1}>Gói hội viên của tôi</Text>
                       <Text className="text-[10px] font-semibold text-slate-400 mt-0.5" numberOfLines={1}>Xem thông tin gói hội viên và đặc quyền tích lũy</Text>
                     </View>
                   </View>
-                  <ChevronRight color="#94a3b8" size={16} />
+                  <ChevronRight color="#94a3b8" size={16} className="shrink-0" />
                 </Pressable>
 
                 {/* Cơ sở yêu thích */}
                 <Pressable
                   onPress={() => router.push('/favorites')}
-                  className="flex-row items-center justify-between p-3.5 rounded-xl border border-slate-100 dark:border-slate-800/45 bg-slate-50/50 dark:bg-slate-900/40 active:bg-slate-100 dark:active:bg-slate-900"
+                  className="flex-row items-center justify-between p-3.5 rounded-xl border border-slate-100 dark:border-slate-800/45 bg-slate-50/50 dark:bg-slate-900/40 active:bg-slate-100 dark:active:bg-slate-900 gap-2"
                 >
-                  <View className="flex-row items-center gap-3">
-                    <View className="size-8 rounded-lg bg-red-50 dark:bg-red-950/20 items-center justify-center">
+                  <View className="flex-row items-center gap-3 flex-1 min-w-0">
+                    <View className="size-8 shrink-0 rounded-lg bg-red-50 dark:bg-red-950/20 items-center justify-center">
                       <Heart color="#ef4444" size={16} />
                     </View>
-                    <View className="flex-1 pr-6">
-                      <Text className="text-xs font-bold text-slate-800 dark:text-slate-200">Cơ sở yêu thích</Text>
+                    <View className="flex-1 min-w-0">
+                      <Text className="text-xs font-bold text-slate-800 dark:text-slate-200" numberOfLines={1}>Cơ sở yêu thích</Text>
                       <Text className="text-[10px] font-semibold text-slate-400 mt-0.5" numberOfLines={1}>Các chi nhánh RC Field bạn thường xuyên ghé chơi</Text>
                     </View>
                   </View>
-                  <ChevronRight color="#94a3b8" size={16} />
+                  <ChevronRight color="#94a3b8" size={16} className="shrink-0" />
                 </Pressable>
 
                 {/* Đánh giá của tôi */}
                 <Pressable
                   onPress={() => router.push('/customer/my-reviews' as any)}
-                  className="flex-row items-center justify-between p-3.5 rounded-xl border border-slate-100 dark:border-slate-800/45 bg-slate-50/50 dark:bg-slate-900/40 active:bg-slate-100 dark:active:bg-slate-900"
+                  className="flex-row items-center justify-between p-3.5 rounded-xl border border-slate-100 dark:border-slate-800/45 bg-slate-50/50 dark:bg-slate-900/40 active:bg-slate-100 dark:active:bg-slate-900 gap-2"
                 >
-                  <View className="flex-row items-center gap-3">
-                    <View className="size-8 rounded-lg bg-amber-50 dark:bg-amber-950/20 items-center justify-center">
+                  <View className="flex-row items-center gap-3 flex-1 min-w-0">
+                    <View className="size-8 shrink-0 rounded-lg bg-amber-50 dark:bg-amber-950/20 items-center justify-center">
                       <MessageSquare color="#d97706" size={16} />
                     </View>
-                    <View className="flex-1 pr-6">
-                      <Text className="text-xs font-bold text-slate-800 dark:text-slate-200">Đánh giá của tôi</Text>
+                    <View className="flex-1 min-w-0">
+                      <Text className="text-xs font-bold text-slate-800 dark:text-slate-200" numberOfLines={1}>Đánh giá của tôi</Text>
                       <Text className="text-[10px] font-semibold text-slate-400 mt-0.5" numberOfLines={1}>Xem các đánh giá và phản hồi dịch vụ của bạn</Text>
                     </View>
                   </View>
-                  <ChevronRight color="#94a3b8" size={16} />
+                  <ChevronRight color="#94a3b8" size={16} className="shrink-0" />
                 </Pressable>
               </View>
             </View>
