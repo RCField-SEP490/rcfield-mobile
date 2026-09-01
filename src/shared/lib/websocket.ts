@@ -148,43 +148,57 @@ class WebSocketClient {
 
     switch (event) {
       case 'SESSION_CHECKIN_INSPECTION': {
-        const bookingId = data?.bookingId || data?.booking_id;
+        const bookingId =
+          data?.bookingId ||
+          data?.booking_id ||
+          data?.data?.bookingId ||
+          data?.data?.booking_id;
+        const sessionId = data?.sessionId || data?.session_id;
         Alert.alert(
           'Biên bản bàn giao xe',
           'Nhân viên trực ca vừa bàn giao xe và bắt đầu phiên chơi của bạn. Lượt chơi hiện đã có hiệu lực.',
           [
             {
-              text: 'OK',
+              text: 'Xem chi tiết',
               onPress: () => {
                 if (bookingId) {
                   router.navigate(`/booking/${bookingId}` as any);
+                } else if (sessionId) {
+                  router.navigate(`/customer/inspections/${sessionId}` as any);
                 }
               },
             },
+            { text: 'Đóng', style: 'cancel' },
           ]
         );
         break;
       }
-      case 'SESSION_CHECKOUT_INSPECTION':
+      case 'SESSION_CHECKOUT_INSPECTION': {
+        const bookingId =
+          data?.bookingId ||
+          data?.booking_id ||
+          data?.data?.bookingId ||
+          data?.data?.booking_id;
+        const sessionId = data?.sessionId || data?.session_id;
         Alert.alert(
           'Biên bản trả xe',
-          'Nhân viên trực ca vừa kiểm tra và nhận lại xe. Vui lòng xem ảnh, checklist và xác nhận biên bản.',
+          'Nhân viên trực ca vừa kiểm tra và nhận lại xe. Bạn có thể xem ảnh và checklist đối chiếu chi tiết trong đơn đặt chỗ.',
           [
             {
-              text: 'Kiểm tra ngay',
+              text: 'Xem chi tiết',
               onPress: () => {
-                if (data?.sessionId) {
-                  router.navigate({
-                    pathname: '/customer/inspections/[sessionId]',
-                    params: { sessionId: data.sessionId, inspectionId: data.inspectionId },
-                  } as any);
+                if (bookingId) {
+                  router.navigate(`/booking/${bookingId}` as any);
+                } else if (sessionId) {
+                  router.navigate(`/customer/inspections/${sessionId}` as any);
                 }
               },
             },
-            { text: 'Để sau', style: 'cancel' },
+            { text: 'Đóng', style: 'cancel' },
           ]
         );
         break;
+      }
       case 'CUSTOMER_CHECKIN_CONFIRMED':
         if (role !== 'customer') {
           Alert.alert('Khách đã xác nhận nhận xe', 'Biên bản nhận xe đã được khách ghi nhận.');
@@ -211,7 +225,8 @@ class WebSocketClient {
           'Đã ghi nhận khoản thanh toán hóa đơn hoặc phí phát sinh cho đơn đặt sân.'
         );
         break;
-      case 'SESSION_EXTENSION_PROPOSED':
+      case 'SESSION_EXTENSION_PROPOSED': {
+        const sessionId = data?.sessionId || data?.session_id;
         Alert.alert(
           'Yêu cầu gia hạn ca chơi',
           `Nhân viên vừa đề xuất gia hạn ca chơi thêm ${data.extraMinutes} phút với phí phát sinh ${Number(data.additionalFee).toLocaleString('vi-VN')}đ.`,
@@ -219,11 +234,8 @@ class WebSocketClient {
             {
               text: 'Phản hồi',
               onPress: () => {
-                if (data?.sessionId) {
-                  router.navigate({
-                    pathname: '/customer/extension/[sessionId]',
-                    params: { sessionId: data.sessionId },
-                  } as any);
+                if (sessionId) {
+                  router.navigate(`/customer/extension/${sessionId}` as any);
                 }
               },
             },
@@ -231,6 +243,7 @@ class WebSocketClient {
           ]
         );
         break;
+      }
       case 'CUSTOMER_EXTENSION_APPROVED':
         if (role !== 'customer') {
           Alert.alert(
@@ -253,6 +266,52 @@ class WebSocketClient {
           `Món ăn/nước uống mới trị giá ${Number(data.totalAmount).toLocaleString('vi-VN')}đ đã được thêm vào phiên chạy.`
         );
         break;
+      case 'FNB_ORDER_SERVED':
+        Alert.alert(
+          'Món của bạn đã sẵn sàng',
+          'Nhân viên đã xác nhận phục vụ đơn đồ ăn & thức uống của bạn.'
+        );
+        break;
+      case 'BOOKING_REVIEW_REQUEST': {
+        const bookingId = data?.bookingId || data?.booking_id;
+        Alert.alert(
+          'Đánh giá trải nghiệm',
+          'Cảm ơn bạn đã tham gia trải nghiệm! Hãy dành chút thời gian đánh giá dịch vụ nhé.',
+          [
+            {
+              text: 'Đánh giá ngay',
+              onPress: () => {
+                if (bookingId) {
+                  router.navigate(`/customer/review/${bookingId}` as any);
+                }
+              },
+            },
+            { text: 'Để sau', style: 'cancel' },
+          ]
+        );
+        break;
+      }
+      case 'BOOKING_CANCELLED': {
+        const bookingId = data?.bookingId || data?.booking_id;
+        Alert.alert(
+          data?.title || 'Đơn đặt lịch bị hủy',
+          data?.message || 'Đơn hàng của bạn đã bị hủy.',
+          [
+            {
+              text: 'Xem đơn',
+              onPress: () => {
+                if (bookingId) {
+                  router.navigate(`/booking/${bookingId}` as any);
+                } else {
+                  router.navigate('/(tabs)/bookings' as any);
+                }
+              },
+            },
+            { text: 'Đóng', style: 'cancel' },
+          ]
+        );
+        break;
+      }
       case 'SESSION_OVERDUE_ALERT':
         if (role !== 'customer') {
           Alert.alert(

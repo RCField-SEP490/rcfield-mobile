@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -12,21 +13,34 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   AlertTriangle,
   ArrowLeft,
+  Banknote,
   Car,
   CheckCircle2,
   Clock,
   Coffee,
+  FileText,
+  Pencil,
+  QrCode,
   ReceiptText,
   ShieldCheck,
+  Smartphone,
   UserRound,
   WalletCards,
+  X,
+  Zap,
   type LucideIcon,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { staffApi, type StaffInspectionType, type StaffSessionDetail } from '@/features/staff/api/staff.api';
+import {
+  staffApi,
+  type BankTransferCheckout,
+  type StaffInspectionType,
+  type StaffSessionDetail,
+} from '@/features/staff/api/staff.api';
 import { getStatusLabel } from '@/features/bookings/lib/status-label';
 import { StaffSessionTools } from '@/features/staff/components/StaffSessionTools';
+import { WalkInBankTransferModal } from '@/features/staff/components/WalkInBankTransferModal';
 import {
   getSessionOperationalTiming,
   type SessionOperationalTiming,
@@ -95,57 +109,11 @@ function getPartTypeLabel(type?: string) {
 function getFnbOrderStatusLabel(status?: string) {
   const labels: Record<string, string> = {
     PENDING: 'Chờ xử lý',
-    CONFIRMED: 'Đang chuẩn bị',
-    DELIVERED: 'Đã giao',
+    CONFIRMED: 'Đang làm',
+    DELIVERED: 'Đã phục vụ',
     CANCELLED: 'Đã hủy',
   };
   return labels[status || ''] || getStatusLabel(status);
-}
-
-type FnbSummary = {
-  items: { name: string; quantity: number; total: number }[];
-  total: number;
-  statusLabel: string;
-};
-
-/**
- * A session may receive several counter orders. The session screen is an
- * operational summary, so it deliberately combines those orders by dish
- * rather than making staff reconcile a stack of nearly-identical cards.
- */
-function summarizeFnbOrders(
-  orders: StaffSessionDetail['fnbOrders'] | undefined,
-  sessionStatus?: string
-): FnbSummary {
-  const activeOrders = (orders || []).filter((order) => order.status !== 'CANCELLED');
-  const itemsByName = new Map<string, { name: string; quantity: number; total: number }>();
-
-  for (const order of activeOrders) {
-    for (const item of order.items || []) {
-      const name = item.name?.trim() || 'Món ăn';
-      const key = name.toLocaleLowerCase('vi-VN');
-      const current = itemsByName.get(key) || { name, quantity: 0, total: 0 };
-      current.quantity += Number(item.qty || 0);
-      current.total += Number(item.price || 0) * Number(item.qty || 0);
-      itemsByName.set(key, current);
-    }
-  }
-
-  const total = activeOrders.reduce((sum, order) => sum + Number(order.total || 0), 0);
-  const statusLabel =
-    sessionStatus === 'COMPLETED'
-      ? 'Đã hoàn tất phiên'
-      : sessionStatus === 'CANCELLED'
-        ? 'Phiên đã hủy'
-        : activeOrders.some((order) => order.status === 'CONFIRMED')
-        ? getFnbOrderStatusLabel('CONFIRMED')
-        : activeOrders.some((order) => order.status === 'PENDING')
-          ? getFnbOrderStatusLabel('PENDING')
-          : activeOrders.length > 0
-            ? getFnbOrderStatusLabel(activeOrders[0].status)
-            : '';
-
-  return { items: [...itemsByName.values()], total, statusLabel };
 }
 
 function getVehicleSourceLabel(type?: string) {
@@ -166,6 +134,10 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
   const [refreshing, setRefreshing] = useState(false);
   const [settling, setSettling] = useState(false);
   const [confirmingCheckout, setConfirmingCheckout] = useState(false);
+  const [confirmSettleModalVisible, setConfirmSettleModalVisible] = useState(false);
+  const [settleQrModalVisible, setSettleQrModalVisible] = useState(false);
+  const [settleBankTransferData, setSettleBankTransferData] = useState<BankTransferCheckout | null>(null);
+  const [generatingQr, setGeneratingQr] = useState(false);
   const [previewPhoto, setPreviewPhoto] = useState<{ url: string; title: string } | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
@@ -185,7 +157,7 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
       const data = await staffApi.getSessionDetail(sessionId);
       setSession(data);
     } catch (error: any) {
-      const message = error?.response?.data?.message || 'Không thể tải chi tiết phiên.';
+      const message = error?.response?.data?.message || 'Không thể tải chi tiết phiên chạy.';
       Alert.alert('Lỗi', message);
     } finally {
       setLoading(false);
@@ -214,6 +186,9 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
           'CUSTOMER_EXTENSION_REJECTED',
           'SESSION_EXTENSION_EXPIRED',
           'SESSION_FNB_ORDER_ADDED',
+          'INSPECTION_UPDATED',
+          'SESSION_UPDATED',
+          'BOOKING_UPDATED',
         ].includes(event)
       ) {
         return;
@@ -230,16 +205,25 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
     return unsubscribe;
   }, [loadSession, sessionId]);
 
-  const fnbSummary = useMemo(
-    () => summarizeFnbOrders(session?.fnbOrders, session?.status),
-    [session?.fnbOrders, session?.status]
+  const allFnbOrders = useMemo(() => session?.fnbOrders || [], [session?.fnbOrders]);
+  const preorderFnbOrders = useMemo(
+    () => allFnbOrders.filter((o) => o.orderType === 'PRE_ORDER' && o.status !== 'CANCELLED'),
+    [allFnbOrders]
+  );
+  const onsiteFnbOrders = useMemo(
+    () => allFnbOrders.filter((o) => o.orderType !== 'PRE_ORDER' && o.status !== 'CANCELLED'),
+    [allFnbOrders]
+  );
+  const onsiteFnbTotal = useMemo(
+    () => onsiteFnbOrders.reduce((sum, o) => sum + Number(o.total || 0), 0),
+    [onsiteFnbOrders]
   );
 
   const totals = useMemo(() => {
     const photoTotal =
       session?.inspections?.reduce((sum, inspection) => sum + (inspection.photos?.length || 0), 0) ?? 0;
-    return { fnbTotal: fnbSummary.total, photoTotal };
-  }, [fnbSummary.total, session?.inspections]);
+    return { fnbTotal: onsiteFnbTotal, photoTotal };
+  }, [onsiteFnbTotal, session?.inspections]);
 
   const checkInInspection = useMemo(
     () => session?.inspections?.find((inspection) => inspection.type === 'CHECK_IN') ?? null,
@@ -264,14 +248,36 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
       (!!session?.vehicles?.length && session.vehicles.every((vehicle) => vehicle.type === 'BYOC')),
     [session?.playMode, session?.vehicles]
   );
+
+  const isWalkIn =
+    session?.bookingSource === 'STAFF_MANUAL' ||
+    session?.bookingSource === 'WALK_IN' ||
+    (session as any)?.source === 'STAFF_MANUAL' ||
+    (session as any)?.source === 'WALK_IN';
   const paymentSummary = session?.paymentSummary;
+  const financialSummary = session?.financialSummary;
   const operationalTiming = getSessionOperationalTiming(session?.plannedEnd, session?.status, now);
-  const canSettlePayments = !!paymentSummary?.requiresSettlement;
-  const settlementDescription = paymentSummary?.outstandingAmount
-    ? `Cần thu thêm: ${formatCurrency(paymentSummary.outstandingAmount)}`
-    : paymentSummary?.pendingRefundAmount
-      ? `Cần hoàn cọc: ${formatCurrency(paymentSummary.pendingRefundAmount)}`
-      : 'Không còn khoản cần thu hoặc hoàn tiền.';
+  const isCheckoutPending = ['ACTIVE', 'EXTENDING'].includes(session?.status || '');
+  const hasOutstandingPayment = !!paymentSummary?.requiresSettlement;
+  const canSettlePayments = hasOutstandingPayment && !isCheckoutPending;
+
+  const prepaidLines = useMemo(() => {
+    const raw = financialSummary?.prepaidLines ?? [];
+    const seen = new Set<string>();
+    return raw.filter((line) => {
+      const key = `${line.componentId || ''}_${line.label}_${line.amount}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [financialSummary?.prepaidLines]);
+  const additionalLines = useMemo(() => financialSummary?.additionalLines ?? [], [financialSummary?.additionalLines]);
+  const prepaidDiscountAmount = financialSummary?.prepaidDiscountAmount ?? 0;
+  const prepaidPaidAmount = financialSummary?.prepaidPaidAmount ?? 0;
+  const additionalTotal = financialSummary?.additionalTotal ?? 0;
+  const additionalOutstandingAmount =
+    financialSummary?.additionalOutstandingAmount ?? paymentSummary?.outstandingAmount ?? 0;
+  const totalPaidAmount = financialSummary?.totalPaidAmount ?? prepaidPaidAmount;
 
   const handleStartInspection = (type: StaffInspectionType) => {
     router.push({
@@ -286,13 +292,35 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
     setSettling(true);
     try {
       await staffApi.settlePendingPayments(session.bookingId);
-      Alert.alert('Đã xử lý', 'Yêu cầu xử lý thanh toán tồn đọng đã hoàn tất.');
+      Alert.alert('Thành công', 'Đã xác nhận thu đủ tiền mặt và quyết toán phiên chơi.');
       await loadSession(true);
     } catch (error: any) {
       const message = error?.response?.data?.message || 'Không thể xử lý thanh toán tồn đọng.';
       Alert.alert('Lỗi', message);
     } finally {
       setSettling(false);
+    }
+  };
+
+  const handleOpenSettleQr = async () => {
+    if (!session?.bookingId) return;
+    setGeneratingQr(true);
+    try {
+      const result = await staffApi.initiateWalkInSettleBankTransfer(session.bookingId);
+      if (result?.bankTransfer) {
+        setSettleBankTransferData(result.bankTransfer);
+        setSettleQrModalVisible(true);
+      } else {
+        Alert.alert('Thông báo', 'Không tìm thấy thông tin chuyển khoản cho đơn này.');
+      }
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.message ||
+        error?.message ||
+        'Không thể tạo mã QR chuyển khoản.';
+      Alert.alert('Lỗi', message);
+    } finally {
+      setGeneratingQr(false);
     }
   };
 
@@ -314,7 +342,7 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
                 'Đã xác nhận',
                 result?.alreadyCompleted
                   ? 'Khách đã xác nhận trước đó. Phiên đã hoàn tất.'
-                  : 'Checkout đã hoàn tất. Kiểm tra thanh toán tồn đọng nếu có phí phát sinh.'
+                  : 'Checkout đã hoàn tất. Vui lòng quyết toán chi phí phát sinh nếu có bên dưới.'
               );
               await loadSession(true);
             } catch (error: any) {
@@ -329,20 +357,28 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
     );
   };
 
+  const handleBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(tabs)/bookings');
+    }
+  };
+
   return (
     <SafeAreaView className="flex-1 bg-[#f8fafc] dark:bg-[#0b0f19]" edges={['top', 'left', 'right']}>
       <View className="flex-row items-center gap-3 border-b border-slate-200 dark:border-slate-900 px-5 py-4">
         <Pressable
-          onPress={() => router.back()}
-          className="h-10 w-10 items-center justify-center rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]"
+          onPress={handleBack}
+          className="h-10 w-10 items-center justify-center rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a] active:bg-slate-100 dark:active:bg-slate-800"
         >
-          <ArrowLeft color="#e2e8f0" size={19} />
+          <ArrowLeft color="#64748b" size={19} />
         </Pressable>
         <View className="flex-1">
           <Text className="text-[12px] uppercase tracking-wider text-slate-500 dark:text-slate-400" weight="700">
-            Phiên chạy
+            Chi tiết phiên
           </Text>
-          <Text className="mt-1 text-[19px] text-slate-900 dark:text-white" weight="700" numberOfLines={1}>
+          <Text className="mt-0.5 text-[19px] text-slate-900 dark:text-white" weight="700" numberOfLines={1}>
             #{shortId(sessionId)}
           </Text>
         </View>
@@ -354,73 +390,81 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
         </View>
       ) : !session ? (
         <View className="flex-1 items-center justify-center px-5">
-          <Text className="text-center text-[15px] text-slate-900 dark:text-white" weight="700">
-            Không tìm thấy phiên
-          </Text>
-          <Text className="mt-1 text-center text-[12px] text-slate-500">
-            Phiên có thể đã bị xóa hoặc tài khoản không có quyền xem.
-          </Text>
+          <Text className="text-[13px] text-slate-400">Không tìm thấy thông tin phiên chạy.</Text>
         </View>
       ) : (
         <ScrollView
-          contentContainerClassName="px-5 py-5 pb-24"
+          contentContainerClassName="px-5 py-5 pb-16"
+          showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
               onRefresh={() => loadSession(true)}
-              colors={['#f97316']}
               tintColor="#f97316"
+              colors={['#f97316']}
             />
           }
-          showsVerticalScrollIndicator={false}
         >
-          <View className="mb-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/70 p-4 shadow-sm">
-            <View className="mb-4 flex-row items-start justify-between gap-3">
-              <View className="flex-1">
-                <Text className="text-[16px] text-slate-900 dark:text-white" weight="700">
-                  Booking #{shortId(session.bookingId)}
-                </Text>
-                <Text className="mt-1 text-[11px] text-slate-500">
-                  Nhân viên: {session.staffName || 'Nhân viên trực ca'}
-                </Text>
-              </View>
-              <View className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-900 px-2 py-1">
-                <Text
-                  className="text-[9px] uppercase"
-                  weight="700"
-                  style={{ color: getStatusColor(session.status) }}
-                >
+          <View className="mb-5 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-5 shadow-sm">
+            <View className="flex-row items-center justify-between gap-3">
+              <View className="flex-row items-center gap-2 flex-wrap flex-1">
+                <View
+                  className="h-2.5 w-2.5 rounded-full"
+                  style={{ backgroundColor: getStatusColor(session.status) }}
+                />
+                <Text className="text-[13px] text-slate-900 dark:text-white" weight="700">
                   {getStatusLabel(session.status)}
                 </Text>
+                {isWalkIn ? (
+                  <View className="flex-row items-center gap-1 rounded-full border border-orange-300 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/60 px-2 py-0.5">
+                    <Zap color="#ea580c" size={10} />
+                    <Text className="text-[9px] text-[#ea580c] font-black uppercase">
+                      Khách vãng lai
+                    </Text>
+                  </View>
+                ) : (
+                  <View className="flex-row items-center gap-1 rounded-full border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/60 px-2 py-0.5">
+                    <Smartphone color="#0284c7" size={10} />
+                    <Text className="text-[9px] text-sky-700 dark:text-sky-300 font-bold">
+                      Đặt qua App
+                    </Text>
+                  </View>
+                )}
               </View>
+              <Text className="text-[10px] text-slate-400">
+                Bắt đầu: {formatDateTime(session.actualStart || session.plannedEnd)}
+              </Text>
             </View>
 
-            <View className="gap-2">
-              <InfoRow Icon={Clock} label="Bắt đầu" value={formatDateTime(session.actualStart)} />
+            <View className="mt-4 gap-2.5 border-t border-slate-100 dark:border-slate-800 pt-4">
               <InfoRow Icon={Clock} label="Kết thúc dự kiến" value={formatDateTime(session.plannedEnd)} />
               {session.actualEnd ? (
-                <InfoRow Icon={CheckCircle2} label="Kết thúc thực tế" value={formatDateTime(session.actualEnd)} />
+                <InfoRow Icon={Clock} label="Kết thúc thực tế" value={formatDateTime(session.actualEnd)} />
               ) : null}
+              <InfoRow Icon={UserRound} label="Nhân viên phụ trách" value={session.staffName || 'Nhân viên trực ca'} />
             </View>
 
-            <View className="mt-4 flex-row flex-wrap gap-3 border-t border-slate-200 dark:border-slate-800 pt-4">
-              <Metric label="Người chơi" value={session.participants?.length || 0} Icon={UserRound} />
-              <Metric label="Xe" value={session.vehicles?.length || 0} Icon={Car} />
-              <Metric label="Kiểm tra" value={session.inspections?.length || 0} Icon={ShieldCheck} />
-              <Metric label="Ảnh" value={totals.photoTotal} Icon={ReceiptText} />
+            <View className="mt-4 flex-row flex-wrap gap-2">
+              <Metric Icon={UserRound} label="Người chơi" value={session.participants?.length || 0} />
+              <Metric Icon={Car} label="Xe" value={session.vehicles?.length || 0} />
+              <Metric Icon={ShieldCheck} label="Kiểm tra" value={session.inspections?.length || 0} />
+              <Metric Icon={ReceiptText} label="Ảnh" value={totals.photoTotal} />
             </View>
           </View>
 
-          {(operationalTiming.state === 'DUE_FOR_CHECKOUT' || operationalTiming.state === 'OVERDUE') && (
+          {(session.status === 'ACTIVE' || session.status === 'EXTENDING') &&
+            (operationalTiming.state === 'DUE_FOR_CHECKOUT' || operationalTiming.state === 'OVERDUE') && (
             <View
               className={`mb-5 rounded-2xl border p-4 ${
                 operationalTiming.state === 'OVERDUE'
-                  ? 'border-red-500/30 bg-red-500/10'
-                  : 'border-amber-500/30 bg-amber-500/10'
+                  ? 'border-red-500/20 bg-red-500/10'
+                  : 'border-amber-500/20 bg-amber-500/10'
               }`}
             >
               <Text
-                className={`text-[13px] ${operationalTiming.state === 'OVERDUE' ? 'text-red-500' : 'text-amber-600'}`}
+                className={`text-[12px] ${
+                  operationalTiming.state === 'OVERDUE' ? 'text-red-400' : 'text-amber-400'
+                }`}
                 weight="700"
               >
                 {operationalTiming.state === 'OVERDUE'
@@ -460,6 +504,7 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
                 key={`${participant.name}-${index}`}
                 participant={participant}
                 index={index}
+                isWalkIn={isWalkIn}
               />
             ))}
             {session.participants?.length === 0 ? <EmptyText text="Chưa có người chơi trong phiên." /> : null}
@@ -498,131 +543,134 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
                       {inspection.type === 'CHECK_IN' ? 'Nhận xe' : 'Trả xe'}
                     </Text>
                   </View>
-                  <Text className="text-[10px] text-slate-500" weight="700">
-                    {inspection.photos?.length || 0} ảnh
-                  </Text>
+                  <View className="flex-row items-center gap-2">
+                    {inspection.type === 'CHECK_OUT' && session.status === 'CHECKING_OUT' && (
+                      <Pressable
+                        onPress={() => handleStartInspection('CHECK_OUT')}
+                        className="flex-row items-center gap-1 bg-amber-100 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 px-2 py-1 rounded-lg"
+                      >
+                        <Pencil color="#b45309" size={11} />
+                        <Text className="text-[10px] text-amber-950 dark:text-amber-200 font-bold">
+                          Sửa biên bản
+                        </Text>
+                      </Pressable>
+                    )}
+                    <Text className="text-[10px] text-slate-500" weight="700">
+                      {inspection.photos?.length || 0} ảnh
+                    </Text>
+                  </View>
                 </View>
                 <Text className="mt-2 text-[11px] text-slate-400">
                   Checklist: {inspection.checklist?.length || 0} mục
                   {inspection.damageFlagged ? ' • Có ghi nhận hư hỏng' : ''}
                 </Text>
+
                 {inspection.damageFlagged ? (
-                  <View className="mt-3 rounded-xl border border-red-500/20 bg-red-500/10 p-3">
-                    <Text className="text-[11px] text-red-300" weight="700">
-                      Hư hỏng/phí phát sinh
+                  <View className="mt-3 rounded-xl border border-red-300 dark:border-red-500/30 bg-red-50 dark:bg-red-950/40 p-3.5">
+                    <Text className="text-[12px] text-red-900 dark:text-red-300 font-extrabold">
+                      Hư hỏng / Phí bồi thường phát sinh
                     </Text>
                     {inspection.damageLineItems?.map((item, index) => (
                       <View key={item.id || `${item.partType}-${index}`} className="mt-2 flex-row justify-between gap-3">
-                        <Text className="flex-1 text-[10px] text-red-100/60" numberOfLines={1}>
-                          {item.customPartName || getPartTypeLabel(item.partType)}
+                        <Text className="flex-1 text-[11px] text-slate-800 dark:text-slate-200 font-medium" numberOfLines={1}>
+                          • {item.customPartName || getPartTypeLabel(item.partType)}
                         </Text>
-                        <Text className="text-[10px] text-red-100" weight="700">
+                        <Text className="text-[11px] text-rose-700 dark:text-rose-400 font-black">
                           {formatCurrency(item.lineTotal)}
                         </Text>
                       </View>
                     ))}
-                    <View className="mt-2 flex-row justify-between gap-3 border-t border-red-500/20 pt-2">
-                      <Text className="text-[10px] text-red-100/60">Tổng phí bồi thường</Text>
-                      <Text className="text-[10px] text-red-100" weight="700">
+                    <View className="mt-2.5 flex-row justify-between gap-3 border-t border-red-200 dark:border-red-500/30 pt-2">
+                      <Text className="text-[11px] text-red-900 dark:text-red-200 font-bold">Tổng phí bồi thường hư hại:</Text>
+                      <Text className="text-[12px] text-rose-700 dark:text-rose-400 font-black">
                         {formatCurrency(inspection.totalDamageCharge)}
                       </Text>
                     </View>
                   </View>
                 ) : null}
+
                 {inspection.type === 'CHECK_OUT' ? (
                   <View
                     className={`mt-3 rounded-xl border p-3 ${
-                      inspection.customerConfirmed
-                        ? 'border-emerald-500/20 bg-emerald-500/10'
-                        : inspection.customerConfirmedAt
-                        ? 'border-red-500/20 bg-red-500/10'
-                        : 'border-amber-500/20 bg-amber-500/10'
+                      session.status === 'COMPLETED'
+                        ? 'border-emerald-300 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10'
+                        : 'border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40'
                     }`}
                   >
                     <Text
                       className={`text-[11px] ${
-                        inspection.customerConfirmed 
-                          ? 'text-emerald-300' 
-                          : inspection.customerConfirmedAt 
-                            ? 'text-red-300' 
-                            : 'text-amber-300'
+                        session.status === 'COMPLETED' 
+                          ? 'text-emerald-800 dark:text-emerald-300' 
+                          : 'text-amber-950 dark:text-amber-200'
                       }`}
                       weight="700"
                     >
-                      {inspection.customerConfirmed
-                        ? 'Khách đã xác nhận biên bản trả xe'
-                        : inspection.customerConfirmedAt
-                          ? 'Khách từ chối biên bản'
-                          : 'Đang chờ khách xác nhận biên bản trả xe'}
+                      {session.status === 'COMPLETED'
+                        ? '✓ Đã hoàn tất kiểm tra trả xe'
+                        : 'Biên bản trả xe đã lập — Sẵn sàng quyết toán'}
                     </Text>
-                    {inspection.customerConfirmedAt ? (
-                      <Text className="mt-1 text-[10px] text-slate-500">
-                        {inspection.customerConfirmed ? 'Xác nhận' : 'Phản hồi'} lúc {formatDateTime(inspection.customerConfirmedAt)}
-                      </Text>
-                    ) : null}
                   </View>
                 ) : null}
+
                 {inspection.photos?.length ? (
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-3">
                     <View className="flex-row gap-2">
-                      {inspection.photos.map((photo, index) => (
+                      {inspection.photos.map((photo, photoIndex) => (
                         <Pressable
-                          accessibilityRole="button"
-                          accessibilityLabel={`Phóng to ảnh ${getPhotoAngleLabel(photo.angle) || index + 1}`}
+                          key={`${inspection.inspectionId}-${photo.angle}-${photoIndex}`}
                           onPress={() =>
                             setPreviewPhoto({
                               url: photo.url,
-                              title: `${inspection.type === 'CHECK_IN' ? 'Ảnh nhận xe' : 'Ảnh trả xe'} · ${getPhotoAngleLabel(photo.angle) || `Ảnh ${index + 1}`}`,
+                              title: `${inspection.type === 'CHECK_IN' ? 'Nhận xe' : 'Trả xe'} • ${
+                                getPhotoAngleLabel(photo.angle) || `Ảnh ${photoIndex + 1}`
+                              }`,
                             })
                           }
-                          key={`${inspection.inspectionId}-${photo.url}-${index}`}
-                          className="h-20 w-20 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-950"
+                          className="relative h-20 w-28 overflow-hidden rounded-xl border border-slate-700 bg-slate-950"
                         >
                           <Image source={{ uri: photo.url }} className="h-full w-full" resizeMode="cover" />
-                          {getPhotoAngleLabel(photo.angle) ? (
-                            <View className="absolute bottom-1 left-1 rounded bg-black/70 px-1 py-0.5">
-                              <Text className="text-[7px] uppercase text-white" weight="700">
-                                {getPhotoAngleLabel(photo.angle)}
-                              </Text>
-                            </View>
-                          ) : null}
+                          <View className="absolute bottom-0 left-0 right-0 bg-black/60 px-1.5 py-0.5">
+                            <Text className="text-[9px] text-white" weight="700" numberOfLines={1}>
+                              {getPhotoAngleLabel(photo.angle) || `Ảnh ${photoIndex + 1}`}
+                            </Text>
+                          </View>
                         </Pressable>
                       ))}
                     </View>
                   </ScrollView>
                 ) : null}
+
                 {inspection.checklist?.length ? (
-                  <View className="mt-3 gap-2">
-                    {inspection.checklist.slice(0, 4).map((item) => (
-                      <View key={`${inspection.inspectionId}-${item.itemKey}`} className="flex-row gap-2">
+                  <View className="mt-3 gap-2 border-t border-slate-100 dark:border-slate-800 pt-3">
+                    {inspection.checklist.map((item) => (
+                      <View key={`${inspection.inspectionId}-${item.itemKey}`} className="flex-row items-center gap-2">
                         <CheckCircle2
-                          color={item.status === 'OK' ? '#34d399' : '#f59e0b'}
-                          size={13}
-                          style={{ marginTop: 2 }}
+                          color={item.status === 'OK' ? '#10b981' : '#f59e0b'}
+                          size={14}
                         />
                         <View className="flex-1">
-                          <Text className="text-[10px] text-slate-300" numberOfLines={2}>
+                          <Text className="text-[11px] text-slate-700 dark:text-slate-300" numberOfLines={2}>
                             {item.itemLabel}
                           </Text>
-                          {item.note ? (
-                            <Text className="mt-0.5 text-[9px] text-slate-500" numberOfLines={2}>
-                              {item.note}
+                          {item.status !== 'OK' && item.note ? (
+                            <Text className="mt-0.5 text-[9px] text-amber-700 dark:text-amber-400" numberOfLines={2}>
+                              Ghi chú: {item.note}
                             </Text>
                           ) : null}
                         </View>
                         <Text
-                          className={`text-[9px] ${item.status === 'OK' ? 'text-emerald-300' : 'text-amber-300'}`}
-                          weight="700"
+                          className={`text-[10px] font-bold ${item.status === 'OK' ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-800 dark:text-amber-400'}`}
                         >
-                          {getStatusLabel(item.status)}
+                          {item.status === 'OK' ? 'Đạt' : 'Cần xử lý'}
                         </Text>
                       </View>
                     ))}
                   </View>
                 ) : null}
+
                 {inspection.staffNotes ? (
-                  <Text className="mt-2 text-[11px] text-slate-500" numberOfLines={3}>
-                    {inspection.staffNotes}
+                  <Text className="mt-2.5 text-[11px] text-slate-600 dark:text-slate-400 italic" numberOfLines={3}>
+                    Ghi chú: {inspection.staffNotes}
                   </Text>
                 ) : null}
               </View>
@@ -632,70 +680,358 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
 
           <SectionTitle title="Đồ ăn, thức uống của phiên" />
           <View className="mb-5 gap-3">
-            {fnbSummary.items.length > 0 ? (
-              <View className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-4 shadow-sm">
+            {preorderFnbOrders.length > 0 && (
+              <View className="rounded-2xl border border-orange-200 dark:border-orange-900/60 bg-orange-50/40 dark:bg-orange-950/20 p-4 shadow-sm">
                 <View className="mb-3 flex-row items-center justify-between gap-3">
-                  <View className="flex-1">
+                  <View className="flex-row items-center gap-2">
+                    <Coffee color="#ea580c" size={17} />
                     <Text className="text-[13px] text-slate-900 dark:text-white" weight="700">
-                      Đồ ăn, thức uống đã gọi
-                    </Text>
-                    <Text className="mt-1 text-[10px] text-slate-500">
-                      {fnbSummary.statusLabel}
+                      Đồ ăn & thức uống đặt trước
                     </Text>
                   </View>
-                  <Text className="text-[12px] text-[#f97316]" weight="700">
-                    {formatCurrency(fnbSummary.total)}
-                  </Text>
+                  <View className="bg-orange-100 dark:bg-orange-900/60 px-2 py-0.5 rounded-full border border-orange-200 dark:border-orange-800">
+                    <Text className="text-[10px] text-orange-800 dark:text-orange-300 font-bold">
+                      Đã thanh toán trước
+                    </Text>
+                  </View>
                 </View>
-                <View className="gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
-                  {fnbSummary.items.map((item) => (
-                    <View key={item.name} className="flex-row justify-between gap-3">
-                      <Text className="flex-1 text-[11px] text-slate-400" numberOfLines={1}>
-                        {item.quantity}x {item.name}
-                      </Text>
-                      <Text className="text-[11px] text-slate-500">{formatCurrency(item.total)}</Text>
+                <View className="gap-2 border-t border-orange-200/60 dark:border-orange-900/60 pt-3">
+                  {preorderFnbOrders.map((order) => (
+                    <View key={order.orderId} className="gap-1.5 rounded-xl bg-white dark:bg-slate-900/80 p-3 border border-orange-200/60 dark:border-orange-900/40">
+                      {order.items.map((item, idx) => (
+                        <View key={idx} className="flex-row justify-between items-start gap-2">
+                          <View className="flex-1">
+                            <Text className="text-[12px] text-slate-900 dark:text-white font-semibold">
+                              {item.qty}x {item.name}
+                            </Text>
+                          </View>
+                          <Text className="text-[12px] text-orange-600 dark:text-orange-400 font-bold">
+                            {formatCurrency(item.price * item.qty)}
+                          </Text>
+                        </View>
+                      ))}
                     </View>
                   ))}
                 </View>
               </View>
-            ) : (
-              <EmptyText text="Phiên chưa có đơn đồ ăn, thức uống." />
             )}
+
+            <View className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-4 shadow-sm">
+              <View className="mb-3 flex-row items-center justify-between gap-3">
+                <View className="flex-row items-center gap-2">
+                  <Coffee color="#ea580c" size={17} />
+                  <Text className="text-[13px] text-slate-900 dark:text-white" weight="700">
+                    Đồ ăn & thức uống gọi trong phiên
+                  </Text>
+                </View>
+                {onsiteFnbTotal > 0 && (
+                  <Text className="text-[12px] text-orange-600 dark:text-orange-400 font-bold">
+                    {formatCurrency(onsiteFnbTotal)}
+                  </Text>
+                )}
+              </View>
+              {onsiteFnbOrders.length > 0 ? (
+                <View className="gap-2 border-t border-slate-100 dark:border-slate-800 pt-3">
+                  {onsiteFnbOrders.map((order) => (
+                    <View key={order.orderId} className="gap-1.5 rounded-xl bg-slate-50 dark:bg-slate-900 p-3 border border-slate-200/60 dark:border-slate-800">
+                      {order.items.map((item, idx) => (
+                        <View key={idx} className="flex-row justify-between items-start gap-2">
+                          <View className="flex-1">
+                            <Text className="text-[12px] text-slate-900 dark:text-white font-semibold">
+                              {item.qty}x {item.name}
+                            </Text>
+                          </View>
+                          <View className="items-end">
+                            <Text className="text-[12px] text-slate-900 dark:text-white font-bold">
+                              {formatCurrency(item.price * item.qty)}
+                            </Text>
+                            <Text className="text-[9px] text-amber-700 dark:text-amber-400 font-semibold mt-0.5">
+                              {getFnbOrderStatusLabel(order.status)}
+                            </Text>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <Text className="text-[11px] text-slate-400 italic text-center py-2">
+                  Chưa có món gọi thêm tại ca.
+                </Text>
+              )}
+            </View>
           </View>
 
-          <View className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-4 shadow-sm">
+          <View className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-4 shadow-sm mb-6">
             <View className="mb-3 flex-row items-center justify-between gap-3">
-              <View className="flex-1">
-                <Text className="text-[13px] text-slate-900 dark:text-white" weight="700">
-                  {canSettlePayments ? 'Thanh toán tồn đọng' : 'Thanh toán đã hoàn tất'}
-                </Text>
-                <Text className="mt-1 text-[11px] text-slate-500">
-                  {settlementDescription}
+              <View className="flex-row items-center gap-2">
+                <FileText color="#ea580c" size={18} />
+                <Text className="text-[14px] text-slate-900 dark:text-white font-extrabold uppercase tracking-wide">
+                  Quyết toán phiên chơi
                 </Text>
               </View>
-              {canSettlePayments ? <Coffee color="#f97316" size={20} /> : <CheckCircle2 color="#10b981" size={20} />}
-            </View>
-            <Pressable
-              disabled={!canSettlePayments || settling}
-              onPress={handleSettlePayments}
-              className={`h-11 flex-row items-center justify-center gap-2 rounded-xl ${
-                canSettlePayments ? 'bg-[#ea580c]' : 'bg-slate-200 dark:bg-slate-800'
-              } ${
-                settling || !canSettlePayments ? 'opacity-70' : ''
-              }`}
-            >
-              {settling ? (
-                <ActivityIndicator color="#ffffff" size="small" />
+              {canSettlePayments ? (
+                <Banknote color="#f97316" size={20} />
               ) : (
-                <WalletCards color="#ffffff" size={16} />
+                <CheckCircle2 color="#10b981" size={20} />
               )}
-              <Text className="text-[12px] text-white" weight="700">
-                {canSettlePayments ? 'Khách hàng thanh toán bằng tiền mặt' : 'Đã thanh toán đầy đủ'}
+            </View>
+
+            {hasOutstandingPayment && (
+              <View
+                className={`mb-3 flex-row items-start gap-2.5 rounded-xl border p-3 ${
+                  isCheckoutPending
+                    ? 'border-amber-300 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-800'
+                    : 'border-orange-200 bg-orange-50 dark:bg-orange-950/40 dark:border-orange-800'
+                }`}
+              >
+                {isCheckoutPending ? (
+                  <AlertTriangle color="#b45309" size={16} style={{ marginTop: 2 }} />
+                ) : (
+                  <Banknote color="#ea580c" size={16} style={{ marginTop: 2 }} />
+                )}
+                <View className="flex-1">
+                  <Text
+                    className={`text-[12px] font-extrabold ${
+                      isCheckoutPending ? 'text-amber-950 dark:text-amber-200' : 'text-orange-950 dark:text-orange-200'
+                    }`}
+                  >
+                    {isCheckoutPending
+                      ? 'BƯỚC 1: Cần kiểm tra trả xe trước'
+                      : 'Còn khoản phát sinh cần thanh toán'}
+                  </Text>
+                  <Text
+                    className={`mt-0.5 text-[11px] leading-4 ${
+                      isCheckoutPending ? 'text-amber-900 dark:text-amber-300' : 'text-orange-900 dark:text-orange-300'
+                    }`}
+                  >
+                    {isCheckoutPending
+                      ? `Khách còn ${formatCurrency(additionalOutstandingAmount)} phí phát sinh. Vui lòng thực hiện BƯỚC 1: KIỂM TRA TRẢ XE ở thẻ phía trên trước khi thu tiền mặt.`
+                      : `Khách cần thanh toán ${formatCurrency(additionalOutstandingAmount)} cho các khoản dưới đây.`}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            <View className="border-t border-slate-100 dark:border-slate-800 pt-3 pb-3">
+              <Text className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
+                Đã thanh toán khi đặt lịch
               </Text>
-            </Pressable>
+              <View className="gap-1.5">
+                {prepaidLines.map((line) => (
+                  <View key={line.componentId} className="flex-row justify-between items-center">
+                    <Text className="text-[11px] text-slate-600 dark:text-slate-400">{line.label}:</Text>
+                    <Text className="text-[11px] font-bold text-slate-900 dark:text-white">
+                      {formatCurrency(line.amount)}
+                    </Text>
+                  </View>
+                ))}
+                {prepaidDiscountAmount > 0 && (
+                  <View className="flex-row justify-between items-center">
+                    <Text className="text-[11px] text-emerald-600 dark:text-emerald-400">Ưu đãi áp dụng:</Text>
+                    <Text className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                      -{formatCurrency(prepaidDiscountAmount)}
+                    </Text>
+                  </View>
+                )}
+                <View className="flex-row justify-between items-center pt-1.5 border-t border-slate-100 dark:border-slate-800/60 mt-0.5">
+                  <Text className="text-[11px] font-bold text-slate-800 dark:text-slate-200">Đã thanh toán trước:</Text>
+                  <Text className="text-[12px] font-extrabold text-slate-900 dark:text-white">
+                    {formatCurrency(prepaidPaidAmount)}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            <View className="border-t border-slate-100 dark:border-slate-800 pt-3 pb-3">
+              <Text className="text-[10px] font-extrabold text-orange-600 dark:text-orange-400 uppercase tracking-wider mb-2">
+                Chi phí phát sinh tại quầy
+              </Text>
+              <View className="gap-2">
+                {additionalLines.length > 0 ? (
+                  additionalLines.map((line) => {
+                    const isPaid = line.status === 'DISBURSED' || line.status === 'CAPTURED';
+                    return (
+                      <View key={line.componentId} className="rounded-xl bg-slate-50 dark:bg-slate-900/80 p-2.5 border border-slate-200/60 dark:border-slate-800">
+                        <View className="flex-row justify-between items-center">
+                          <Text className="text-[11px] text-slate-700 dark:text-slate-300 font-semibold">{line.label}</Text>
+                          <Text className="text-[12px] font-extrabold text-orange-600 dark:text-orange-400">
+                            +{formatCurrency(line.amount)}
+                          </Text>
+                        </View>
+                        <Text className={`text-[10px] font-bold mt-0.5 ${isPaid ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}`}>
+                          {isPaid ? '✓ Đã thanh toán' : '⏳ Chờ thanh toán'}
+                        </Text>
+                      </View>
+                    );
+                  })
+                ) : (
+                  <Text className="text-[11px] text-slate-400 italic">Không phát sinh chi phí tại quầy.</Text>
+                )}
+                {additionalTotal > 0 && (
+                  <View className="flex-row justify-between items-center pt-1.5 border-t border-slate-100 dark:border-slate-800/60">
+                    <Text className="text-[11px] font-bold text-slate-800 dark:text-slate-200">Tổng phí phát sinh:</Text>
+                    <Text className="text-[12px] font-extrabold text-orange-600 dark:text-orange-400">
+                      +{formatCurrency(additionalTotal)}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
+
+            <View className="rounded-xl bg-slate-50 dark:bg-slate-900/90 p-3.5 border border-slate-200 dark:border-slate-800 gap-2 mb-3">
+              <View className="flex-row justify-between items-center">
+                <Text className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">Tổng khách đã trả:</Text>
+                <Text className="text-[13px] font-extrabold text-slate-900 dark:text-white">
+                  {formatCurrency(totalPaidAmount)}
+                </Text>
+              </View>
+              {additionalOutstandingAmount > 0 && (
+                <View className="flex-row justify-between items-center pt-2 border-t border-slate-200 dark:border-slate-800">
+                  <Text className="text-[12px] font-black text-orange-700 dark:text-orange-400">Tổng tiền cần thu thêm:</Text>
+                  <Text className="text-[15px] font-black text-orange-600 dark:text-orange-400">
+                    {formatCurrency(additionalOutstandingAmount)}
+                  </Text>
+                </View>
+              )}
+              {Number(paymentSummary?.pendingRefundAmount || 0) > 0 && (
+                <View className="flex-row justify-between items-center pt-2 border-t border-slate-200 dark:border-slate-800">
+                  <Text className="text-[12px] font-black text-emerald-700 dark:text-emerald-400">Tiền cần hoàn cọc lại:</Text>
+                  <Text className="text-[15px] font-black text-emerald-600 dark:text-emerald-400">
+                    {formatCurrency(paymentSummary?.pendingRefundAmount)}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {isCheckoutPending ? (
+              <View className="h-12 flex-row items-center justify-center gap-2 rounded-xl border border-amber-300 bg-amber-100/90 dark:bg-amber-950/40 dark:border-amber-800">
+                <WalletCards color="#b45309" size={16} />
+                <Text className="text-[12px] font-bold text-amber-950 dark:text-amber-200">
+                  🔒 Cần kiểm tra trả xe trước
+                </Text>
+              </View>
+            ) : canSettlePayments ? (
+              <View className="gap-2">
+                <View className="flex-row gap-2">
+                  <Pressable
+                    disabled={settling || generatingQr}
+                    onPress={() => setConfirmSettleModalVisible(true)}
+                    className="flex-1 h-12 flex-row items-center justify-center gap-2 rounded-xl bg-[#ea580c] active:bg-[#c2410c] shadow-sm"
+                  >
+                    {settling ? (
+                      <ActivityIndicator color="#ffffff" size="small" />
+                    ) : (
+                      <Banknote color="#ffffff" size={16} />
+                    )}
+                    <Text className="text-[12px] font-bold text-white">
+                      Thu tiền mặt
+                    </Text>
+                  </Pressable>
+
+                  <Pressable
+                    disabled={settling || generatingQr}
+                    onPress={handleOpenSettleQr}
+                    className="flex-1 h-12 flex-row items-center justify-center gap-2 rounded-xl border border-orange-300 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/40 active:bg-orange-100 shadow-sm"
+                  >
+                    {generatingQr ? (
+                      <ActivityIndicator color="#ea580c" size="small" />
+                    ) : (
+                      <QrCode color="#ea580c" size={16} />
+                    )}
+                    <Text className="text-[12px] font-bold text-[#ea580c]">
+                      Chuyển khoản QR
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : (
+              <View className="h-12 flex-row items-center justify-center gap-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                <CheckCircle2 color="#10b981" size={16} />
+                <Text className="text-[12px] font-bold text-slate-600 dark:text-slate-300">
+                  Đã thanh toán đầy đủ
+                </Text>
+              </View>
+            )}
           </View>
         </ScrollView>
       )}
+
+      <Modal visible={confirmSettleModalVisible} transparent animationType="fade">
+        <View className="flex-1 bg-black/70 justify-center items-center px-5">
+          <View className="w-full max-w-sm rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-2xl">
+            <View className="flex-row items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <View className="flex-row items-center gap-2">
+                <Banknote color="#ea580c" size={20} />
+                <Text className="text-[15px] font-bold text-slate-900 dark:text-white">
+                  Xác nhận thu tiền mặt
+                </Text>
+              </View>
+              <Pressable onPress={() => setConfirmSettleModalVisible(false)} className="p-1">
+                <X color="#94a3b8" size={18} />
+              </Pressable>
+            </View>
+
+            <View className="py-4 items-center">
+              <Text className="text-[11px] text-slate-500 uppercase tracking-wider font-bold">
+                Số tiền cần thu từ khách
+              </Text>
+              <Text className="text-[24px] font-black text-[#ea580c] mt-1">
+                {formatCurrency(additionalOutstandingAmount)}
+              </Text>
+            </View>
+
+            <View className="rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 p-3 mb-4">
+              <Text className="text-[11px] text-amber-900 dark:text-amber-200 leading-4 font-semibold">
+                ⚠️ Vui lòng đảm bảo bạn đã thu đủ số tiền mặt trực tiếp từ khách hàng tại quầy trước khi xác nhận.
+              </Text>
+            </View>
+
+            <View className="gap-2">
+              <Pressable
+                disabled={settling}
+                onPress={async () => {
+                  setConfirmSettleModalVisible(false);
+                  await handleSettlePayments();
+                }}
+                className="h-11 flex-row items-center justify-center gap-2 rounded-xl bg-[#ea580c] active:bg-[#c2410c]"
+              >
+                {settling ? (
+                  <ActivityIndicator color="#ffffff" size="small" />
+                ) : (
+                  <CheckCircle2 color="#ffffff" size={16} />
+                )}
+                <Text className="text-[12px] font-bold text-white">
+                  Tôi đã thu đủ tiền mặt & Xác nhận
+                </Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => setConfirmSettleModalVisible(false)}
+                className="h-10 flex-row items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 active:bg-slate-200"
+              >
+                <Text className="text-[12px] font-bold text-slate-700 dark:text-slate-300">
+                  Hủy bỏ
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <WalkInBankTransferModal
+        visible={settleQrModalVisible}
+        bookingId={session?.bookingId || ''}
+        bookingCode={(session as any)?.shortCode || (session as any)?.bookingCode || session?.bookingId?.slice(0, 8)?.toUpperCase()}
+        bankTransfer={settleBankTransferData}
+        onClose={() => setSettleQrModalVisible(false)}
+        onSuccess={async () => {
+          setSettleQrModalVisible(false);
+          await loadSession(true);
+        }}
+        onSwitchToCash={() => setConfirmSettleModalVisible(true)}
+      />
+
       <ImageZoomModal
         visible={!!previewPhoto}
         imageUrl={previewPhoto?.url}
@@ -711,7 +1047,7 @@ function InfoRow({ Icon, label, value }: { Icon: LucideIcon; label: string; valu
     <View className="flex-row items-center gap-2">
       <Icon color="#94a3b8" size={14} />
       <Text className="w-32 text-[11px] text-slate-500">{label}</Text>
-      <Text className="flex-1 text-right text-[11px] text-slate-300" weight="700">
+      <Text className="flex-1 text-right text-[11px] text-slate-900 dark:text-white" weight="700">
         {value}
       </Text>
     </View>
@@ -822,25 +1158,48 @@ function SessionOperations({
         ) : null}
 
         {status === 'CHECKING_OUT' && hasCheckOutInspection && !checkOutConfirmed ? (
-          <View className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-3">
-            <Text className="text-[12px] text-amber-300" weight="700">
-              Đang chờ xác nhận trả xe
-            </Text>
-            <Text className="mt-1 text-[11px] leading-4 text-amber-200/70">
-              Chờ khách xác nhận trên ứng dụng, hoặc xác nhận trực tiếp tại quầy sau khi khách đã xem biên bản.
-            </Text>
-            <Pressable
-              disabled={confirmingCheckout}
-              onPress={onConfirmCheckout}
-              className={`mt-3 h-10 flex-row items-center justify-center gap-2 rounded-xl bg-[#ea580c] ${
-                confirmingCheckout ? 'opacity-70' : ''
-              }`}
-            >
-              {confirmingCheckout ? <ActivityIndicator color="#ffffff" size="small" /> : <CheckCircle2 color="#ffffff" size={15} />}
-              <Text className="text-[11px] text-white" weight="700">
-                Xác nhận trả xe tại quầy
+          <View className="rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-3.5">
+            <View className="flex-row items-center justify-between gap-2 mb-1">
+              <Text className="text-[13px] text-amber-950 dark:text-amber-100" weight="700">
+                Biên bản trả xe đã sẵn sàng
               </Text>
-            </Pressable>
+              <View className="bg-amber-200/80 dark:bg-amber-900/60 px-2 py-0.5 rounded-full border border-amber-300 dark:border-amber-800">
+                <Text className="text-[10px] text-amber-900 dark:text-amber-200 font-bold">
+                  Chờ đóng ca
+                </Text>
+              </View>
+            </View>
+            <Text className="text-[11px] leading-4 text-amber-900 dark:text-amber-200 font-medium">
+              Đã lập biên bản kiểm tra trả xe. Bạn có thể xem lại, chỉnh sửa nếu cần hoặc xác nhận trả xe để đóng phiên và quyết toán.
+            </Text>
+            <View className="mt-3 gap-2">
+              <Pressable
+                disabled={confirmingCheckout}
+                onPress={onConfirmCheckout}
+                className={`h-11 flex-row items-center justify-center gap-2 rounded-xl bg-[#ea580c] active:bg-[#c2410c] shadow-sm ${
+                  confirmingCheckout ? 'opacity-70' : ''
+                }`}
+              >
+                {confirmingCheckout ? (
+                  <ActivityIndicator color="#ffffff" size="small" />
+                ) : (
+                  <CheckCircle2 color="#ffffff" size={16} />
+                )}
+                <Text className="text-[12px] text-white" weight="700">
+                  Xác nhận trả xe tại quầy
+                </Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => onStartInspection('CHECK_OUT')}
+                className="h-10 flex-row items-center justify-center gap-2 rounded-xl border border-amber-400/60 dark:border-amber-700/60 bg-amber-100/60 dark:bg-amber-900/30 active:bg-amber-200/60"
+              >
+                <Pencil color="#b45309" size={13} />
+                <Text className="text-[11px] text-amber-950 dark:text-amber-200 font-bold">
+                  Sửa / Lập lại biên bản trả xe
+                </Text>
+              </Pressable>
+            </View>
           </View>
         ) : null}
 
@@ -867,9 +1226,11 @@ function SectionTitle({ title }: { title: string }) {
 function ParticipantRow({
   participant,
   index,
+  isWalkIn,
 }: {
   participant: { name: string; type: string; avatarUrl?: string };
   index: number;
+  isWalkIn?: boolean;
 }) {
   const initials = participant.name
     .split(/\s+/)
@@ -907,7 +1268,9 @@ function ParticipantRow({
         <Text className="text-[13px] text-slate-900 dark:text-white" weight="700" numberOfLines={1}>
           {participant.name || `Người chơi ${index + 1}`}
         </Text>
-        <Text className="mt-1 text-[11px] text-slate-500">Người chơi</Text>
+        <Text className="mt-1 text-[11px] text-slate-500">
+          {isWalkIn ? 'Khách vãng lai (Tại quầy)' : 'Người chơi'}
+        </Text>
       </View>
     </View>
   );

@@ -38,4 +38,11 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           EXPO_PUBLIC_API_URL: ${{ secrets.EXPO_PUBLIC_API_URL }}
           EAS_BUILD_NO_EXPO_GO_WARNING: "true"
-        run: eas build --platform android --non-interactive
+        run: |
+          if [ "${{ github.ref_name }}" = "main" ] || [ "${{ github.base_ref }}" = "main" ]; then
+            PROFILE="production"
+          else
+            PROFILE="preview"
+          fi
+          echo "Building with profile: $PROFILE"
+          eas build --platform android --profile $PROFILE --non-interactive

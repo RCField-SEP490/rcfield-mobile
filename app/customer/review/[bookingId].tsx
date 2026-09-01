@@ -11,7 +11,7 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, CheckCircle2, Star, XCircle } from 'lucide-react-native';
+import { ArrowLeft, CheckCircle2, Clock, Star, XCircle } from 'lucide-react-native';
 
 import { bookingWizardApi } from '@/features/bookings/api/booking-wizard.api';
 import { dismissReview, submitReview } from '@/features/reviews/api/review.api';
@@ -40,6 +40,18 @@ export default function CustomerReviewScreen() {
   const [facilityScore, setFacilityScore] = useState(0);
   const [note, setNote] = useState('');
 
+  const isAlreadyReviewed = !!booking?.review;
+  const isBookingOrSessionDone = booking?.status === 'COMPLETED' || booking?.session?.status === 'COMPLETED';
+  const completionTime =
+    booking?.completedAt ||
+    booking?.completed_at ||
+    booking?.session?.actualEndAt ||
+    (isBookingOrSessionDone ? booking?.slotEnd : null);
+  const isReviewExpired =
+    booking?.is_review_expired ??
+    (completionTime
+      ? Date.now() - new Date(completionTime).getTime() > 5 * 24 * 60 * 60 * 1000
+      : false);
 
   const loadBooking = useCallback(async () => {
     if (!normalizedBookingId) {
@@ -172,71 +184,128 @@ export default function CustomerReviewScreen() {
             </Text>
           </View>
 
-          {/* Rating Rows */}
-          <View className="gap-3">
-            <RatingRow label="Tổng thể" value={overallScore} onChange={setOverallScore} isDark={isDark} />
-            {booking?.playMode === 'BYOC' ? null : (
-              <RatingRow label="Xe thuê" value={vehicleScore} onChange={setVehicleScore} isDark={isDark} />
-            )}
-            <RatingRow label="Nhân viên" value={staffScore} onChange={setStaffScore} isDark={isDark} />
-            <RatingRow label="Cơ sở/sân" value={facilityScore} onChange={setFacilityScore} isDark={isDark} />
-          </View>
-
-          {/* Ghi chú */}
-          <View className="mt-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-4 shadow-sm">
-            <Text className="mb-2 text-[12px] uppercase tracking-wider text-slate-500 dark:text-slate-450" weight="700">
-              Ghi chú
-            </Text>
-            <TextInput
-              value={note}
-              onChangeText={setNote}
-              multiline
-              placeholder="Chia sẻ điểm tốt hoặc điều cần cải thiện..."
-              placeholderTextColor={isDark ? '#475569' : '#94a3b8'}
-              className="min-h-[112px] rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 py-3 text-[12px] text-slate-900 dark:text-white"
-              style={{ textAlignVertical: 'top' }}
-              onFocus={() => {
-                setTimeout(() => {
-                  scrollViewRef.current?.scrollToEnd({ animated: true });
-                }, 100);
-              }}
-            />
-          </View>
-
-          {/* Actions */}
-          <View className="mt-6 gap-3">
-            <Pressable
-              disabled={!!submitting}
-              onPress={handleSubmit}
-              className={`h-12 flex-row items-center justify-center gap-2 rounded-xl bg-[#ea580c] active:bg-[#f97316] shadow-md ${submitting ? 'opacity-70' : ''
-                }`}
-            >
-              {submitting === 'submit' ? (
-                <ActivityIndicator color="#ffffff" size="small" />
-              ) : (
-                <CheckCircle2 color="#ffffff" size={17} />
-              )}
-              <Text className="text-[13px] text-white font-bold">
-                Gửi đánh giá
+          {isAlreadyReviewed ? (
+            <View className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-5 shadow-sm">
+              <View className="flex-row items-center gap-2">
+                <CheckCircle2 color="#10b981" size={20} />
+                <Text className="text-[15px] font-bold text-emerald-800 dark:text-emerald-300">
+                  Bạn đã gửi đánh giá cho đơn đặt này
+                </Text>
+              </View>
+              <View className="flex-row items-center gap-1 mt-3">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Star
+                    key={i}
+                    color="#eab308"
+                    fill={i < (booking.review.overallScore || booking.review.rating || 5) ? '#eab308' : 'transparent'}
+                    size={18}
+                  />
+                ))}
+                <Text className="ml-2 text-sm font-bold text-slate-700 dark:text-slate-300">
+                  {booking.review.overallScore || booking.review.rating || 5}/5 sao
+                </Text>
+              </View>
+              {booking.review.note ? (
+                <Text className="mt-2.5 text-xs italic text-slate-600 dark:text-slate-400">
+                  {`"${booking.review.note}"`}
+                </Text>
+              ) : null}
+              <Pressable
+                onPress={() => router.back()}
+                className="mt-5 h-11 flex-row items-center justify-center rounded-xl bg-emerald-600 active:bg-emerald-700"
+              >
+                <Text className="text-xs font-bold text-white">Quay lại chi tiết đặt sân</Text>
+              </Pressable>
+            </View>
+          ) : isReviewExpired ? (
+            <View className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-5 shadow-sm">
+              <View className="flex-row items-center gap-2">
+                <Clock color="#d97706" size={20} />
+                <Text className="text-[15px] font-bold text-amber-900 dark:text-amber-200">
+                  Thời hạn đánh giá đã kết thúc
+                </Text>
+              </View>
+              <Text className="mt-2 text-xs leading-5 text-amber-800 dark:text-amber-300">
+                Đơn đặt này đã hoàn thành hơn 5 ngày trước nên hệ thống đã đóng cổng gửi đánh giá trải nghiệm.
               </Text>
-            </Pressable>
+              <Pressable
+                onPress={() => router.back()}
+                className="mt-5 h-11 flex-row items-center justify-center rounded-xl bg-[#d97706] active:bg-[#b45309]"
+              >
+                <Text className="text-xs font-bold text-white">Quay lại chi tiết đặt sân</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <>
+              {/* Rating Rows */}
+              <View className="gap-3">
+                <RatingRow label="Tổng thể" value={overallScore} onChange={setOverallScore} isDark={isDark} />
+                {booking?.playMode === 'BYOC' ? null : (
+                  <RatingRow label="Xe thuê" value={vehicleScore} onChange={setVehicleScore} isDark={isDark} />
+                )}
+                <RatingRow label="Nhân viên" value={staffScore} onChange={setStaffScore} isDark={isDark} />
+                <RatingRow label="Cơ sở/sân" value={facilityScore} onChange={setFacilityScore} isDark={isDark} />
+              </View>
 
-            <Pressable
-              disabled={!!submitting}
-              onPress={handleDismiss}
-              className={`h-12 flex-row items-center justify-center gap-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 active:bg-slate-100 dark:active:bg-slate-800 ${submitting ? 'opacity-70' : ''
-                }`}
-            >
-              {submitting === 'dismiss' ? (
-                <ActivityIndicator color={isDark ? '#94a3b8' : '#475569'} size="small" />
-              ) : (
-                <XCircle color={isDark ? '#94a3b8' : '#475569'} size={17} />
-              )}
-              <Text className="text-[13px] text-slate-700 dark:text-slate-300 font-bold">
-                Bỏ qua
-              </Text>
-            </Pressable>
-          </View>
+              {/* Ghi chú */}
+              <View className="mt-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-4 shadow-sm">
+                <Text className="mb-2 text-[12px] uppercase tracking-wider text-slate-500 dark:text-slate-450" weight="700">
+                  Ghi chú
+                </Text>
+                <TextInput
+                  value={note}
+                  onChangeText={setNote}
+                  multiline
+                  placeholder="Chia sẻ điểm tốt hoặc điều cần cải thiện..."
+                  placeholderTextColor={isDark ? '#475569' : '#94a3b8'}
+                  className="min-h-[112px] rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 py-3 text-[12px] text-slate-900 dark:text-white"
+                  style={{ textAlignVertical: 'top' }}
+                  onFocus={() => {
+                    setTimeout(() => {
+                      scrollViewRef.current?.scrollToEnd({ animated: true });
+                    }, 100);
+                  }}
+                />
+              </View>
+
+              {/* Actions */}
+              <View className="mt-6 gap-3">
+                <Pressable
+                  disabled={!!submitting}
+                  onPress={handleSubmit}
+                  className={`h-12 flex-row items-center justify-center gap-2 rounded-xl bg-[#ea580c] active:bg-[#f97316] shadow-md ${
+                    submitting ? 'opacity-70' : ''
+                  }`}
+                >
+                  {submitting === 'submit' ? (
+                    <ActivityIndicator color="#ffffff" size="small" />
+                  ) : (
+                    <CheckCircle2 color="#ffffff" size={17} />
+                  )}
+                  <Text className="text-[13px] text-white font-bold">
+                    Gửi đánh giá
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  disabled={!!submitting}
+                  onPress={handleDismiss}
+                  className={`h-12 flex-row items-center justify-center gap-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 active:bg-slate-100 dark:active:bg-slate-800 ${
+                    submitting ? 'opacity-70' : ''
+                  }`}
+                >
+                  {submitting === 'dismiss' ? (
+                    <ActivityIndicator color={isDark ? '#94a3b8' : '#475569'} size="small" />
+                  ) : (
+                    <XCircle color={isDark ? '#94a3b8' : '#475569'} size={17} />
+                  )}
+                  <Text className="text-[13px] text-slate-700 dark:text-slate-300 font-bold">
+                    Bỏ qua
+                  </Text>
+                </Pressable>
+              </View>
+            </>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
