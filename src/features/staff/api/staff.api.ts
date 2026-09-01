@@ -10,7 +10,7 @@ export type StaffBookingStatus =
 
 export type StaffFnbOrderStatus = 'PENDING' | 'CONFIRMED' | 'DELIVERED' | 'CANCELLED';
 export type StaffInspectionType = 'CHECK_IN' | 'CHECK_OUT';
-export type StaffBookingSource = 'APP' | 'STAFF_MANUAL';
+export type StaffBookingSource = 'APP' | 'STAFF_MANUAL' | 'WALK_IN' | 'FACEBOOK' | 'CONTEST';
 export type StaffPlayMode = 'RENTAL' | 'BYOC' | 'MIXED';
 export type StaffInspectionItemStatus = 'OK' | 'BROKEN';
 export type DamagePartType =
@@ -33,6 +33,19 @@ export interface DamageLineItemInput {
 export interface DamageLineItemDetail extends DamageLineItemInput {
   id?: string;
   lineTotal: number;
+}
+
+export interface BankTransferCheckout {
+  qr_image_data_url: string;
+  qr_payload: string;
+  ref_code: string;
+  bank_name: string;
+  account_number: string;
+  account_name: string;
+  amount: number;
+  expires_at: string;
+  is_sandbox?: boolean;
+  sandbox_url?: string;
 }
 
 export interface TodayBookingItem {
@@ -168,6 +181,18 @@ export interface StaffSessionDetail {
     items: { name: string; qty: number; price: number }[];
     total: number;
   }[];
+  financialSummary?: {
+    prepaidLines: { componentId: string; label: string; amount: number }[];
+    prepaidDiscountAmount: number;
+    prepaidPaidAmount: number;
+    additionalLines: { componentId: string; label: string; amount: number; status: string }[];
+    additionalTotal: number;
+    additionalOutstandingAmount: number;
+    totalPaidAmount: number;
+    depositAmount: number;
+    depositConsumed: number;
+    depositRemaining: number;
+  };
   paymentSummary?: {
     outstandingAmount: number;
     pendingRefundAmount: number;
@@ -343,12 +368,19 @@ export const staffApi = {
   async updateDamageItems(
     sessionId: string,
     inspectionId: string,
-    damageLineItems: DamageLineItemInput[]
+    payload:
+      | {
+          damageLineItems: DamageLineItemInput[];
+          checklist?: { itemKey?: string; itemLabel: string; status: string; note?: string | null }[];
+          staffNotes?: string;
+        }
+      | DamageLineItemInput[]
   ): Promise<{ inspectionId: string; damageLineItems: DamageLineItemDetail[]; totalDamageCharge: number }> {
+    const body = Array.isArray(payload) ? { damageLineItems: payload } : payload;
     const response = await api.put<{
       success: boolean;
       data: { inspectionId: string; damageLineItems: DamageLineItemDetail[]; totalDamageCharge: number };
-    }>(`/staff/sessions/${sessionId}/inspections/${inspectionId}/damage-items`, { damageLineItems });
+    }>(`/staff/sessions/${sessionId}/inspections/${inspectionId}/damage-items`, body);
     return response.data.data;
   },
 
@@ -366,6 +398,14 @@ export const staffApi = {
     const response = await api.post<{ success: boolean; data: any }>(
       `/staff/sessions/${sessionId}/extensions`,
       payload
+    );
+    return response.data.data;
+  },
+
+  async simulateClientExtension(sessionId: string, data: { approved: boolean }): Promise<any> {
+    const response = await api.post<{ success: boolean; data: any }>(
+      `/staff/sessions/${sessionId}/simulate-extension-response`,
+      data
     );
     return response.data.data;
   },
@@ -419,6 +459,32 @@ export const staffApi = {
     const response = await api.post<{ success: boolean; data: any }>(
       `/staff/bookings/${bookingId}/settle-pending-payments`
     );
+    return response.data.data;
+  },
+
+  async initiateWalkInSettleBankTransfer(bookingId: string): Promise<{
+    success: boolean;
+    bookingId: string;
+    amount: number;
+    bankTransfer: BankTransferCheckout;
+  }> {
+    const response = await api.post<{
+      success: boolean;
+      data: {
+        success: boolean;
+        bookingId: string;
+        amount: number;
+        bankTransfer: BankTransferCheckout;
+      };
+    }>(`/staff/bookings/${bookingId}/settle-bank-transfer`);
+    return response.data.data;
+  },
+
+  async confirmWalkInBankTransfer(bookingId: string): Promise<any> {
+    const response = await api.post<{
+      success: boolean;
+      data: any;
+    }>(`/staff/bookings/${bookingId}/confirm-bank-transfer`);
     return response.data.data;
   },
 };
