@@ -136,6 +136,7 @@ export interface BankTransferCheckout {
   expires_at: string;
   is_sandbox: boolean;
   sandbox_url?: string;
+  txn_ref?: string;
 }
 
 export interface CheckoutResponse {
@@ -244,7 +245,7 @@ export const bookingWizardApi = {
   createCheckout: async (
     bookingId: string,
     returnUrl?: string,
-    paymentMethod?: 'vnpay' | 'bank_transfer'
+    paymentMethod?: 'vnpay' | 'bank_transfer' | 'pay_later'
   ): Promise<CheckoutResponse> => {
     const response = await api.post(`/bookings/${bookingId}/checkout`, {
       return_url: returnUrl,
@@ -267,8 +268,15 @@ export const bookingWizardApi = {
     await api.post(`/bookings/${bookingId}/mock-checkout`);
   },
 
-  createCheckoutAdditionalPayment: async (bookingId: string, returnUrl?: string): Promise<CheckoutResponse> => {
-    const response = await api.post(`/bookings/${bookingId}/checkout-additional-payment`, { return_url: returnUrl });
+  createCheckoutAdditionalPayment: async (
+    bookingId: string,
+    returnUrl?: string,
+    paymentMethod?: 'vnpay' | 'bank_transfer'
+  ): Promise<CheckoutResponse> => {
+    const response = await api.post(`/bookings/${bookingId}/checkout-additional-payment`, {
+      return_url: returnUrl,
+      payment_method: paymentMethod,
+    });
     return response.data?.data;
   },
 

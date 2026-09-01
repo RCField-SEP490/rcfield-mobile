@@ -22,11 +22,12 @@ import {
   Building2,
   RefreshCw,
   Sparkles,
-  ShieldCheck,
   Download,
   Share2,
 } from 'lucide-react-native';
 
+import { api } from '@/shared/lib/api';
+import { wsClient } from '@/shared/lib/websocket';
 import { Text } from '@/shared/ui/Text';
 import { bookingWizardApi, type BankTransferCheckout } from '../api/booking-wizard.api';
 
@@ -34,6 +35,8 @@ interface BankTransferModalProps {
   visible: boolean;
   bookingId: string;
   checkout: BankTransferCheckout | null;
+  isAdditionalPayment?: boolean;
+  payLaterLabel?: string;
   onClose: () => void;
   onSuccess: (bookingId: string) => void;
 }
@@ -42,6 +45,8 @@ export function BankTransferModal({
   visible,
   bookingId,
   checkout,
+  isAdditionalPayment = false,
+  payLaterLabel,
   onClose,
   onSuccess,
 }: BankTransferModalProps) {
@@ -90,33 +95,99 @@ export function BankTransferModal({
     return () => clearInterval(timer);
   }, [visible, checkout, expiresAtMs]);
 
-  // 2. Status Polling loop
-  const checkPaymentStatus = useCallback(async (silent = false) => {
-    if (!bookingId) return;
-    if (!silent) setIsCheckingStatus(true);
-    try {
-      const data = await bookingWizardApi.getBooking(bookingId);
-      if (
-        data?.status === 'CONFIRMED' ||
-        data?.status === 'PAYMENT_CONFIRMED' ||
-        data?.status === 'CHECKED_IN' ||
-        data?.status === 'IN_SESSION'
-      ) {
-        setIsPaid(true);
-      } else if (!silent) {
-        Alert.alert(
-          'Đang chờ xác nhận',
-          'Hệ thống chưa nhận được thông tin chuyển khoản khớp với mã đơn. Nếu bạn đã chuyển, vui lòng chờ trong giây lát rồi nhấn kiểm tra lại nhé.'
+  // 2. Realtime WebSocket listener
+  useEffect(() => {
+    if (!visible || !bookingId || isPaid) return;
+
+    const unsubscribe = wsClient.subscribe((event, data) => {
+      const targetBookingId = data?.bookingId || data?.booking_id;
+      if (!targetBookingId || targetBookingId === bookingId) {
+        if (
+          [
+            'CUSTOMER_PAYMENT_CONFIRMED',
+            'BOOKING_PAYMENT_UPDATED',
+            'BOOKING_UPDATED',
+            'BOOKING_PAID',
+            'SESSION_CHECKOUT_COMPLETED',
+          ].includes(event)
+        ) {
+          console.log(`[BankTransferModal] Payment confirmed via WebSocket event '${event}'`);
+          setIsPaid(true);
+        }
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [visible, bookingId, isPaid]);
+
+  // 3. Status Polling loop & manual checking
+  const checkPaymentStatus = useCallback(
+    async (silent = false) => {
+      if (!bookingId) return;
+      if (!silent) setIsCheckingStatus(true);
+      try {
+        // Trong môi trường sandbox / dev, kích hoạt mô phỏng thanh toán ngân hàng khi bấm nút kiểm tra
+        if (!silent && checkout?.is_sandbox && checkout.ref_code) {
+          try {
+            await api.post('/sandbox-bank/transfer', { ref: checkout.ref_code });
+          } catch (sbErr) {
+            console.log('[BankTransferModal] Sandbox simulation call notice:', sbErr);
+          }
+        }
+
+        const data = await bookingWizardApi.getBooking(bookingId);
+
+        // Kiểm tra xem giao dịch chuyển khoản cụ thể này đã SUCCESS chưa
+        const matchingTx = checkout?.ref_code
+          ? data?.payment_transactions?.find(
+              (tx: any) =>
+                tx.txnRef === checkout.ref_code ||
+                tx.txnRef === checkout.txn_ref ||
+                (tx.rawRequest as any)?.paymentRefCode === checkout.ref_code
+            )
+          : null;
+        const isTxSuccess = matchingTx?.status === 'SUCCESS';
+
+        // Kiểm tra các khoản phát sinh còn nợ không
+        const pendingComponents = (data?.payment_components || []).filter(
+          (c: any) => c.status === 'PENDING'
         );
+        const hasPendingComponents = pendingComponents.length > 0;
+        const additionalOutstanding = Number(
+          data?.financial_summary?.additionalOutstandingAmount ??
+            data?.payment_summary?.outstandingAmount ??
+            0
+        );
+        const isAdditionalCleared = !hasPendingComponents && additionalOutstanding <= 0;
+
+        // Trạng thái đơn đặt lịch đã được xác nhận / hoàn tất
+        const isBookingStatusValid =
+          data?.status === 'CONFIRMED' ||
+          data?.status === 'PAYMENT_CONFIRMED' ||
+          data?.status === 'CHECKED_IN' ||
+          data?.status === 'IN_SESSION' ||
+          data?.status === 'COMPLETED';
+
+        if (isTxSuccess || isAdditionalCleared || (isBookingStatusValid && data?.status !== 'PENDING')) {
+          setIsPaid(true);
+        } else if (!silent) {
+          Alert.alert(
+            'Đang chờ xác nhận',
+            'Hệ thống chưa nhận được thông tin chuyển khoản khớp với mã đơn. Nếu bạn đã chuyển, vui lòng chờ trong giây lát rồi nhấn kiểm tra lại nhé.'
+          );
+        }
+      } catch {
+        if (!silent) {
+          Alert.alert('Thông báo', 'Không thể kiểm tra trạng thái lúc này. Vui lòng thử lại.');
+        }
+      } finally {
+        if (!silent) setIsCheckingStatus(false);
       }
-    } catch {
-      if (!silent) {
-        Alert.alert('Thông báo', 'Không thể kiểm tra trạng thái lúc này. Vui lòng thử lại.');
-      }
-    } finally {
-      if (!silent) setIsCheckingStatus(false);
-    }
-  }, [bookingId]);
+    },
+    [bookingId, checkout]
+  );
 
   useEffect(() => {
     if (!visible || !bookingId || isPaid || remainingSeconds <= 0) return;
@@ -250,9 +321,20 @@ export function BankTransferModal({
   if (!checkout) return null;
 
   const isExpired = remainingSeconds <= 0 && !isPaid;
-  const minutes = Math.floor(remainingSeconds / 60);
+  const hours = Math.floor(remainingSeconds / 3600);
+  const minutes = Math.floor((remainingSeconds % 3600) / 60);
   const seconds = remainingSeconds % 60;
-  const formattedCountdown = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
+  const formattedCountdown =
+    hours > 0
+      ? `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+      : `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
+  const resolvedPayLaterLabel =
+    payLaterLabel ||
+    (isAdditionalPayment
+      ? 'Đóng (Thanh toán tại quầy sau)'
+      : 'Thanh toán sau (Giữ chỗ 30 phút)');
 
   return (
     <Modal
@@ -296,7 +378,7 @@ export function BankTransferModal({
               Thanh toán thành công!
             </Text>
             <Text className="text-sm text-slate-600 dark:text-slate-300 text-center leading-5 font-semibold px-4 mb-6">
-              Hệ thống đã xác nhận nhận tiền thành công. Lịch đặt của bạn đã được chuyển sang trạng thái sẵn sàng.
+              Hệ thống đã xác nhận nhận tiền thành công. Lịch đặt của bạn đã được cập nhật hoàn tất.
             </Text>
             <View className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/50 rounded-2xl px-5 py-3.5 mb-8 flex-row items-center gap-2.5">
               <Sparkles color="#10b981" size={18} />
@@ -320,10 +402,12 @@ export function BankTransferModal({
               <AlertTriangle color="#ef4444" size={40} />
             </View>
             <Text className="text-xl text-slate-900 dark:text-white font-black text-center mb-2">
-              Hết thời gian giữ chỗ
+              {isAdditionalPayment ? 'Mã thanh toán hết hiệu lực' : 'Hết thời gian giữ chỗ'}
             </Text>
             <Text className="text-xs text-slate-500 dark:text-slate-400 text-center leading-5 font-semibold px-4 mb-6">
-              Phiên thanh toán này đã hết hạn 15 phút. Nếu bạn đã chuyển khoản, đừng lo lắng, tiền vẫn được ghi nhận trong sổ đối soát của cơ sở.
+              {isAdditionalPayment
+                ? 'Phiên thanh toán chuyển khoản này đã hết hạn. Bạn có thể tạo lại mã mới hoặc thanh toán trực tiếp tại quầy.'
+                : 'Phiên thanh toán này đã hết hạn. Nếu bạn đã chuyển khoản, đừng lo lắng, tiền vẫn được ghi nhận trong sổ đối soát của cơ sở.'}
             </Text>
             <Pressable
               onPress={onClose}
@@ -340,145 +424,118 @@ export function BankTransferModal({
             contentContainerClassName="p-5 pb-12"
             showsVerticalScrollIndicator={false}
           >
-            {/* Sandbox alert if applicable */}
-            {checkout.is_sandbox && (
-              <View className="flex-row items-center gap-2 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-700/50 rounded-xl px-3.5 py-2.5 mb-4">
-                <ShieldCheck color="#d97706" size={16} />
-                <Text className="text-[11px] text-amber-800 dark:text-amber-300 font-bold flex-1">
-                  Môi trường mô phỏng (Sandbox) — Không trừ tiền thật.
-                </Text>
-              </View>
-            )}
-
             {/* QR Card Container */}
-            <View className="bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-sm items-center">
+            <View className="bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-slate-850 rounded-3xl p-5 shadow-sm items-center">
               {/* VietQR Badge */}
               <View className="flex-row items-center justify-between w-full mb-3">
                 <View className="flex-row items-center gap-1.5 bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800/60 px-2.5 py-1 rounded-lg">
                   <Text className="text-[10px] text-blue-700 dark:text-blue-300 font-extrabold tracking-wider uppercase">
-                    {checkout.is_sandbox ? 'VietQR Test' : 'VietQR 24/7'}
+                    VIETQR
                   </Text>
                 </View>
 
                 {/* Live Countdown Badge */}
-                <View
-                  className={`flex-row items-center gap-1.5 px-3 py-1 rounded-full border ${
-                    remainingSeconds <= 180
-                      ? 'bg-red-50 dark:bg-red-950/40 border-red-200 text-red-600'
-                      : 'bg-orange-50 dark:bg-orange-950/40 border-orange-200 dark:border-orange-800/40'
-                  }`}
-                >
-                  <Clock
-                    color={remainingSeconds <= 180 ? '#ef4444' : '#f97316'}
-                    size={13}
-                  />
-                  <Text
-                    className={`text-[12px] font-mono font-bold ${
-                      remainingSeconds <= 180
-                        ? 'text-red-600 dark:text-red-400'
-                        : 'text-[#ea580c] dark:text-[#f97316]'
-                    }`}
-                  >
+                <View className="flex-row items-center gap-1 bg-orange-50 dark:bg-orange-950/50 border border-orange-200 dark:border-orange-800/60 px-2.5 py-1 rounded-lg">
+                  <Clock color="#ea580c" size={12} />
+                  <Text className="text-[10px] text-[#ea580c] font-bold">
                     Còn {formattedCountdown}
                   </Text>
                 </View>
               </View>
 
               {/* QR Image Box */}
-              <View className="border-2 border-slate-200 dark:border-slate-800 p-2.5 rounded-2xl bg-white my-2 shadow-inner">
+              <View className="p-3 bg-white rounded-2xl border-2 border-slate-100 dark:border-slate-800 shadow-inner my-2">
                 {checkout.qr_image_data_url ? (
                   <Image
                     source={{ uri: checkout.qr_image_data_url }}
-                    className="w-56 h-56 rounded-lg object-contain"
+                    className="w-56 h-56 rounded-lg"
+                    resizeMode="contain"
                   />
                 ) : (
                   <View className="w-56 h-56 items-center justify-center bg-slate-50">
-                    <ActivityIndicator size="small" color="#f97316" />
-                    <Text className="text-xs text-slate-400 mt-2 font-semibold">
-                      Đang tải mã QR...
-                    </Text>
+                    <ActivityIndicator size="large" color="#f97316" />
                   </View>
                 )}
               </View>
 
-              {/* Quick Actions for QR */}
-              <View className="flex-row items-center gap-2 mt-2 mb-1 w-full justify-center px-1">
+              {/* Quick Actions (Save & Share QR) */}
+              <View className="flex-row items-center gap-2.5 mt-3 w-full">
                 <Pressable
+                  disabled={isSavingQr}
                   onPress={handleSaveQrCode}
-                  disabled={isSavingQr || !checkout.qr_image_data_url}
-                  className="flex-1 max-w-[200px] py-2 px-3 rounded-xl bg-orange-500/10 active:bg-orange-500/20 border border-orange-500/30 flex-row items-center justify-center gap-1.5"
+                  className="flex-1 flex-row items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-900/60 active:bg-orange-100 dark:active:bg-orange-900/60"
                 >
                   {isSavingQr ? (
                     <ActivityIndicator size="small" color="#ea580c" />
                   ) : (
-                    <Download color="#ea580c" size={15} />
+                    <Download color="#ea580c" size={14} />
                   )}
-                  <Text className="text-[12px] text-[#ea580c] font-bold">
-                    {isSavingQr ? 'Đang lưu...' : 'Lưu mã QR về máy'}
+                  <Text className="text-xs text-[#ea580c] font-bold">
+                    Lưu mã QR về máy
                   </Text>
                 </Pressable>
 
                 <Pressable
+                  disabled={isSharingQr}
                   onPress={handleShareQrCode}
-                  disabled={isSharingQr || !checkout.qr_image_data_url}
-                  className="py-2 px-3.5 rounded-xl bg-slate-100 dark:bg-slate-800 active:bg-slate-200 dark:active:bg-slate-700 border border-slate-200 dark:border-slate-700 flex-row items-center justify-center gap-1.5"
+                  className="flex-1 flex-row items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 active:bg-slate-100 dark:active:bg-slate-700"
                 >
                   {isSharingQr ? (
                     <ActivityIndicator size="small" color="#64748b" />
                   ) : (
-                    <Share2 color="#64748b" size={15} />
+                    <Share2 color="#64748b" size={14} />
                   )}
-                  <Text className="text-[12px] text-slate-700 dark:text-slate-300 font-semibold">
+                  <Text className="text-xs text-slate-700 dark:text-slate-300 font-bold">
                     Chia sẻ
                   </Text>
                 </Pressable>
               </View>
 
-              {/* Total Amount Big Display */}
-              <View className="mt-3 items-center">
-                <Text className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">
+              {/* Amount Display */}
+              <View className="mt-4 items-center">
+                <Text className="text-[11px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">
                   Số tiền cần chuyển
                 </Text>
-                <Text className="text-[26px] text-[#ea580c] font-black tracking-tight mt-0.5">
-                  {checkout.amount.toLocaleString('vi-VN')}đ
+                <Text className="text-2xl text-[#ea580c] font-black mt-0.5 tracking-tight">
+                  {Number(checkout.amount || 0).toLocaleString('vi-VN')}đ
                 </Text>
               </View>
             </View>
 
-            {/* Transfer Details Card with One-Tap Copy */}
-            <View className="bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800 rounded-2xl p-4 mt-4 shadow-sm">
-              <Text className="text-[12px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider mb-3">
+            {/* Manual Banking Info Card */}
+            <View className="mt-4 bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800 rounded-3xl p-4 shadow-sm">
+              <Text className="text-xs text-slate-900 dark:text-white font-bold uppercase tracking-wider mb-3 px-1">
                 Thông tin chuyển khoản thủ công
               </Text>
 
-              <View className="space-y-3">
+              <View className="gap-2.5">
                 {/* Bank Name */}
-                <View className="flex-row justify-between items-center py-1">
+                <View className="flex-row justify-between items-center py-1.5 border-b border-slate-100 dark:border-slate-850">
                   <Text className="text-xs text-slate-500 dark:text-slate-400 font-semibold">
                     Ngân hàng
                   </Text>
-                  <Text className="text-xs text-slate-900 dark:text-white font-bold text-right flex-1 ml-4">
+                  <Text className="text-xs text-slate-800 dark:text-slate-200 font-bold">
                     {checkout.bank_name}
                   </Text>
                 </View>
 
                 {/* Account Name */}
-                <View className="flex-row justify-between items-center py-1 border-t border-slate-100 dark:border-slate-850">
+                <View className="flex-row justify-between items-center py-1.5 border-b border-slate-100 dark:border-slate-850">
                   <Text className="text-xs text-slate-500 dark:text-slate-400 font-semibold">
                     Chủ tài khoản
                   </Text>
-                  <Text className="text-xs text-slate-900 dark:text-white font-bold uppercase text-right flex-1 ml-4">
+                  <Text className="text-xs text-slate-800 dark:text-slate-200 font-bold uppercase">
                     {checkout.account_name}
                   </Text>
                 </View>
 
                 {/* Account Number with Copy */}
-                <View className="flex-row justify-between items-center py-1.5 border-t border-slate-100 dark:border-slate-850">
+                <View className="flex-row justify-between items-center py-1.5 border-b border-slate-100 dark:border-slate-850">
                   <View>
                     <Text className="text-xs text-slate-500 dark:text-slate-400 font-semibold">
                       Số tài khoản
                     </Text>
-                    <Text className="text-sm font-mono text-slate-900 dark:text-white font-black mt-0.5">
+                    <Text className="text-sm font-mono text-slate-900 dark:text-white font-bold mt-0.5">
                       {checkout.account_number}
                     </Text>
                   </View>
@@ -573,10 +630,11 @@ export function BankTransferModal({
 
               <Pressable
                 onPress={onClose}
-                className="w-full bg-slate-100 dark:bg-slate-900 active:bg-slate-200 dark:active:bg-slate-800 py-3 rounded-xl items-center justify-center border border-slate-200 dark:border-slate-800"
+                className="w-full bg-orange-50 dark:bg-orange-950/30 active:bg-orange-100 dark:active:bg-orange-900/40 py-3.5 rounded-xl flex-row items-center justify-center gap-2 border border-orange-200 dark:border-orange-800"
               >
-                <Text className="text-slate-600 dark:text-slate-300 text-xs font-bold">
-                  Để sau / Xem đơn trong Lịch đặt
+                <Clock color="#ea580c" size={16} />
+                <Text className="text-[#ea580c] dark:text-orange-400 text-xs font-bold">
+                  {resolvedPayLaterLabel}
                 </Text>
               </Pressable>
             </View>

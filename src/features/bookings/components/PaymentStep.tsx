@@ -20,7 +20,7 @@ import {
   type RentalVehicleUnit,
 } from '../api/booking-wizard.api';
 
-export type PaymentMethodType = 'vnpay' | 'bank_transfer';
+export type PaymentMethodType = 'vnpay' | 'bank_transfer' | 'pay_later';
 
 interface PaymentStepProps {
   cafeId: string;
@@ -33,7 +33,7 @@ interface PaymentStepProps {
   selectedVehicleIds: string[];
   vehiclePriceTotal: number;
   fnbPriceTotal: number;
-  fnbDetailsList: { name: string; qty: number; price: number }[];
+  fnbDetailsList: { name: string; qty: number; price: number; note?: string }[];
   selectedPackageId: string | null;
   setSelectedPackageId: (id: string | null) => void;
   appliedPromo: PromoValidationResult | null;
@@ -489,13 +489,20 @@ export function PaymentStep({
                 </Text>
               </View>
               {fnbDetailsList.map((m, idx) => (
-                <View key={idx} className="flex-row justify-between items-center pl-2">
-                  <Text className="text-[10px] text-slate-500 dark:text-slate-400 font-medium flex-1 pr-2" numberOfLines={1}>
-                    • {m.name} (x{m.qty})
-                  </Text>
-                  <Text className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold shrink-0">
-                    {(m.qty * m.price).toLocaleString('vi-VN')}đ
-                  </Text>
+                <View key={idx} className="pl-2 mb-1">
+                  <View className="flex-row justify-between items-center">
+                    <Text className="text-[10px] text-slate-500 dark:text-slate-400 font-medium flex-1 pr-2" numberOfLines={1}>
+                      • {m.name} (x{m.qty})
+                    </Text>
+                    <Text className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold shrink-0">
+                      {(m.qty * m.price).toLocaleString('vi-VN')}đ
+                    </Text>
+                  </View>
+                  {m.note ? (
+                    <Text className="text-[9px] text-amber-600 dark:text-amber-400 italic pl-2.5 mt-0.5" numberOfLines={1}>
+                      Ghi chú: {m.note}
+                    </Text>
+                  ) : null}
                 </View>
               ))}
             </View>

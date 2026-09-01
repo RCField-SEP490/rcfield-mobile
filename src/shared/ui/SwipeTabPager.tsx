@@ -142,6 +142,12 @@ export function SwipeTabPager() {
     };
   });
 
+  // Luôn khôi phục TabBar khi chuyển tab hoặc chuyển route
+  useEffect(() => {
+    translateY.value = withTiming(0, { duration: 200 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeIndex, pathname]);
+
   // Lắng nghe thay đổi của route để đồng bộ hóa tab hiện tại
   useEffect(() => {
     const matchedIndex = tabs.findIndex((tab) => {
