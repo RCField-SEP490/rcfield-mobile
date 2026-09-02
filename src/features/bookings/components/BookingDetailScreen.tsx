@@ -174,7 +174,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
   };
 
   const renderPhotoGrid = (photos: any[], label: string, type: 'CHECK_IN' | 'CHECK_OUT') => {
-    const isByoc = booking?.playMode === 'BYOC';
+    const isByoc = booking?.playMode === 'BYOC' || (booking as any)?.play_mode === 'BYOC';
 
     if (photos.length === 0) {
       return (
@@ -183,12 +183,16 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
             <Camera color={colorScheme === 'dark' ? '#94a3b8' : '#64748b'} size={20} />
           </View>
           <Text className="text-slate-700 dark:text-slate-300 text-xs font-bold">
-            Chưa có ảnh {type === 'CHECK_OUT' ? 'bàn giao trả xe' : 'nhận xe'}
+            {isByoc
+              ? 'Chưa có ảnh xe cá nhân vào sân'
+              : `Chưa có ảnh ${type === 'CHECK_OUT' ? 'bàn giao trả xe' : 'nhận xe'}`}
           </Text>
           <Text className="text-slate-400 dark:text-slate-500 text-[11px] text-center max-w-[240px]">
-            {type === 'CHECK_OUT'
-              ? 'Nhân viên sẽ chụp ảnh đối chiếu 4-6 góc khi quý khách kết thúc ca chơi.'
-              : 'Chưa có hình ảnh kiểm tra nhận xe.'}
+            {isByoc
+              ? 'Nhân viên sẽ chụp ảnh xe cá nhân của bạn khi check-in vào sân.'
+              : type === 'CHECK_OUT'
+                ? 'Nhân viên sẽ chụp ảnh đối chiếu 4-6 góc khi quý khách kết thúc ca chơi.'
+                : 'Chưa có hình ảnh kiểm tra nhận xe.'}
           </Text>
         </View>
       );
@@ -196,28 +200,34 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
 
     if (isByoc) {
       return (
-        <View className="space-y-2">
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Phóng to ${label}`}
-            onPress={() =>
-              setPreviewPhoto({
-                url: photos[0].url,
-                title: `${label} · ${getInspectionPhotoLabel(photos[0].angle)}`,
-              })
-            }
-            className="w-full aspect-video rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 overflow-hidden relative shadow-xs active:opacity-90"
-          >
-            <Image
-              source={{ uri: photos[0].url }}
-              className="w-full h-full object-cover"
-            />
-            <View className="absolute bottom-2 left-2 bg-black/75 px-2.5 py-1 rounded-md">
-              <Text className="text-[10px] text-white uppercase font-black tracking-wide">
-                {getInspectionPhotoLabel(photos[0].angle)}
-              </Text>
-            </View>
-          </Pressable>
+        <View className="gap-2.5">
+          {photos.map((p: any, idx: number) => {
+            const photoTitle = p.notes || (photos.length > 1 ? `Xe cá nhân người chơi ${idx + 1}` : 'Xe cá nhân vào sân');
+            return (
+              <Pressable
+                key={p.url || idx}
+                accessibilityRole="button"
+                accessibilityLabel={`Phóng to ${label} ${idx + 1}`}
+                onPress={() =>
+                  setPreviewPhoto({
+                    url: p.url,
+                    title: `${label} · ${photoTitle}`,
+                  })
+                }
+                className="w-full aspect-video rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 overflow-hidden relative shadow-xs active:opacity-90"
+              >
+                <Image
+                  source={{ uri: p.url }}
+                  className="w-full h-full object-cover"
+                />
+                <View className="absolute bottom-2 left-2 bg-black/75 px-2.5 py-1 rounded-md">
+                  <Text className="text-[10px] text-white font-bold tracking-wide">
+                    {photoTitle}
+                  </Text>
+                </View>
+              </Pressable>
+            );
+          })}
         </View>
       );
     }
@@ -317,6 +327,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
             'BOOKING_REVIEW_REQUEST',
             'SESSION_UPDATED',
             'INSPECTION_UPDATED',
+            'BOOKING_CHECKED_IN',
             'BOOKING_UPDATED',
             'BOOKING_PAYMENT_UPDATED',
           ].includes(event)
@@ -331,6 +342,23 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
       unsubscribe();
     };
   }, [bookingId, loadBookingDetail]);
+
+  useEffect(() => {
+    const sessionStatus = booking?.session?.status;
+    const bookingStatus = booking?.status;
+    const shouldPoll =
+      bookingStatus === 'AWAITING_PAYMENT' ||
+      bookingStatus === 'CONFIRMED' ||
+      ['CHECKED_IN', 'ACTIVE', 'EXTENDING', 'CHECKING_OUT'].includes(sessionStatus || '');
+
+    if (!shouldPoll) return;
+
+    const interval = setInterval(() => {
+      loadBookingDetail();
+    }, 10_000);
+
+    return () => clearInterval(interval);
+  }, [booking?.session?.status, booking?.status, loadBookingDetail]);
 
   useEffect(() => {
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
@@ -540,6 +568,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
     )?.amount ?? snapshotFnbPreorder
   );
 
+  const isByoc = booking?.playMode === 'BYOC' || (booking as any)?.play_mode === 'BYOC';
   const totalPrepaid = slotFee + rentalFee + fnbPreorderFee + depositAmount - discountAmount;
 
   // Session thực tế
@@ -553,9 +582,11 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
   const displayBookingStatus = getDisplayBookingStatus(booking.status, booking.slotStart, session);
   const isSessionActive =
     !checkInExpired && session && ['ACTIVE', 'EXTENDING', 'CHECKED_IN', 'CHECKING_OUT'].includes(session.status);
-  const isCheckoutPending = ['CHECKED_IN', 'ACTIVE', 'EXTENDING', 'CHECKING_OUT'].includes(
-    sessionDetail?.status ?? session?.status ?? ''
-  );
+  const isCheckoutPending =
+    !isByoc &&
+    ['CHECKED_IN', 'ACTIVE', 'EXTENDING', 'CHECKING_OUT'].includes(
+      sessionDetail?.status ?? session?.status ?? ''
+    );
   const pendingExtension =
     sessionDetail?.extensionProposal?.status === 'PENDING' && operationalTiming.state !== 'OVERDUE'
       ? sessionDetail.extensionProposal
@@ -787,7 +818,13 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
             {bookingId.slice(0, 8).toUpperCase()}
           </Text>
           <Text className="text-slate-500 dark:text-slate-400 text-[11px] text-center font-medium mt-2 leading-4">
-            Đưa mã QR này cho nhân viên tại quầy để check-in nhận làn đua và nhận xe thuê của bạn.
+            {isByoc
+              ? ['ACTIVE', 'EXTENDING', 'CHECKING_OUT', 'COMPLETED'].includes(session?.status ?? '')
+                ? 'Mã đặt sân của bạn. Bạn đang trong ca chơi xe cá nhân tại sân.'
+                : 'Đưa mã QR này cho nhân viên tại quầy để check-in vào sân và xác nhận xe cá nhân của bạn.'
+              : ['ACTIVE', 'EXTENDING', 'CHECKING_OUT', 'COMPLETED'].includes(session?.status ?? '')
+                ? 'Mã đặt sân của bạn. Bạn đang trong ca chạy xe thuê tại sân.'
+                : 'Đưa mã QR này cho nhân viên tại quầy để check-in nhận làn đua và nhận xe thuê của bạn.'}
           </Text>
         </View>
 
@@ -823,10 +860,14 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
               >
                 {operationalTiming.state === 'OVERDUE'
                   ? `Phiên đã quá giờ ${operationalTiming.minutesPastPlannedEnd} phút`
-                  : 'Đã đến giờ trả xe'}
+                  : isByoc
+                    ? 'Đã hết giờ chơi'
+                    : 'Đã đến giờ trả xe'}
               </Text>
               <Text className="mt-1 text-[12px] leading-4 text-slate-500">
-                Vui lòng trả xe tại quầy để nhân viên kiểm tra và hoàn tất phiên. Xe vẫn được giữ trong phiên đến khi checkout xong.
+                {isByoc
+                  ? 'Vui lòng liên hệ quầy để nhân viên hoàn tất phiên chơi.'
+                  : 'Vui lòng trả xe tại quầy để nhân viên kiểm tra và hoàn tất phiên. Xe vẫn được giữ trong phiên đến khi checkout xong.'}
               </Text>
             </View>
           </View>
@@ -875,7 +916,23 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
           </View>
         )}
 
-        {checkOutInspection || sessionDetail?.status === 'CHECKING_OUT' ? (
+        {isByoc ? (
+          sessionDetail?.status === 'CHECKING_OUT' ? (
+            <View className="mb-6 rounded-2xl border border-blue-200 dark:border-blue-900/40 bg-blue-50/70 dark:bg-blue-950/20 p-4 shadow-sm">
+              <View className="flex-row items-start gap-3">
+                <Clock color="#3b82f6" size={20} style={{ marginTop: 2 }} />
+                <View className="flex-1">
+                  <Text className="text-blue-800 dark:text-blue-300 text-[14px]" weight="700">
+                    Đang hoàn tất phiên chơi
+                  </Text>
+                  <Text className="mt-1 text-xs leading-4 text-slate-700 dark:text-slate-300 font-semibold">
+                    Nhân viên đang đối soát dịch vụ và kết thúc phiên chơi ca tự mang xe của bạn.
+                  </Text>
+                </View>
+              </View>
+            </View>
+          ) : null
+        ) : (checkOutInspection || sessionDetail?.status === 'CHECKING_OUT') ? (
           <View className="mb-6 rounded-2xl border border-emerald-200 dark:border-emerald-900/40 bg-emerald-50/70 dark:bg-emerald-950/20 p-4 shadow-sm">
             <View className="flex-row items-start gap-3">
               <ClipboardCheck color="#10b981" size={20} style={{ marginTop: 2 }} />
@@ -994,8 +1051,8 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
           </Text>
 
           <View className="space-y-4">
-            {!session?.actualStartAt ? (
-              // ─── HÌNH 1: CHƯA CHECK-IN (3 BƯỚC) ───
+            {!session || session.status === 'CHECKED_IN' ? (
+              // ─── HÌNH 1: CHƯA CHECK-IN HOẶC ĐANG CHECK-IN (3 BƯỚC) ───
               <>
                 {/* Bước 1: Đặt thành công */}
                 <View className="flex-row gap-3">
@@ -1003,7 +1060,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                     <View className="size-6 rounded-full bg-emerald-500 border border-emerald-400 justify-center items-center">
                       <CheckCircle2 color="#ffffff" size={13} />
                     </View>
-                    <View className="w-[1.5px] h-8 bg-emerald-500/50 mt-1" />
+                    <View className={cn("w-[1.5px] h-8 mt-1", session?.status === 'CHECKED_IN' ? "bg-amber-500/50" : "bg-emerald-500/50")} />
                   </View>
                   <View className="flex-1 pt-0.5">
                     <Text className="text-slate-900 dark:text-white text-sm" weight="700">Đặt thành công</Text>
@@ -1013,21 +1070,44 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                   </View>
                 </View>
 
-                {/* Bước 2: Chờ check-in */}
-                <View className="flex-row gap-3">
-                  <View className="items-center">
-                    <View className="size-6 rounded-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 justify-center items-center">
-                      <Clock color={colorScheme === 'dark' ? '#94a3b8' : '#64748b'} size={13} />
+                {/* Bước 2: Chờ check-in HOẶC Đang check-in */}
+                {session?.status === 'CHECKED_IN' ? (
+                  <View className="flex-row gap-3">
+                    <View className="items-center">
+                      <View className="size-6 rounded-full bg-amber-500/10 border border-amber-500/40 justify-center items-center">
+                        <Clock color="#f59e0b" size={13} />
+                      </View>
+                      <View className="w-[1.5px] h-8 bg-slate-200 dark:bg-slate-800 mt-1" />
                     </View>
-                    <View className="w-[1.5px] h-8 bg-slate-200 dark:bg-slate-800 mt-1" />
+                    <View className="flex-1 pt-0.5">
+                      <Text className="text-amber-600 dark:text-amber-400 text-sm" weight="700">Đang check-in</Text>
+                      <Text className="text-slate-500 dark:text-slate-400 text-xs mt-0.5 font-semibold">
+                        {booking.play_mode === 'BYOC' || booking.playMode === 'BYOC'
+                          ? (sessionDetail?.staffName
+                              ? `Nhân viên ${sessionDetail.staffName} đang kiểm tra & chụp ảnh xe cá nhân`
+                              : 'Nhân viên đang kiểm tra & chụp ảnh xe cá nhân')
+                          : (sessionDetail?.staffName
+                              ? `Nhân viên ${sessionDetail.staffName} đang kiểm tra tình trạng xe bàn giao`
+                              : 'Nhân viên đang kiểm tra tình trạng xe bàn giao')}
+                      </Text>
+                    </View>
                   </View>
-                  <View className="flex-1 pt-0.5">
-                    <Text className="text-slate-900 dark:text-white text-sm" weight="700">Chờ check-in</Text>
-                    <Text className="text-slate-500 dark:text-slate-400 text-xs mt-0.5 font-semibold">
-                      Dự kiến: {formatTimeOnlyStep(booking.slotStart)} - {formatTimeOnlyStep(booking.slotEnd)}, {formatDateOnlyStep(booking.slotStart)}
-                    </Text>
+                ) : (
+                  <View className="flex-row gap-3">
+                    <View className="items-center">
+                      <View className="size-6 rounded-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 justify-center items-center">
+                        <Clock color={colorScheme === 'dark' ? '#94a3b8' : '#64748b'} size={13} />
+                      </View>
+                      <View className="w-[1.5px] h-8 bg-slate-200 dark:bg-slate-800 mt-1" />
+                    </View>
+                    <View className="flex-1 pt-0.5">
+                      <Text className="text-slate-900 dark:text-white text-sm" weight="700">Chờ check-in</Text>
+                      <Text className="text-slate-500 dark:text-slate-400 text-xs mt-0.5 font-semibold">
+                        Dự kiến: {formatTimeOnlyStep(booking.slotStart)} - {formatTimeOnlyStep(booking.slotEnd)}, {formatDateOnlyStep(booking.slotStart)}
+                      </Text>
+                    </View>
                   </View>
-                </View>
+                )}
 
                 {/* Bước 3: Hoàn thành */}
                 <View className="flex-row gap-3">
@@ -1281,8 +1361,31 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
           </View>
         )}
 
+        {/* Xe tự mang (BYOC) */}
+        {isByoc && (
+          <View className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-5 shadow-xl mb-6">
+            <View className="flex-row items-center gap-2 mb-3.5 border-b border-slate-200 dark:border-slate-800/80 pb-2">
+              <Car color="#f97316" size={16} />
+              <Text className="text-[12px] font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                Xe tự mang (BYOC)
+              </Text>
+            </View>
+            <View className="bg-slate-50 dark:bg-slate-950/40 p-3.5 rounded-xl border border-slate-200 dark:border-slate-900 gap-2">
+              <View className="flex-row items-center justify-between">
+                <Text className="text-slate-900 dark:text-white text-xs font-bold">Khách tự mang xe cá nhân</Text>
+                <View className="px-2 py-0.5 rounded bg-orange-500/10 border border-orange-500/20">
+                  <Text className="text-[9px] font-bold text-orange-600 dark:text-orange-400 uppercase">BYOC</Text>
+                </View>
+              </View>
+              <Text className="text-slate-500 dark:text-slate-400 text-[11px] leading-4">
+                Đơn mang xe riêng: Khách hàng tự quản lý và bảo quản xe cá nhân trong suốt ca chơi. Nhân viên chụp ảnh xe lúc vào sân để xác thực lượt chơi.
+              </Text>
+            </View>
+          </View>
+        )}
+
         {/* Danh sách xe thuê (Rental Vehicles) */}
-        {booking.vehicles && booking.vehicles.length > 0 && (
+        {!isByoc && booking.vehicles && booking.vehicles.length > 0 && (
           <View className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a]/60 p-5 shadow-xl mb-6">
             <View className="flex-row items-center gap-2 mb-3.5 border-b border-slate-200 dark:border-slate-800/80 pb-2">
               <Car color="#f97316" size={16} />
@@ -1437,40 +1540,42 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                 </View>
                 <View>
                   <Text className="text-[12px] font-bold text-slate-900 dark:text-white uppercase tracking-wider">
-                    {booking.playMode === 'BYOC' ? 'Biên bản xe Check-in' : 'Biên bản & đối chiếu bàn giao xe'}
+                    {isByoc ? 'Xác nhận xe vào sân (BYOC)' : 'Biên bản & đối chiếu bàn giao xe'}
                   </Text>
                   <Text className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
-                    {inspectionPhotoTab === 'CHECK_IN'
-                      ? 'Hiện trạng kỹ thuật & ảnh xe lúc nhận ban đầu'
-                      : 'Hiện trạng kỹ thuật & ảnh xe lúc trả sau ca chơi'}
+                    {isByoc
+                      ? 'Hình ảnh xe cá nhân & checklist an toàn lúc vào sân'
+                      : inspectionPhotoTab === 'CHECK_IN'
+                        ? 'Hiện trạng kỹ thuật & ảnh xe lúc nhận ban đầu'
+                        : 'Hiện trạng kỹ thuật & ảnh xe lúc trả sau ca chơi'}
                   </Text>
                 </View>
               </View>
             </View>
 
             {/* Segmented Control Tabs */}
-            <View className="flex-row rounded-xl bg-slate-200/70 dark:bg-slate-800/80 p-1 gap-1 mb-4">
-              <Pressable
-                onPress={() => setInspectionPhotoTab('CHECK_IN')}
-                className={cn(
-                  "flex-1 py-2 rounded-lg items-center justify-center",
-                  inspectionPhotoTab === 'CHECK_IN'
-                    ? "bg-white dark:bg-[#0f172a] shadow-xs"
-                    : "opacity-75"
-                )}
-              >
-                <Text
+            {!isByoc ? (
+              <View className="flex-row rounded-xl bg-slate-200/70 dark:bg-slate-800/80 p-1 gap-1 mb-4">
+                <Pressable
+                  onPress={() => setInspectionPhotoTab('CHECK_IN')}
                   className={cn(
-                    "text-[11px] font-bold",
+                    "flex-1 py-2 rounded-lg items-center justify-center",
                     inspectionPhotoTab === 'CHECK_IN'
-                      ? "text-[#ea580c] dark:text-[#f97316]"
-                      : "text-slate-600 dark:text-slate-400"
+                      ? "bg-white dark:bg-[#0f172a] shadow-xs"
+                      : "opacity-75"
                   )}
                 >
-                  📸 Nhận xe (Check-in)
-                </Text>
-              </Pressable>
-              {booking.playMode !== 'BYOC' && (
+                  <Text
+                    className={cn(
+                      "text-[11px] font-bold",
+                      inspectionPhotoTab === 'CHECK_IN'
+                        ? "text-[#ea580c] dark:text-[#f97316]"
+                        : "text-slate-600 dark:text-slate-400"
+                    )}
+                  >
+                    📸 Nhận xe (Check-in)
+                  </Text>
+                </Pressable>
                 <Pressable
                   onPress={() => setInspectionPhotoTab('CHECK_OUT')}
                   className={cn(
@@ -1491,8 +1596,16 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                     🏁 Trả xe (Check-out)
                   </Text>
                 </Pressable>
-              )}
-            </View>
+              </View>
+            ) : (
+              <View className="mb-4 flex-row items-center gap-2">
+                <View className="px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/20">
+                  <Text className="text-[11px] font-bold text-orange-600 dark:text-orange-400">
+                    Xe cá nhân vào sân (Check-in)
+                  </Text>
+                </View>
+              </View>
+            )}
 
             {/* Content for TAB 1: CHECK_IN */}
             {inspectionPhotoTab === 'CHECK_IN' ? (
@@ -1503,7 +1616,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                     <FileText color="#d97706" size={16} style={{ marginTop: 2 }} />
                     <View className="flex-1">
                       <Text className="text-amber-950 dark:text-amber-300 text-[11px] font-bold">
-                        Ghi chú nhận xe của nhân viên (Check-in):
+                        {isByoc ? 'Ghi chú của nhân viên khi vào sân:' : 'Ghi chú nhận xe của nhân viên (Check-in):'}
                       </Text>
                       <Text className="text-amber-900 dark:text-amber-400 text-xs mt-1 leading-4">
                         {checkInStaffNotes}
@@ -1519,7 +1632,7 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                       <View className="flex-row items-center gap-1.5">
                         <ClipboardCheck color="#10b981" size={16} />
                         <Text className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                          Checklist kiểm tra nhận xe (Check-in)
+                          {isByoc ? 'Checklist an toàn xe cá nhân lúc vào sân' : 'Checklist kiểm tra nhận xe (Check-in)'}
                         </Text>
                       </View>
                       <View className="bg-emerald-100 dark:bg-emerald-950/50 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
@@ -1570,10 +1683,12 @@ export function BookingDetailScreen({ bookingId }: BookingDetailScreenProps) {
                   <View className="flex-row items-center gap-1.5">
                     <Camera color="#f97316" size={14} />
                     <Text className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                      Hình ảnh nhận xe ({checkInPhotos.length} góc chụp)
+                      {isByoc
+                        ? `Hình ảnh xe cá nhân vào sân (${checkInPhotos.length} ảnh)`
+                        : `Hình ảnh nhận xe (${checkInPhotos.length} góc chụp)`}
                     </Text>
                   </View>
-                  {renderPhotoGrid(checkInPhotos, 'Ảnh bàn giao Check-in', 'CHECK_IN')}
+                  {renderPhotoGrid(checkInPhotos, isByoc ? 'Ảnh xe cá nhân vào sân' : 'Ảnh bàn giao Check-in', 'CHECK_IN')}
                 </View>
               </View>
             ) : (

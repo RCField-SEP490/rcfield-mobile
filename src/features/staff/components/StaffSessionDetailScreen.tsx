@@ -272,6 +272,121 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
     });
   }, [financialSummary?.prepaidLines]);
   const additionalLines = useMemo(() => financialSummary?.additionalLines ?? [], [financialSummary?.additionalLines]);
+
+  const onsiteFnbComponents = useMemo(
+    () => additionalLines.filter((l) => l.type === 'FNB_ON_SITE' || l.label.includes('Đồ ăn & thức uống')),
+    [additionalLines]
+  );
+  const pendingOnsiteFnbAmount = useMemo(
+    () => onsiteFnbComponents.filter((l) => l.status === 'PENDING').reduce((sum, l) => sum + Number(l.amount), 0),
+    [onsiteFnbComponents]
+  );
+  const paidOnsiteFnbAmount = useMemo(
+    () =>
+      onsiteFnbComponents
+        .filter((l) => l.status === 'DISBURSED' || l.status === 'CAPTURED')
+        .reduce((sum, l) => sum + Number(l.amount), 0),
+    [onsiteFnbComponents]
+  );
+
+  const onsiteOrderPaidMap = useMemo(() => {
+    const map = new Map<string, boolean>();
+    if (onsiteFnbOrders.length === 0) return map;
+
+    if (pendingOnsiteFnbAmount === 0) {
+      onsiteFnbOrders.forEach((o) => map.set(o.orderId, true));
+      return map;
+    }
+    if (paidOnsiteFnbAmount === 0) {
+      onsiteFnbOrders.forEach((o) => map.set(o.orderId, false));
+      return map;
+    }
+
+    const exactPendingMatch = onsiteFnbOrders.find((o) => Number(o.total) === pendingOnsiteFnbAmount);
+    if (exactPendingMatch) {
+      onsiteFnbOrders.forEach((o) => {
+        map.set(o.orderId, o.orderId !== exactPendingMatch.orderId);
+      });
+      return map;
+    }
+
+    let remainingPending = pendingOnsiteFnbAmount;
+    const reversed = [...onsiteFnbOrders].reverse();
+    for (const order of reversed) {
+      const orderTotal = Number(order.total);
+      if (remainingPending >= orderTotal && orderTotal > 0) {
+        map.set(order.orderId, false);
+        remainingPending -= orderTotal;
+      } else {
+        map.set(order.orderId, true);
+      }
+    }
+    return map;
+  }, [onsiteFnbOrders, paidOnsiteFnbAmount, pendingOnsiteFnbAmount]);
+
+  const groupedAdditionalLines = useMemo(() => {
+    const fnbLines = additionalLines.filter(
+      (l) => l.type === 'FNB_ON_SITE' || l.label.includes('Đồ ăn & thức uống')
+    );
+    const otherLines = additionalLines.filter(
+      (l) => l.type !== 'FNB_ON_SITE' && !l.label.includes('Đồ ăn & thức uống')
+    );
+
+    const paidFnb = fnbLines.filter((l) => l.status === 'DISBURSED' || l.status === 'CAPTURED');
+    const pendingFnb = fnbLines.filter((l) => l.status !== 'DISBURSED' && l.status !== 'CAPTURED');
+
+    const paidFnbTotal = paidFnb.reduce((sum, l) => sum + Number(l.amount), 0);
+    const pendingFnbTotal = pendingFnb.reduce((sum, l) => sum + Number(l.amount), 0);
+
+    const result: {
+      id: string;
+      label: string;
+      amount: number;
+      paid: boolean;
+    }[] = [];
+
+    if (paidFnbTotal > 0 && pendingFnbTotal > 0) {
+      result.push({
+        id: 'fnb-paid-aggregate',
+        label: 'Đồ ăn & thức uống gọi tại quầy',
+        amount: paidFnbTotal,
+        paid: true,
+      });
+      result.push({
+        id: 'fnb-pending-aggregate',
+        label: 'Đồ ăn & thức uống gọi tại quầy',
+        amount: pendingFnbTotal,
+        paid: false,
+      });
+    } else if (paidFnbTotal > 0) {
+      result.push({
+        id: 'fnb-paid-aggregate',
+        label: 'Đồ ăn & thức uống gọi tại quầy',
+        amount: paidFnbTotal,
+        paid: true,
+      });
+    } else if (pendingFnbTotal > 0) {
+      result.push({
+        id: 'fnb-pending-aggregate',
+        label: 'Đồ ăn & thức uống gọi tại quầy',
+        amount: pendingFnbTotal,
+        paid: false,
+      });
+    }
+
+    for (const line of otherLines) {
+      const isPaid = line.status === 'DISBURSED' || line.status === 'CAPTURED';
+      result.push({
+        id: line.componentId || line.label,
+        label: line.label,
+        amount: Number(line.amount),
+        paid: isPaid,
+      });
+    }
+
+    return result;
+  }, [additionalLines]);
+
   const prepaidDiscountAmount = financialSummary?.prepaidDiscountAmount ?? 0;
   const prepaidPaidAmount = financialSummary?.prepaidPaidAmount ?? 0;
   const additionalTotal = financialSummary?.additionalTotal ?? 0;
@@ -357,6 +472,34 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
     );
   };
 
+  const handleCompleteByoc = () => {
+    if (!sessionId) return;
+
+    Alert.alert(
+      'Xác nhận kết thúc phiên',
+      'Khách mang xe cá nhân (BYOC) đã hoàn thành ca chơi và thanh toán đủ các khoản phát sinh. Bạn có chắc chắn muốn kết thúc phiên chơi ngay?',
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Kết thúc ngay',
+          onPress: async () => {
+            setConfirmingCheckout(true);
+            try {
+              await staffApi.completeByocSession(sessionId);
+              Alert.alert('Thành công', 'Đã kết thúc phiên chơi xe cá nhân (BYOC) thành công.');
+              await loadSession(true);
+            } catch (error: any) {
+              const message = error?.response?.data?.message || 'Không thể kết thúc phiên chơi.';
+              Alert.alert('Lỗi', message);
+            } finally {
+              setConfirmingCheckout(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleBack = () => {
     if (router.canGoBack()) {
       router.back();
@@ -426,7 +569,7 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
                   <View className="flex-row items-center gap-1 rounded-full border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/60 px-2 py-0.5">
                     <Smartphone color="#0284c7" size={10} />
                     <Text className="text-[9px] text-sky-700 dark:text-sky-300 font-bold">
-                      Đặt qua App
+                      Đặt qua Web/App
                     </Text>
                   </View>
                 )}
@@ -469,10 +612,14 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
               >
                 {operationalTiming.state === 'OVERDUE'
                   ? `Phiên đã quá giờ ${operationalTiming.minutesPastPlannedEnd} phút`
-                  : 'Đã đến giờ trả xe'}
+                  : isByoc
+                    ? 'Đã hết giờ chơi'
+                    : 'Đã đến giờ trả xe'}
               </Text>
               <Text className="mt-1 text-[11px] leading-4 text-slate-500">
-                Xe vẫn được giữ trong phiên cho đến khi hoàn tất biên bản trả xe và xác nhận checkout.
+                {isByoc
+                  ? 'Phiên chơi xe cá nhân (BYOC) đã đến giờ kết thúc. Vui lòng thanh toán phát sinh và hoàn tất phiên.'
+                  : 'Xe vẫn được giữ trong phiên cho đến khi hoàn tất biên bản trả xe và xác nhận checkout.'}
               </Text>
             </View>
           )}
@@ -487,8 +634,10 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
             disputedNote={checkOutInspection?.staffNotes}
             onStartInspection={handleStartInspection}
             onConfirmCheckout={handleConfirmCheckout}
+            onCompleteByoc={handleCompleteByoc}
             confirmingCheckout={confirmingCheckout}
             operationalTiming={operationalTiming}
+            additionalOutstandingAmount={additionalOutstandingAmount}
           />
 
           <StaffSessionTools
@@ -732,27 +881,58 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
               </View>
               {onsiteFnbOrders.length > 0 ? (
                 <View className="gap-2 border-t border-slate-100 dark:border-slate-800 pt-3">
-                  {onsiteFnbOrders.map((order) => (
-                    <View key={order.orderId} className="gap-1.5 rounded-xl bg-slate-50 dark:bg-slate-900 p-3 border border-slate-200/60 dark:border-slate-800">
-                      {order.items.map((item, idx) => (
-                        <View key={idx} className="flex-row justify-between items-start gap-2">
-                          <View className="flex-1">
-                            <Text className="text-[12px] text-slate-900 dark:text-white font-semibold">
-                              {item.qty}x {item.name}
-                            </Text>
+                  {onsiteFnbOrders.map((order) => {
+                    const isOrderPaid = onsiteOrderPaidMap.get(order.orderId) ?? true;
+                    return (
+                      <View
+                        key={order.orderId}
+                        className={`gap-1.5 rounded-xl p-3 border ${
+                          isOrderPaid
+                            ? 'bg-slate-50 dark:bg-slate-900 border-slate-200/60 dark:border-slate-800'
+                            : 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800'
+                        }`}
+                      >
+                        {order.items.map((item, idx) => (
+                          <View key={idx} className="flex-row justify-between items-start gap-2">
+                            <View className="flex-1">
+                              <Text className="text-[12px] text-slate-900 dark:text-white font-semibold">
+                                {item.qty}x {item.name}
+                              </Text>
+                            </View>
+                            <View className="items-end">
+                              <Text className="text-[12px] text-slate-900 dark:text-white font-bold">
+                                {formatCurrency(item.price * item.qty)}
+                              </Text>
+                              <View className="flex-row items-center gap-1 mt-0.5">
+                                <Text className="text-[9px] text-amber-700 dark:text-amber-400 font-semibold">
+                                  {getFnbOrderStatusLabel(order.status)}
+                                </Text>
+                                <Text
+                                  className={`text-[9px] font-bold ${
+                                    isOrderPaid
+                                      ? 'text-emerald-700 dark:text-emerald-400'
+                                      : 'text-amber-800 dark:text-amber-300 font-extrabold'
+                                  }`}
+                                >
+                                  · {isOrderPaid ? 'Đã thanh toán' : 'Chờ thanh toán'}
+                                </Text>
+                              </View>
+                            </View>
                           </View>
-                          <View className="items-end">
-                            <Text className="text-[12px] text-slate-900 dark:text-white font-bold">
-                              {formatCurrency(item.price * item.qty)}
-                            </Text>
-                            <Text className="text-[9px] text-amber-700 dark:text-amber-400 font-semibold mt-0.5">
-                              {getFnbOrderStatusLabel(order.status)}
-                            </Text>
-                          </View>
-                        </View>
-                      ))}
+                        ))}
+                      </View>
+                    );
+                  })}
+                  {onsiteFnbOrders.length > 0 && pendingOnsiteFnbAmount > 0 && paidOnsiteFnbAmount > 0 && (
+                    <View className="flex-row justify-between items-center rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 p-2.5 mt-1">
+                      <Text className="text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold">
+                        Đã thanh toán: {formatCurrency(paidOnsiteFnbAmount)}
+                      </Text>
+                      <Text className="text-[10px] text-amber-800 dark:text-amber-300 font-bold">
+                        Chờ thanh toán: {formatCurrency(pendingOnsiteFnbAmount)}
+                      </Text>
                     </View>
-                  ))}
+                  )}
                 </View>
               ) : (
                 <Text className="text-[11px] text-slate-400 italic text-center py-2">
@@ -848,23 +1028,20 @@ export function StaffSessionDetailScreen({ sessionId }: { sessionId: string }) {
                 Chi phí phát sinh tại quầy
               </Text>
               <View className="gap-2">
-                {additionalLines.length > 0 ? (
-                  additionalLines.map((line) => {
-                    const isPaid = line.status === 'DISBURSED' || line.status === 'CAPTURED';
-                    return (
-                      <View key={line.componentId} className="rounded-xl bg-slate-50 dark:bg-slate-900/80 p-2.5 border border-slate-200/60 dark:border-slate-800">
-                        <View className="flex-row justify-between items-center">
-                          <Text className="text-[11px] text-slate-700 dark:text-slate-300 font-semibold">{line.label}</Text>
-                          <Text className="text-[12px] font-extrabold text-orange-600 dark:text-orange-400">
-                            +{formatCurrency(line.amount)}
-                          </Text>
-                        </View>
-                        <Text className={`text-[10px] font-bold mt-0.5 ${isPaid ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}`}>
-                          {isPaid ? '✓ Đã thanh toán' : '⏳ Chờ thanh toán'}
+                {groupedAdditionalLines.length > 0 ? (
+                  groupedAdditionalLines.map((line) => (
+                    <View key={line.id} className="rounded-xl bg-slate-50 dark:bg-slate-900/80 p-2.5 border border-slate-200/60 dark:border-slate-800">
+                      <View className="flex-row justify-between items-center">
+                        <Text className="text-[11px] text-slate-700 dark:text-slate-300 font-semibold">{line.label}</Text>
+                        <Text className="text-[12px] font-extrabold text-orange-600 dark:text-orange-400">
+                          +{formatCurrency(line.amount)}
                         </Text>
                       </View>
-                    );
-                  })
+                      <Text className={`text-[10px] font-bold mt-0.5 ${line.paid ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}`}>
+                        {line.paid ? '✓ Đã thanh toán' : '⏳ Chờ thanh toán'}
+                      </Text>
+                    </View>
+                  ))
                 ) : (
                   <Text className="text-[11px] text-slate-400 italic">Không phát sinh chi phí tại quầy.</Text>
                 )}
@@ -1076,8 +1253,10 @@ function SessionOperations({
   disputedNote,
   onStartInspection,
   onConfirmCheckout,
+  onCompleteByoc,
   confirmingCheckout,
   operationalTiming,
+  additionalOutstandingAmount = 0,
 }: {
   status: string;
   isByoc: boolean;
@@ -1088,8 +1267,10 @@ function SessionOperations({
   disputedNote?: string;
   onStartInspection: (type: StaffInspectionType) => void;
   onConfirmCheckout: () => void;
+  onCompleteByoc?: () => void;
   confirmingCheckout: boolean;
   operationalTiming: SessionOperationalTiming;
+  additionalOutstandingAmount?: number;
 }) {
   const canSubmitCheckIn = status === 'CHECKED_IN' && !hasCheckInInspection;
   const canSubmitCheckOut =
@@ -1136,7 +1317,7 @@ function SessionOperations({
           >
             <CheckCircle2 color="#ffffff" size={16} />
             <Text className="text-[12px] text-white" weight="700">
-              Tạo biên bản nhận xe
+              {isByoc ? 'Chụp ảnh xe vào sân' : 'Tạo biên bản nhận xe'}
             </Text>
           </Pressable>
         ) : null}
@@ -1203,11 +1384,35 @@ function SessionOperations({
           </View>
         ) : null}
 
-        {!canSubmitCheckIn && !canSubmitCheckOut && status !== 'CHECKING_OUT' ? (
+        {isByoc && ['ACTIVE', 'EXTENDING'].includes(status) ? (
+          additionalOutstandingAmount === 0 ? (
+            <Pressable
+              disabled={confirmingCheckout}
+              onPress={onCompleteByoc}
+              className="h-11 flex-row items-center justify-center gap-2 rounded-xl bg-emerald-600 active:bg-emerald-700 shadow-sm"
+            >
+              {confirmingCheckout ? (
+                <ActivityIndicator color="#ffffff" size="small" />
+              ) : (
+                <CheckCircle2 color="#ffffff" size={16} />
+              )}
+              <Text className="text-[12px] text-white" weight="700">
+                Kết thúc phiên chơi (BYOC)
+              </Text>
+            </Pressable>
+          ) : (
+            <View className="rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-3 flex-row items-center gap-2">
+              <AlertTriangle color="#f59e0b" size={15} />
+              <Text className="flex-1 text-[11px] text-amber-900 dark:text-amber-200 font-semibold leading-4">
+                Còn {additionalOutstandingAmount.toLocaleString('vi-VN')}đ phí phát sinh. Vui lòng quyết toán trước khi kết thúc phiên.
+              </Text>
+            </View>
+          )
+        ) : null}
+
+        {!canSubmitCheckIn && !canSubmitCheckOut && status !== 'CHECKING_OUT' && !isByoc ? (
           <Text className="text-[11px] leading-4 text-slate-500">
-            {isByoc
-              ? 'Phiên mang xe cá nhân (BYOC) không yêu cầu lập biên bản trả xe.'
-              : 'Không có thao tác kiểm xe cần xử lý ở trạng thái hiện tại.'}
+            Không có thao tác kiểm xe cần xử lý ở trạng thái hiện tại.
           </Text>
         ) : null}
       </View>

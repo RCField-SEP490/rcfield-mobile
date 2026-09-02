@@ -147,6 +147,31 @@ class WebSocketClient {
     const role = useAuthStore.getState().role;
 
     switch (event) {
+      case 'BOOKING_CHECKED_IN': {
+        const bookingId =
+          data?.bookingId ||
+          data?.booking_id ||
+          data?.data?.bookingId ||
+          data?.data?.booking_id;
+        Alert.alert(
+          'Đã bắt đầu check-in',
+          'Nhân viên trực ca đang tiến hành kiểm tra xe và hỗ trợ bạn vào sân.',
+          [
+            ...(bookingId
+              ? [
+                  {
+                    text: 'Xem đơn đặt',
+                    onPress: () => {
+                      router.navigate(`/booking/${bookingId}` as any);
+                    },
+                  },
+                ]
+              : []),
+            { text: 'Đóng', style: 'cancel' },
+          ]
+        );
+        break;
+      }
       case 'SESSION_CHECKIN_INSPECTION': {
         const bookingId =
           data?.bookingId ||
@@ -315,8 +340,8 @@ class WebSocketClient {
       case 'SESSION_OVERDUE_ALERT':
         if (role !== 'customer') {
           Alert.alert(
-            'Phiên chạy quá giờ chưa trả xe',
-            data?.message || 'Vui lòng kiểm tra và hoàn tất trả xe cho phiên này.'
+            'Phiên chơi quá giờ chưa kết thúc',
+            data?.message || 'Vui lòng kiểm tra và hoàn tất kết thúc phiên này.'
           );
         }
         break;

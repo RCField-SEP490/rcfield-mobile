@@ -179,7 +179,10 @@ export function StaffBookingsScreen() {
       const newSessionId = session?.sessionId ?? session?.id;
       await loadBookings(true);
       if (newSessionId) {
-        router.push(`/staff/session/${newSessionId}` as any);
+        router.push({
+          pathname: '/staff/inspection/[sessionId]',
+          params: { sessionId: newSessionId, type: 'CHECK_IN' },
+        } as any);
       } else {
         Alert.alert('Đã check-in', 'Phiên đã được tạo.');
       }
@@ -346,13 +349,18 @@ function BookingCard({
           : booking.status;
   const customerName = getCustomerName(booking);
   const isWalkIn = (booking as any).source === 'STAFF_MANUAL' || (booking as any).source === 'WALK_IN';
+  const isByoc = (booking as any).play_mode === 'BYOC' || (booking as any).playMode === 'BYOC';
   const canOpenSession = !!sessionId;
   const canCheckIn = !sessionId && !checkInExpired && booking.status === 'CONFIRMED';
   const actionLabel = canOpenSession
     ? session?.status === 'CHECKING_OUT'
-      ? 'Tiếp tục trả xe'
+      ? isByoc
+        ? 'Hoàn tất phiên'
+        : 'Tiếp tục trả xe'
       : timing.state === 'DUE_FOR_CHECKOUT' || timing.state === 'OVERDUE'
-        ? 'Xử lý trả xe'
+        ? isByoc
+          ? 'Xử lý phiên'
+          : 'Xử lý trả xe'
         : 'Xem chi tiết'
     : checkInExpired
       ? 'Quá giờ'
@@ -360,7 +368,9 @@ function BookingCard({
         ? 'Đã hủy'
         : booking.status === 'COMPLETED'
           ? 'Đã hoàn tất'
-          : 'Nhận xe';
+          : isByoc
+            ? 'Vào sân'
+            : 'Nhận xe';
   const canAct = canOpenSession || canCheckIn;
 
   return (
@@ -385,7 +395,7 @@ function BookingCard({
               <View className="flex-row items-center gap-1 rounded-full border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/60 px-2 py-0.5">
                 <Smartphone color="#0284c7" size={9} />
                 <Text className="text-[9px] text-sky-700 dark:text-sky-300 font-bold uppercase">
-                  App
+                  Web/App
                 </Text>
               </View>
             )}
@@ -420,8 +430,10 @@ function BookingCard({
             weight="700"
           >
             {timing.state === 'OVERDUE'
-              ? `Quá giờ ${timing.minutesPastPlannedEnd} phút${timing.shouldAlert ? ' · Cần xử lý trả xe' : ''}`
-              : 'Đã đến giờ trả xe · Vui lòng hoàn tất biên bản trả xe'}
+              ? `Quá giờ ${timing.minutesPastPlannedEnd} phút${timing.shouldAlert ? (isByoc ? ' · Cần đóng ca' : ' · Cần xử lý trả xe') : ''}`
+              : isByoc
+                ? 'Đã hết giờ chơi · Sẵn sàng hoàn tất phiên'
+                : 'Đã đến giờ trả xe · Vui lòng hoàn tất biên bản trả xe'}
           </Text>
         </View>
       ) : null}

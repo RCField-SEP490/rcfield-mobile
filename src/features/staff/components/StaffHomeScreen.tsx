@@ -153,7 +153,10 @@ export function StaffHomeScreen() {
       Alert.alert('Đã bắt đầu check-in', `Phiên ${shortId(newSessionId || booking.bookingId)} đã được tạo.`);
       await loadData(true);
       if (newSessionId) {
-        router.push(`/staff/session/${newSessionId}` as any);
+        router.push({
+          pathname: '/staff/inspection/[sessionId]',
+          params: { sessionId: newSessionId, type: 'CHECK_IN' },
+        } as any);
       }
     } catch (error: any) {
       const message = error?.response?.data?.message || 'Không thể bắt đầu check-in.';
@@ -543,7 +546,9 @@ function BookingRow({
         ? 'Đã hủy'
         : booking.status === 'COMPLETED'
           ? 'Đã hoàn tất'
-          : 'Nhận xe';
+          : (booking as any).play_mode === 'BYOC' || (booking as any).playMode === 'BYOC'
+            ? 'Vào sân'
+            : 'Nhận xe';
   const customer = booking.participantDetails?.[0]?.name || booking.plannedParticipants?.[0] || 'Khách hàng';
 
   return (

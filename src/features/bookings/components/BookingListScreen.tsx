@@ -202,7 +202,12 @@ export function BookingListScreen() {
       : isSessionActive
         ? sessStatus!
         : item.status;
-    const status = STATUS_CONFIG[displayStatus] ?? STATUS_CONFIG.PENDING;
+    const isByoc = item.playMode === 'BYOC' || (item as any).play_mode === 'BYOC';
+    const baseStatus = STATUS_CONFIG[displayStatus] ?? STATUS_CONFIG.PENDING;
+    const status = {
+      ...baseStatus,
+      label: displayStatus === 'CHECKED_IN' && isByoc ? 'Đang vào sân' : baseStatus.label,
+    };
     const StatusIcon = status.icon;
 
     const slotStart = new Date(item.slotStart);
@@ -266,7 +271,7 @@ export function BookingListScreen() {
               <View
                 className={cn(
                   'px-2 py-0.5 rounded-md border',
-                  item.playMode === 'RENTAL'
+                  !isByoc
                     ? 'bg-orange-500/5 border-orange-500/10'
                     : 'bg-blue-500/5 border-blue-500/10'
                 )}
@@ -274,10 +279,10 @@ export function BookingListScreen() {
                 <Text
                   className={cn(
                     'text-[9px] font-bold uppercase',
-                    item.playMode === 'RENTAL' ? 'text-orange-500' : 'text-blue-400'
+                    !isByoc ? 'text-orange-500' : 'text-blue-500 dark:text-blue-400'
                   )}
                 >
-                  {item.playMode === 'RENTAL' ? 'Thuê xe' : 'Xe riêng'}
+                  {!isByoc ? 'Thuê xe' : 'Xe riêng (BYOC)'}
                 </Text>
               </View>
             </View>

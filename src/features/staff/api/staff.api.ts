@@ -185,7 +185,7 @@ export interface StaffSessionDetail {
     prepaidLines: { componentId: string; label: string; amount: number }[];
     prepaidDiscountAmount: number;
     prepaidPaidAmount: number;
-    additionalLines: { componentId: string; label: string; amount: number; status: string }[];
+    additionalLines: { componentId: string; type?: string; label: string; amount: number; status: string }[];
     additionalTotal: number;
     additionalOutstandingAmount: number;
     totalPaidAmount: number;
@@ -485,6 +485,14 @@ export const staffApi = {
       success: boolean;
       data: any;
     }>(`/staff/bookings/${bookingId}/confirm-bank-transfer`);
+    return response.data.data;
+  },
+
+  async completeByocSession(sessionId: string): Promise<any> {
+    const response = await api.post<{
+      success: boolean;
+      data: any;
+    }>(`/staff/sessions/${sessionId}/complete-byoc`);
     return response.data.data;
   },
 };
